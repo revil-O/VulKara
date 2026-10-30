@@ -10,13 +10,6 @@ import type { ViewerPayload } from '@shared/api'
 
 const payloads = new Map<number, ViewerPayload>()  // by the id of the window's page
 const windows = new Set<BrowserWindow>()
-let changed: (open: boolean) => void = () => {}
-
-/** told whether a viewer window is open, after each one opens or closes */
-export function onViewersChange(fn: (open: boolean) => void): void {
-  changed = fn
-}
-
 export const isViewer = (sender: WebContents): boolean => payloads.has(sender.id)
 export const viewerPayload = (sender: WebContents): ViewerPayload | undefined => payloads.get(sender.id)
 
@@ -45,9 +38,7 @@ export function openViewer(payload: ViewerPayload, opener?: BrowserWindow): void
   win.on('closed', () => {
     payloads.delete(id)
     windows.delete(win)
-    changed(windows.size > 0)
   })
-  changed(true)
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://')) void shell.openExternal(url)
     return { action: 'deny' }

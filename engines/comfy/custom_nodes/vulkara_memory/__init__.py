@@ -12,10 +12,13 @@ unpadded such heads hold the whole attention matrix. The VAE keeps its split att
 fit ends the process instead of raising, so ComfyUI's fallback to slices would never run.
 
 An FP8 model stays in 16 bit: ComfyUI keeps one in FP8 where 16 bit would not fit, but MPS cannot cast FP8 ("Undefined
-type Float8_e4m3fn" at the first step), so a Mac short of memory swaps instead of stopping the job.
+type Float8_e4m3fn" at the first step), so a Mac short of memory swaps instead of stopping the job. And a model that
+may run in float16 does so instead of bfloat16: MPS computes bfloat16 at half the speed (MEASUREMENTS 7ab). Of the
+models VulKara runs here that is Anima alone (Lumina 2 allows only bfloat16, AuraFlow and Wan pick float16 already).
 """
 import asyncio
 import comfy.model_management as mm
+import torch
 import torch.nn.functional as F
 from aiohttp import web
 from server import PromptServer
@@ -38,19 +41,23 @@ def pad_attention():
     F.scaled_dot_product_attention = padded
 
 
-def no_fp8_weights():
+def mac_weights():
     unet_dtype = mm.unet_dtype
 
     def dtype(*args, **kwargs):
         dt = unet_dtype(*args, **kwargs)
-        if dt in mm.FLOAT8_TYPES and mm.get_torch_device().type == "mps":
+        if mm.get_torch_device().type != "mps":
+            return dt
+        if dt in mm.FLOAT8_TYPES:
             dt = unet_dtype(*args, **dict(kwargs, weight_dtype=None))
+        if dt == torch.bfloat16 and torch.float16 in (kwargs.get("supported_dtypes") or ()):
+            dt = torch.float16
         return dt
     mm.unet_dtype = dtype
 
 
 pad_attention()
-no_fp8_weights()
+mac_weights()
 mm.pytorch_attention_enabled_vae = lambda: False
 
 MODES = {"SHARED": mm.VRAMState.SHARED, "LOW_VRAM": mm.VRAMState.LOW_VRAM}

@@ -1,11 +1,13 @@
 <!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 · Copyright (C) 2026 Oliver Schmidt -->
 <script setup lang="ts">
 // What changed from version to version: the changelog shipped with the app, newest first.
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { RefreshCw } from 'lucide-vue-next'
 import PageFrame from '../components/PageFrame.vue'
 import { isRemote } from '../remote_vk'
 import { parseChangelog } from '../util/changelog'
+import { useAppUpdateStore } from '../stores/appUpdate'
 import { t } from '../i18n'
 import text from '../../../../CHANGELOG.md?raw'
 import type { AppUpdateState } from '@shared/api'
@@ -14,15 +16,12 @@ const versions = parseChangelog(text)
 const installed = ref('')
 // the app's update check (the banner offers the update itself); not in the remote web UI
 const remote = isRemote()
-const update = ref<AppUpdateState>()
-let off: (() => void) | undefined
+const updates = useAppUpdateStore()
+const { state: update } = storeToRefs(updates)
 onMounted(async () => {
   installed.value = (await window.vk.app.info()).version
-  if (remote) return
-  off = window.vk.app.onUpdate((s) => (update.value = s))
-  update.value = await window.vk.app.update()
+  if (!remote) updates.start()
 })
-onUnmounted(() => off?.())
 function check(): void {
   void window.vk.app.checkUpdate()
 }

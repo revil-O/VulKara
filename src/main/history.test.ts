@@ -16,13 +16,14 @@ describe('history', () => {
   it('keeps entries across restarts, newest first', () => {
     const dir = folder()
     const h = new History(() => dir)
-    h.add(job('a', 'a lighthouse'), ['/i/a.png'], 100)
+    h.add(job('a', 'a lighthouse'), ['/i/a.png'], 100, { seconds: 61.5, secondsPerStep: 2.1 })
     h.add({ ...job('b', 'a fox'), consent: true }, ['/i/b.mp4'], 200)
     const again = new History(() => dir).list({})
     expect(again.total).toBe(2)
     expect(again.entries.map((e) => e.id)).toEqual(['b', 'a'])
     expect(again.entries[0]).toMatchObject({ kind: 'video', modelName: 'SD-1.5' })
     expect('consent' in again.entries[0].job).toBe(false)
+    expect(again.entries[1]).toMatchObject({ seconds: 61.5, secondsPerStep: 2.1 })
   })
 
   it('knows its results and the pictures its jobs started from, also after a restart and a removal', () => {

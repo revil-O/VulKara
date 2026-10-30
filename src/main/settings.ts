@@ -37,6 +37,7 @@ const VALID: { [K in keyof Settings]: (v: unknown) => boolean } = {
   comfyStreaming: (v) => typeof v === 'boolean',
   streamCacheDir: folder,
   stepCache: (v) => ['off', 'light', 'strong'].includes(v as string),
+  idleUnloadMinutes: (v) => [0, 5, 10, 30, 60].includes(v as number),
   runtime: (v) => ['auto', 'diffusers', 'mlx'].includes(v as string),
   allowExplicit: (v) => typeof v === 'boolean',
   notifySound: (v) => typeof v === 'boolean',

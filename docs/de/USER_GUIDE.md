@@ -843,6 +843,12 @@ Was beim Import passiert:
   auch das nicht und erlaubt das Modell es, wird es für SSD-Streaming markiert (siehe unten). Ein Modell, das immer noch
   nicht passt, wird mit *Braucht mehr Arbeitsspeicher, als dieser Mac hat* markiert, und **Trotzdem importieren**
   importiert es dennoch.
+- **In Stufen**: Vor dem Streaming läuft ein Modell, das nicht neben seinen Text-Encoder passt, in Stufen: Ein neuer
+  Prompt wird mit dem Text-Encoder allein kodiert (das Modell ist so lange nicht im Speicher), danach wird das Modell
+  in 8 Bit geladen und macht das Bild. Ein Prompt aus dem Prompt-Cache braucht keinen der beiden Schritte. So läuft
+  Qwen-Image 2.1 auf einem Mac mit 16 GB: etwa so schnell wie gestreamt in 16 Bit (1 830 s statt 1 700–1 860 s bei
+  1024 px und 40 Schritten), mit weniger Speicher und ohne pro Bild rund 380 GB von der SSD zu lesen. *Immer* unter
+  Einstellungen → Engine → *Große Modelle Stück für Stück von der SSD laden* streamt stattdessen in 16 Bit.
 - **SSD-Streaming**: Ein 16-Bit-Modell, das nicht in den Arbeitsspeicher passt, kann trotzdem laufen: Sein Denoiser wird
   einmal, Block für Block, in den *Cache für SSD-Streaming* geschrieben (etwa doppelt so groß wie das Modell, im Ordner
   des Modells oder in dem in den Einstellungen festgelegten Ordner), und während ein Bild entsteht, wird jeder Block
@@ -877,7 +883,8 @@ Jeder fertige Auftrag, der neueste zuerst, mit allen seinen Einstellungen.
 Das Feld eines einzelnen Eintrags zeigt das Bild groß (bis zur halben Fensterbreite; ein Bild im Hochformat nur so hoch wie ein quadratisches) und darunter im linken Drittel alle
 seine Tasten untereinander: **Favorit**, **Speichern unter**, **Im Finder anzeigen**, **Teilen** und **Bild kopieren** für
 jedes Bild, dann die drei Tasten des Eintrags. Daneben stehen, durch eine Linie getrennt, die Einstellungen, dann Prompt und negativer Prompt unter eigenen Überschriften.
-Solange die große Ansicht offen ist, zeigt das Feld nur die Tasten.
+Sie bleiben stehen, auch während die große Ansicht offen ist. **Laufzeit** zeigt, wie lange der Auftrag lief (mit Laden),
+und seine Sekunden pro Schritt (Einträge ab 0.7.10): ein Bild, das viel länger brauchte als die vorigen, fällt so auf.
 
 - **Diese Einstellungen verwenden** übernimmt Prompt, Modell, Stil, Größe, Seed, LoRAs und alle anderen Einstellungen
   wieder in die Seite, von der der Auftrag kam. Das Modell wird auch dann wiedergefunden, wenn sein Ordner verschoben
@@ -931,7 +938,8 @@ Video.
 
 ![Große Ansicht](../screenshots/de/viewer.jpg)
 
-Ein Klick auf ein Ergebnis öffnet es in einem **eigenen Fenster**. Es können mehrere große Ansichten offen sein; wer
+Ein Klick auf ein Ergebnis öffnet es in einem **eigenen Fenster**; ein durchscheinendes Band unten auf jedem solchen Bild
+sagt das („Klicken für Vorschau“; in der Web-Oberfläche „Klicken für die große Ansicht“). Es können mehrere große Ansichten offen sein; wer
 zurück ins Hauptfenster geht, schließt sie alle. Ist die App im Vollbildmodus, öffnet sich die große Ansicht als Fenster darüber im selben Space (statt in
 einem eigenen Vollbild-Space ohne Titelleiste), so verdeckt sie die App nie unerreichbar.
 
@@ -982,11 +990,13 @@ Es wird kein Token gesendet und nichts über deine Dateien; gelesen werden nur d
 
 #### App-Updates
 
-Mit derselben täglichen Prüfung (und **Nach Update suchen** auf der Seite Änderungen) fragt VulKara GitHub nach seinem
+Mit derselben täglichen Prüfung (und **Auf Update prüfen** auf der Seite Änderungen) fragt VulKara GitHub nach seinem
 neuesten Release. Gibt es ein neueres, sagt es eine Karte in der Ecke: **Aktualisieren und neu starten** lädt es,
 prüft es (die SHA-256-Prüfsumme, die GitHub für die Datei angibt, die Version darin, die Developer-ID-Signatur der
 VulKara-Releases und Gatekeeper) und setzt es an die Stelle der App, sobald VulKara beendet ist; dann startet die neue
 Version. **Was ist neu** öffnet die Release-Notizen, **Später** blendet die Karte bis zur nächsten Version aus.
+Die Titelzeile jeder Seite zeigt die Version (*v0.7.9*, ein Klick öffnet die Änderungen) oder bei einer neueren
+*Update auf Version … vorhanden!*: ein Klick holt die Karte zurück.
 Aktualisiert wird nur, während nichts erzeugt oder installiert wird, und nur eine App in einem Ordner, in den sie
 schreiben darf (in Programme, nicht aus dem Disk-Image gestartet). Mit Homebrew installiert? Das geht genauso;
 `brew upgrade --cask vulkara` auch.
@@ -1021,6 +1031,9 @@ Weg, einen Ordner festzulegen; **Standard** kehrt zum Standardordner zurück.
   16 GB etwa 88 s pro Schritt statt 225 s mit dem ganzen Modell im Speicher (macOS lagert aus); auf 24 GB passt das
   Modell und wird ganz geladen (44 s; stückweise wären es 50 s). Modelle, die passen, betrifft das nicht; safetensors
   werden immer ganz gelesen.
+- **Speicher im Leerlauf freigeben**: *Nach 10 Min.* (Standard), 5, 30 oder 60 Min. oder *Nie*. Kommt so lange kein
+  Job, geben die Engines ihr geladenes Modell frei, und der Speicher steht anderen Programmen zur Verfügung; das nächste
+  Bild lädt es wieder. Gemessen mit Z-Image Turbo (MLX): nach einem Bild hielten die Engines 7,5 GB, freigegeben 1,1 GB.
 - **Schritt-Cache**: *Aus* (Standard), *Leicht* oder *Stark*. Schritte, die das Bild kaum verändern, verwenden den
   vorigen Schritt wieder, statt vollständig berechnet zu werden; ein gestreamtes Modell liest diese Blöcke dann gar
   nicht erst von der SSD. FLUX.1 [dev] mit 28 Schritten: *Leicht* verwendet etwa 5 Schritte wieder (etwa 1,2× schneller,

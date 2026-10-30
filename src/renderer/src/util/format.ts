@@ -13,6 +13,10 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))} h`
 }
 
+/** 2.345 -> "2.35 s/step" (in the number format of the language) */
+export const perStep = (seconds: number): string =>
+  t('jobs.perStep', { seconds: seconds.toLocaleString(numLocale(), { maximumFractionDigits: 2, useGrouping: false }) })
+
 const PAGE_NAMES: Record<string, PlainKey> = {
   text: 'jobs.pages.text', image: 'jobs.pages.image', inpaint: 'jobs.pages.inpaint', canvas: 'jobs.pages.canvas', video: 'jobs.pages.video',
   upscale: 'jobs.pages.upscale', illusion: 'jobs.pages.illusion', lora: 'jobs.pages.lora', start: 'jobs.pages.start',
@@ -43,6 +47,6 @@ export function jobProgress(q: QueuedJob): string {
   if (q.progress > 0) parts.push(`${Math.round(q.progress)} %`)
   else if (q.status) parts.push(q.status)
   if (q.eta !== undefined) parts.push(t('jobs.left', { time: formatDuration(q.eta) }))
-  if (q.secondsPerStep) parts.push(t('jobs.perStep', { seconds: q.secondsPerStep.toLocaleString(numLocale(), { maximumFractionDigits: 2, useGrouping: false }) }))
+  if (q.secondsPerStep) parts.push(perStep(q.secondsPerStep))
   return parts.join(' · ') || t('jobs.starting')
 }

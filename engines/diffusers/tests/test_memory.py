@@ -152,3 +152,22 @@ def test_attention_with_a_head_size_mps_does_not_fuse_is_padded_to_the_same_resu
     padded = F.scaled_dot_product_attention(q, k, v)
     assert getattr(F.scaled_dot_product_attention, "vk_padded", False) and padded.shape == plain.shape
     assert (padded - plain).abs().max().item() < 1e-3
+
+
+def test_qwen_image21_runs_in_stages_on_16gb_instead_of_streaming():
+    comps = {"text_encoder": 8.77, "transformer": 7.12, "vae": 0.34}  # Qwen-Image 2.1
+    assert not memory.plan(comps, "transformer", "qwen_image21", 16)["fits"]  # the engine streamed it before (7s, 7w)
+    p = memory.fitting_plan(comps, "transformer", "qwen_image21", 16)
+    assert p["fits"] and p["releases_denoiser"] and p["staged_text_encoder"]
+    assert p["quant"] == {"transformer": "q8", "text_encoder": "q8"}
+    # bigger Macs keep the denoiser while encoding; a plan that fits as it is stays as it is
+    assert not memory.fitting_plan(comps, "transformer", "qwen_image21", 24).get("releases_denoiser")
+    sdxl = {"unet": 2.6, "text_encoder": 0.8, "vae": 0.1}
+    assert memory.fitting_plan(sdxl, "unet", "sdxl", 16) == memory.plan(sdxl, "unet", "sdxl", 16)
+
+
+def test_staging_that_frees_the_denoiser_still_counts_a_second_one():
+    # Ideogram 4: encoding frees the transformer, its unconditional twin (4 B, 8 bit) stays loaded beside the encoder
+    comps = {"transformer": 4.0, "unconditional_transformer": 4.0, "text_encoder": 12.0, "vae": 0.1}
+    p = memory.plan(comps, "transformer", "ideogram4", 24, quant="q8", staging_frees_denoiser=True)
+    assert p["staged_text_encoder"] and p["est_peak_gb"] >= p["text_gb"] + 4.0

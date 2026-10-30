@@ -16,6 +16,9 @@
   --danger: #f06a6a;
   --ok: #56c38d;
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  /* a see-through grey band over a picture (OpenHint) */
+  --scrim: rgba(37, 41, 49, 0.6);
+  --scrim-text: #e9e7e2;
 
   --radius-s: 6px;
   --radius-m: 10px;
@@ -44,6 +47,8 @@
     --danger: #c63d3d;
     --ok: #23895a;
     --shadow: 0 12px 32px rgba(40, 30, 20, 0.16);
+    --scrim: rgba(238, 236, 231, 0.62);
+    --scrim-text: #1d1f24;
     color-scheme: light;
   }
 }

@@ -49,6 +49,7 @@ def main(job_path):
     if model.spec["family"] != "sdxl":
         raise ValueError("Diffusers training supports SDXL models; FLUX.2 [klein] and Krea 2 train with MLX")
     model.load()
+    model.ensure_denoiser()  # a plan in stages loads the pipeline without its UNet
     pipe = model.pipe
 
     # pictures and captions are encoded once

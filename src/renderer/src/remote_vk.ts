@@ -5,8 +5,7 @@
 // the access token, which comes with the link once and is kept in this browser.
 
 import { makeApi } from '@shared/bridge'
-import { watch } from 'vue'
-import { showViewer, viewerOverlay } from './viewer_overlay'
+import { showViewer } from './viewer_overlay'
 import type { VulkaraApi } from '@shared/api'
 
 const KEY = 'vk.remoteToken'
@@ -97,7 +96,6 @@ export function installRemoteVk(token: string, unauthorized: () => void): void {
   })
   // a browser has no second window: the large view opens over the page (App.vue), the rest of viewer stays unused
   api.viewer.open = (items, index) => { showViewer(items, index); return Promise.resolve() }
-  api.viewer.onOpen = (fn) => watch(viewerOverlay, (v) => fn(!!v))
   // a model's or licence's page opens in this browser, not on the Mac (links.ts lets only https:// through)
   api.app.openExternal = (link) => { window.open(link, '_blank', 'noopener'); return Promise.resolve() }
   ;(window as { vk?: VulkaraApi }).vk = api

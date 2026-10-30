@@ -2,17 +2,19 @@
 <script setup lang="ts">
 // A newer VulKara on GitHub: update and restart, read what is new, or later (until the next version). Shows the
 // download and the check of the update while they run.
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { Download, ExternalLink, RotateCw, X } from 'lucide-vue-next'
 import { t } from '../i18n'
 import { cleanError } from '../stores/runtimes'
-import type { AppUpdateState } from '@shared/api'
+import { useAppUpdateStore } from '../stores/appUpdate'
 
 const DISMISSED = 'vk.updateLater'
-const state = ref<AppUpdateState>()
+const updates = useAppUpdateStore()
+const { state } = storeToRefs(updates)
 const later = ref(readLater())
 const failed = ref('')
-let off: (() => void) | undefined
+const installButton = ref<HTMLButtonElement>()
 
 function readLater(): string {
   try {
@@ -22,11 +24,13 @@ function readLater(): string {
   }
 }
 
-onMounted(async () => {
-  off = window.vk.app.onUpdate((s) => (state.value = s))
-  state.value = await window.vk.app.update()
+onMounted(() => updates.start())
+// the page header's notice: the card comes back (also after Later) with its button focused
+watch(() => updates.shown, async () => {
+  later.value = ''
+  await nextTick()
+  installButton.value?.focus()
 })
-onUnmounted(() => off?.())
 
 const shown = computed(() => {
   const s = state.value
@@ -78,7 +82,7 @@ function dismiss(): void {
       </p>
       <p v-if="error" class="error selectable">{{ t('app.update.failed', { reason: error }) }}</p>
       <div class="actions">
-        <button v-if="!stuck" class="btn primary small" @click="install">
+        <button v-if="!stuck" ref="installButton" class="btn primary small" @click="install">
           <component :is="error ? RotateCw : Download" :size="13" /> {{ error ? t('app.update.retry') : t('app.update.install') }}
         </button>
         <button class="btn small" @click="notes"><ExternalLink :size="13" /> {{ t('app.update.notes') }}</button>

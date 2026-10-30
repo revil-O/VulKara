@@ -34,6 +34,30 @@ def test_streamed_blocks_give_the_same_result_and_stay_off_memory(tmp_path):
     assert model.single_transformer_blocks[1].weight.device.type == "meta"
 
 
+def test_on_mps_at_most_two_streamed_blocks_wait_on_the_gpu(tmp_path, monkeypatch):
+    if not torch.backends.mps.is_available():
+        return
+    queued = []  # events not yet waited for, at each load
+
+    class Event:
+        def record(self):
+            queued.append(self)
+
+        def synchronize(self):
+            queued.remove(self)
+    monkeypatch.setattr(torch.mps, "Event", Event)
+    torch.manual_seed(0)
+    model, x = Toy(), torch.randn(2, 8)
+    expected = model(x)
+    streaming.enable(model, torch.device("mps"), torch.float32, str(tmp_path))
+    seen = []
+    for b in list(model.transformer_blocks) + list(model.single_transformer_blocks):
+        b.register_forward_pre_hook(lambda m, a: seen.append(len(queued)))
+    out = model(x.to("mps"))
+    assert torch.allclose(out.cpu(), expected, atol=1e-5)
+    assert seen and max(seen) <= streaming.QUEUED - 1
+
+
 def test_loras_are_merged_while_streaming_and_removed_again(tmp_path):
     torch.manual_seed(0)
     model, x = Toy(), torch.randn(2, 8)

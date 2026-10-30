@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.7.10 – 2026-10-30
+
+- **Qwen-Image 2.1 on a 16 GB Mac without SSD streaming.** A model that does not fit beside its text encoder now runs
+  in stages before it is streamed: a new prompt is encoded with the text encoder alone, then the model is loaded in 8
+  bit; a prompt from the prompt cache needs neither. Qwen-Image 2.1: about as fast as streamed (1 830 s per picture at
+  1024 px), at most 9.9–12.2 GB instead of 12.1 GB, and 20 GB read from the disk instead of about 380 GB per picture.
+  Streaming in 16 bit stays available (Settings → Engine → *Always*).
+- **The version in the title row of every page.** Beside Discord each page shows *v0.7.9* (a click opens the
+  Changelog) or, when a newer version is out, *Update to version … available!*: a click brings back the card with
+  **Update and restart**, also after **Later**. The Changelog page's button is now called **Check for update**.
+- **Memory back to the Mac when idle.** After 10 minutes without a job (Settings → Engine: 5, 10, 30 or 60 minutes,
+  or never) the engines free their loaded model; the next picture loads it again. Z-Image Turbo: 7.5 GB held before,
+  1.1 GB after.
+- **Pictures say that a click opens them.** Results on the pages and the picture in the History carry a see-through
+  band along their bottom: *Click to show preview* (in light and dark, in all five languages; in the
+  remote web UI *Click for the large view*). A picture's label and its (i) sit in that band.
+- **Fixed:** the History hid the settings and prompts of the selected entry while its large view was open.
+- **Run time in the History.** Every new entry keeps how long its job ran (loading included) and its seconds per
+  step; the History shows them under *Run time*, so a picture that took much longer than the ones before stands out.
+- **Streamed models stay in their memory when the GPU is busy.** A model streamed from the SSD let blocks pile up while
+  the GPU was busy with other programs, each holding its weights: FLUX.2 [klein] 9B on a 16 GB plan rose to 19.6 GB
+  and the Mac swapped. Now at most two blocks wait on the GPU: 14.3 GB, and the picture is faster (225 instead of 279 s).
+- **Anima faster on the Mac.** ComfyUI ran Anima models in bfloat16, which MPS computes at half the speed of float16;
+  they now run in float16 (MiaoMiao RealSkin at 1024 × 1536: 92 instead of 117–130 s per step on an M2).
+
 ## 0.7.9 – 2026-10-29
 
 - **Prompt cache for MLX models too.** Z-Image, Krea 2 and Ideogram 4 on a 16 GB Mac load their text encoder only for

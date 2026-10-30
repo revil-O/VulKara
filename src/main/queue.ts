@@ -22,8 +22,8 @@ export interface QueueDeps<E = string> {
   check(path: string, model: string, label?: AiLabel): Promise<{ ok: boolean; reason?: string }>
   now(): number
   changed(): void
-  /** a job ended with results (after the content filter) */
-  finished?(job: Job, results: string[]): void
+  /** a job ended with results (after the content filter), with how long it ran */
+  finished?(job: Job, results: string[], timing: { seconds?: number; secondsPerStep?: number }): void
   /** a result the content filter did not pass (or could not check) is removed from the disk */
   discard?(path: string): void
   /** whether an input picture is VulKara's own making with no real photo behind it (a pose editor skeleton): no
@@ -226,7 +226,8 @@ export class JobQueue<E = string> {
       entry.error = t('main.queue.noResult')
     }
     try {
-      if (entry.results.length) this.deps.finished?.(entry.job, [...entry.results])
+      const seconds = entry.startedAt !== undefined ? Math.round((entry.finishedAt - entry.startedAt) / 100) / 10 : undefined
+      if (entry.results.length) this.deps.finished?.(entry.job, [...entry.results], { seconds, secondsPerStep: entry.secondsPerStep })
     } catch (err) {
       // the history could not be written (disk full, folder gone): the queue goes on
       this.deps.log?.(`[queue] the finished job could not be saved: ${(err as Error).message}`)

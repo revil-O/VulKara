@@ -20,7 +20,8 @@ ACTIVATIONS_GB = {"sd1": 1.9, "sd2": 1.0, "sdxl": 1.5, "sd3": 2.0, "flux1": 2.5,
                   "z_image": 3.0,
                   "wan": 4.0,  # wan (video): decoding all frames dominates
                   # Qwen-Image at its native 1328 px (6900 image tokens); 2.1 at 1024 px with its text cache
-                  "qwen_image": 3.5, "qwen_image21": 3.0}
+                  # 2.1: 10.5 GB with its transformer in 8 bit in stages (7z), 12.1 GB streamed (7w)
+                  "qwen_image": 3.5, "qwen_image21": 2.8}
 # families made for a smaller picture: whether they fit is judged at their own size, not at 1024²
 NATIVE_SIDE = {"sd1": 512, "sd2": 768}
 # further denoisers that run next to the main one and get its precision (Ideogram 4 denoises with a
@@ -141,9 +142,12 @@ def plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=N
         denoiser_opts = [quant]
     te_opts = (text_quant_opts or AUTO_ORDER) if quant == "auto" else [quant]
 
+    def seconds_gb(dq):
+        return sum(_gb(components[n], "q8" if dq == "gguf" else dq) for n in seconds)
+
     def denoiser_gb(dq):
         main = denoiser_fixed_gb if dq == "gguf" else _gb(components[denoiser], dq)
-        return main + sum(_gb(components[n], "q8" if dq == "gguf" else dq) for n in seconds)
+        return main + seconds_gb(dq)
 
     def denoise_peak(dq, tq, staged):
         den_gb = denoiser_gb(dq)
@@ -154,7 +158,8 @@ def plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=N
         den_gb = denoiser_gb(dq)
         te_gb = small_te_gb + sum(_gb(components[n], tq) for n in big_te)
         if staged:
-            encoding = te_gb + other_gb + RUNTIME_OVERHEAD_GB if staging_frees_denoiser else \
+            # freeing the denoiser leaves a second one (Ideogram 4's unconditional transformer) loaded
+            encoding = te_gb + seconds_gb(dq) + other_gb + RUNTIME_OVERHEAD_GB if staging_frees_denoiser else \
                 te_gb + den_gb + other_gb + RUNTIME_OVERHEAD_GB
             return max(encoding, denoise_peak(dq, tq, staged))
         return denoise_peak(dq, tq, staged)
@@ -206,3 +211,20 @@ def plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=N
         "min_ram_gb": min_ram_gb,
         "ram_gb": round(ram_gb, 1),
     }
+
+
+def fitting_plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=None, activations_gb=None):
+    """The plan without SSD streaming: plan(), and where that does not fit, a big text encoder may go to 4 bit, then
+    the denoiser may make room while a new prompt is encoded ("releases_denoiser": it is loaded again afterwards, a
+    prompt from the prompt cache needs neither). Streaming the denoiser is the engine's last resort."""
+    p = plan(components, denoiser, family, ram_gb, quant=quant, denoiser_fixed_gb=denoiser_fixed_gb,
+             activations_gb=activations_gb)
+    if p["fits"]:
+        return p
+    for frees in (False, True):
+        q = plan(components, denoiser, family, ram_gb, quant=quant, denoiser_fixed_gb=denoiser_fixed_gb,
+                 activations_gb=activations_gb, text_quant_opts=QUANT_ORDER, staging_frees_denoiser=frees)
+        if q["fits"]:
+            q["releases_denoiser"] = frees and q["staged_text_encoder"]
+            return q
+    return p

@@ -13,6 +13,7 @@ Reading is the slow part (a step reads every streamed block), so:
   - the next blocks are read ahead (`PREFETCH` blocks, `READERS` reads at a time: a fast internal SSD
     delivers more with two reads at once, an external one is not slower for it).
 """
+import collections
 import json
 import os
 import time
@@ -22,6 +23,10 @@ import torch
 FORMAT = 1
 PREFETCH = 2  # blocks read ahead
 READERS = 2   # reads at a time
+# streamed blocks whose computing may still be queued on the GPU when the next one is loaded: MPS runs asynchronously,
+# and on a busy GPU Python ran far ahead, every queued block holding its weights (FLUX.2 [klein] 9B: 18.6 GB instead
+# of 13, MEASUREMENTS 7ac)
+QUEUED = 2
 PROFILE = os.environ.get("VK_STREAM_PROFILE") == "1"
 # VK_STREAM_PROFILE=1: where the time of a streamed generation goes (waiting for the SSD, copying to the GPU,
 # computing), how much was read and how often the denoiser ran (two passes per step with true guidance)
@@ -112,6 +117,8 @@ def enable(model, device, dtype, cache_dir, report=None, resident_share=0.0):
         return load_bytes(data)
 
     order = []  # the streamed blocks in the order they run
+    queued = collections.deque()  # an MPS event after each streamed block's computing, oldest first
+    on_mps = torch.device(device).type == "mps"
 
     def prefetch(q):
         """Reads the streamed block at place q of the order (and wraps to the next pass)."""
@@ -156,6 +163,8 @@ def enable(model, device, dtype, cache_dir, report=None, resident_share=0.0):
                 if PROFILE:
                     STATS["skipped"] += 1
                 return
+            while len(queued) >= QUEUED:
+                queued.popleft().synchronize()
             t0 = time.time()
             prefetch(q)
             state = pending.pop(i).result()
@@ -183,6 +192,9 @@ def enable(model, device, dtype, cache_dir, report=None, resident_share=0.0):
                 STATS["forward"] += time.time() - STATS["t_fwd"]
                 STATS["peak_gb"] = max(STATS["peak_gb"], torch.mps.driver_allocated_memory() / 1024 ** 3)
             module.to("meta")
+            if on_mps:
+                queued.append(torch.mps.Event())
+                queued[-1].record()
             return output
 
         block.register_forward_pre_hook(load)

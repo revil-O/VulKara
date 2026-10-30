@@ -52,9 +52,9 @@ def test_off_refuses_a_model_that_does_not_fit(tmp_path, monkeypatch):
 
 
 def test_a_big_text_encoder_goes_to_4_bit_when_only_that_lets_the_model_stream(tmp_path, monkeypatch):
-    # Qwen-Image 2.1 on a 16 GB Mac (Mac mini M4): its 8.8B text encoder in 8 bit leaves no room even when the
-    # transformer streams; in 4 bit it fits
-    monkeypatch.setenv("VK_SSD_STREAMING", "auto")
+    # Qwen-Image 2.1 on a 16 GB Mac (Mac mini M4), streaming forced: its 8.8B text encoder in 8 bit leaves no room even
+    # when the transformer streams; in 4 bit it fits
+    monkeypatch.setenv("VK_SSD_STREAMING", "always")
     monkeypatch.setattr(engine.LoadedModel, "_check_stream_disk", lambda self: None)
     monkeypatch.setattr(engine.registry, "runtime_too_old", lambda arch: None)
     manifest = {
@@ -64,8 +64,13 @@ def test_a_big_text_encoder_goes_to_4_bit_when_only_that_lets_the_model_stream(t
     }
     (tmp_path / "model.json").write_text(json.dumps(manifest))
     m = engine.LoadedModel(str(tmp_path), "cpu", ram_gb=16)
-    assert m.stream and m.plan["fits"]
+    assert m.stream and m.plan["fits"] and not m.release_denoiser
     assert m.plan["quant"]["text_encoder"] == "q4"
+    # left to the plan it runs in stages instead (7z): text encoder in 8 bit alone, then the transformer in 8 bit
+    monkeypatch.setenv("VK_SSD_STREAMING", "auto")
+    m = engine.LoadedModel(str(tmp_path), "cpu", ram_gb=16)
+    assert not m.stream and m.release_denoiser and m.plan["fits"]
+    assert m.plan["quant"] == {"transformer": "q8", "text_encoder": "q8"}
     # with enough memory the text encoder stays in 8 bit
     m = engine.LoadedModel(str(tmp_path), "cpu", ram_gb=24)
     assert m.plan["quant"]["text_encoder"] == "q8"

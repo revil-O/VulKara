@@ -268,6 +268,16 @@ const THEMES: { id: 'system' | 'light' | 'dark'; title: PlainKey; icon: typeof M
           </label>
           <label class="row">
             <div class="grow">
+              <strong>{{ t('settings.engine.idleUnload') }}</strong>
+              <p class="dim">{{ t('settings.engine.idleUnloadHint') }}</p>
+            </div>
+            <select :value="settings.values.idleUnloadMinutes" @change="settings.set('idleUnloadMinutes', Number(($event.target as HTMLSelectElement).value))">
+              <option v-for="n in [5, 10, 30, 60]" :key="n" :value="n">{{ t('settings.engine.afterMinutes', { n }) }}</option>
+              <option :value="0">{{ t('settings.engine.never') }}</option>
+            </select>
+          </label>
+          <label class="row">
+            <div class="grow">
               <strong>{{ t('settings.engine.stepCache') }}</strong>
               <p class="dim">{{ t('settings.engine.stepCacheHint') }}</p>
             </div>

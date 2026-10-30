@@ -104,7 +104,6 @@ export function makeApi(call: Call, on: On, extra: BridgeExtra): VulkaraApi {
       payload: () => call('viewer:payload'),
       act: (action) => call('viewer:act', action),
       onAction: (fn) => on('viewer:action', fn),
-      onOpen: (fn) => on('viewer:opened', fn),
     },
     licences: {
       get: (id, refresh) => call('licences:get', id, refresh),

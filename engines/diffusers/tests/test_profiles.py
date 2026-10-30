@@ -7,11 +7,12 @@ def row(ram, model_id, bf16_native=True):
     return [r for r in profiles.recommendations(ram, bf16_native) if r["id"] == model_id][0]
 
 
-def test_24gb_mac_runs_flux2_klein_9b_only_with_mlx_4bit():
+def test_24gb_mac_runs_flux2_klein_9b_without_streaming():
     r = row(24, "flux2_klein_9b")
-    assert r["diffusers"].get("streamed") and "streamed from the SSD" in r["diffusers"]["mode"]
+    # its text encoder in 4 bit lets the 8 bit model stay in memory (memory.fitting_plan) instead of streaming
+    assert not r["diffusers"].get("streamed") and r["diffusers"]["mode"] == "model 8 bit, text encoder 4 bit"
     assert r["mlx"]["fits"] and r["mlx"]["mode"] == "model 4 bit" and r["mlx"]["side"] == 1024
-    assert "Diffusers only streamed" in r["why"]
+    assert r["why"].startswith("both fit")
     assert not row(24, "flux2_dev")["diffusers"]["fits"]  # the text encoder alone is too big
 
 

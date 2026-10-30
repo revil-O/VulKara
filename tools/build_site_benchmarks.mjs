@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto'
 
 const MEASURED = 'Apple M2, 24 GB'
 
-// before → after, per step and the engine's peak (MEASUREMENTS 7m, 7n, 7o): [label, runtime, s/step, GB, note]
+// before → after, per step and the engine's peak (MEASUREMENTS 7m, 7n, 7o, 7ab, 7ac; gb left out where not measured)
 const CHANGES = [
   { ref: '7n', model: 'SD 1.5 (epiCPhotoGasm), 512 px', runtime: 'Diffusers', step: [1.55, 0.72], gb: [7.3, 3.7], why: 'attention heads padded to a size the fused kernel takes' },
   { ref: '7n', model: 'SD 1.5 (epiCPhotoGasm), 1024 px', runtime: 'Diffusers', step: [9.4, 4.8], gb: [9.8, 5.0], why: 'padded heads, no attention slicing' },
@@ -21,6 +21,9 @@ const CHANGES = [
   { ref: '7o', model: 'NetaYume v4 (Lumina 2), 1024 px', runtime: 'ComfyUI', step: [32.45, 28.7], gb: [15.85, 14.7], range: ['31.9–33.0', '28.7', '15.5–16.2', '14.1–15.3'], why: 'PyTorch attention instead of sub-quadratic' },
   { ref: '7o', model: 'Pony V7 Q8_0 (AuraFlow), 1024 px', runtime: 'ComfyUI, GGUF', step: [46.05, 46.7], gb: [15.35, 13.0], range: ['46.0–46.1', '46.7', '14.8–15.9', '12.3–13.7'], why: 'PyTorch attention instead of sub-quadratic' },
   { ref: '7o', model: 'Anima-Turbo, 1024 px', runtime: 'ComfyUI', step: [12.1, 11.8], gb: [10.0, 10.0], why: 'PyTorch attention instead of sub-quadratic' },
+  { ref: '7ac', model: 'FLUX.2 [klein] 9B streamed, 16 GB plan, busy GPU', runtime: 'Diffusers', step: [67.0, 50.4], gb: [19.6, 14.3], why: 'at most two streamed blocks wait on the GPU' },
+  { ref: '7ab', model: 'MiaoMiao RealSkin (Anima), 1024×1536, CFG 5', runtime: 'ComfyUI', step: [123.5, 92.3], range: ['117–130', '92.3'], why: 'float16 instead of bfloat16, which MPS computes at half the speed' },
+  { ref: '7ab', model: 'MiaoMiao RealSkin (Anima), 512×768, CFG 5', runtime: 'ComfyUI', step: [21.2, 18.1], why: 'float16 instead of bfloat16' },
 ]
 
 // the memory plan against the engine's measured peak, 1024 px (MEASUREMENTS 7m): [model, runtime, used, planned]
@@ -50,14 +53,17 @@ const PLAN_AFTER = [
   ['Qwen-Image 2.1, streamed (16 GB plan)', 'Diffusers, kept blocks counted (7w)', 12.1, 11.8],
 ]
 
-// work done once and kept, and a stop that waited (MEASUREMENTS 7r, 7s, 7t, 7u, 7x): before, after, unit
+// work done once and kept, and a stop that waited (MEASUREMENTS 7r, 7s, 7t, 7u, 7x, 7y, 7z): before, after, unit
 const ONCE = [
   { ref: '7s', what: 'Qwen-Image 2.1, whole picture', sub: '16 GB plan: text encoder quantized to 4 bit, then from the quantized cache', a: 10971, b: 221, unit: 's' },
   { ref: '7s', what: 'Qwen-Image 2.1, memory at most', sub: 'the same two pictures', a: 14.5, b: 11.8, unit: 'GB' },
   { ref: '7t', what: 'Qwen-Image 2.1, prompt from the prompt cache', sub: 'memory at most; the text encoder is not loaded, same picture to the pixel', a: 14.5, b: 12.1, unit: 'GB' },
   { ref: '7t', what: 'Qwen-Image 2.1, a prompt used before, after a restart', sub: 'whole picture: text encoder from its 4 bit copy, then the prompt from the prompt cache', a: 4264, b: 1711, unit: 's' },
   { ref: '7u', what: 'Qwen-Image 2.1, text encoder for a new prompt', sub: 'its 4 bit copy moved to the GPU and the prompt encoded: TinyGemm repacked per layer, then the plain packing', a: 2586, b: 28.9, unit: 's' },
+  { ref: '7z', what: 'Qwen-Image 2.1, read from the SSD per picture', sub: 'transformer streamed in 16 bit, then in stages: text encoder alone, then the transformer whole in 8 bit (about as fast)', a: 382, b: 20, unit: 'GB' },
+  { ref: '7z', what: 'Qwen-Image 2.1 in stages, memory at most', sub: 'prompt from the prompt cache: streamed (16 bit) against the transformer whole in 8 bit', a: 12.1, b: 9.9, unit: 'GB' },
   { ref: '7x', what: 'Z-Image Turbo (MLX), a prompt used before', sub: '16 GB plan, 512 px, after another prompt: the model loaded again, then its encodings from the prompt cache', a: 98.7, b: 64.4, unit: 's' },
+  { ref: '7y', what: 'Engines without a job', sub: 'Z-Image Turbo (MLX) loaded: memory held after the picture, then freed after the idle time', a: 7.5, b: 1.1, unit: 'GB' },
   { ref: '7r', what: 'Stop while SSD streaming is prepared', sub: 'Chroma1 Flash, stopped at 21 %: seconds until the job ended', a: 84.9, b: 0, unit: 's' },
 ]
 
@@ -176,8 +182,9 @@ function speedChart() {
 }
 
 function memoryChart() {
-  const ax = axis(Math.max(...CHANGES.flatMap((c) => c.gb)), 4)
-  const rows = CHANGES.map((c) => {
+  const measured = CHANGES.filter((c) => c.gb)
+  const ax = axis(Math.max(...measured.flatMap((c) => c.gb)), 4)
+  const rows = measured.map((c) => {
     const [a, b] = c.gb
     const r = c.range
     const v = `${r ? r[2] : fmt(a)} → ${r ? r[3] : fmt(b)} GB`
@@ -189,7 +196,7 @@ function memoryChart() {
       <p class="sub">The engine's peak footprint during the picture (macOS, with what the GPU holds), in GB.</p>
       ${legend('before', 'after')}
       <div class="bx">${ticksRow(ax, '')}${rows}
-      </div>${table(['Model', 'Runtime', 'Before GB', 'After GB'], CHANGES.map((c) => [esc(c.model), esc(c.runtime), c.range?.[2] ?? fmt(c.gb[0]), c.range?.[3] ?? fmt(c.gb[1])]))}
+      </div>${table(['Model', 'Runtime', 'Before GB', 'After GB'], measured.map((c) => [esc(c.model), esc(c.runtime), c.range?.[2] ?? fmt(c.gb[0]), c.range?.[3] ?? fmt(c.gb[1])]))}
     </section>`
 }
 
@@ -226,7 +233,7 @@ function onceTable() {
   return `
     <section class="chart" id="once">
       <h2>Done once, then kept</h2>
-      <p class="sub">What a cache or a fix saves on a 16 GB plan (memory kept free 12 GB on the 24 GB Mac). Each row's bars share its own scale. Also measured: an FP8 model on a Mac short of memory stopped at its first step (MPS cannot compute FP8); it now runs in 16 bit (Anima-Turbo, 4.9 GB, MEASUREMENTS 7q).</p>
+      <p class="sub">What a cache or a fix saves on a 16 GB plan (memory kept free 12 GB on the 24 GB Mac). Each row's bars share its own scale. Also measured: an FP8 model on a Mac short of memory stopped at its first step (MPS cannot compute FP8); it now runs in 16 bit (Anima-Turbo, 4.9 GB, MEASUREMENTS 7q). Not built in: MLX's wired limit (68 % of the RAM or its recommended working set) was not faster in all three MLX models tried (MEASUREMENTS 7aa).</p>
       ${legend('before', 'after')}
       <table class="micro">
         <thead><tr><th>Case</th><th>per row</th><th class="num">before</th><th class="num">after</th><th class="num">less</th></tr></thead>

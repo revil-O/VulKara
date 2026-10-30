@@ -39,7 +39,7 @@ import { dirSize, engineCommand, installRuntime, listRuntimes, removeRuntime, st
 import { AUTO_INTERVAL, UpdateChecker } from './runtime_updates'
 import { AppUpdater } from './app_update'
 import { getToken, hasToken, setToken, type TokenService } from './secrets'
-import { closeViewers, isViewer, onViewersChange, openViewer, viewerPayload } from './viewer'
+import { closeViewers, isViewer, openViewer, viewerPayload } from './viewer'
 import { confirmSplash, isSplash, splashState } from './splash'
 import { engineLine, mainLanguage, t } from './i18n'
 import { engineEnv, getSettings, helpersDir, historyDir, imagesDir, isValidSetting, modelsDir, settableByPage, lorasDir, onSettingChanged, setSetting } from './settings'
@@ -94,14 +94,15 @@ const queue: JobQueue<RuntimeId> = new JobQueue<RuntimeId>({
   discard: (path) => { if (isInside(path, imagesDir())) rmSync(path, { force: true }) },
   log,
   now: Date.now,
-  finished: (job, results) => {
+  finished: (job, results, timing) => {
     // a preview of Restore (a part of the photo) is shown on its page only
     if (job.restore?.preview) return
-    history.add(job, results)
+    history.add(job, results, Date.now(), timing)
     if (results.length && !getSettings().firstPictureMade) setSetting('firstPictureMade', true)
     if (getSettings().notifySound && !queue.snapshot().some((j) => j.state === 'waiting')) doneSound()
   },
   changed: () => {
+    watchIdle()
     snapshotTimer ??= setTimeout(() => {
       snapshotTimer = undefined
       benchmarks.observe(queue.snapshot(), Date.now())
@@ -113,6 +114,27 @@ const queue: JobQueue<RuntimeId> = new JobQueue<RuntimeId>({
 // benchmarks of single models (Hardware page): measured from the queue's snapshots and the monitor's samples
 const benchmarks = new Benchmarks(() => join(dataDir(), 'benchmarks.json'), (runs) => send('benchmark:change', runs),
   `${app.getVersion()} ${__VK_BUILD__}`, () => t('main.status.starting'))
+
+// the engines free their models after a while without a job (Settings → Engine): the memory goes back to the other
+// programs; the next job loads its model again
+let idleTimer: NodeJS.Timeout | undefined
+function watchIdle(restart = false): void {
+  const minutes = getSettings().idleUnloadMinutes
+  if (restart || busy() || !minutes) {
+    clearTimeout(idleTimer)
+    idleTimer = undefined
+  }
+  // restart: armed also while busy, it looks again when it fires
+  if (!minutes || (busy() && !restart)) return
+  idleTimer ??= setTimeout(() => {
+    idleTimer = undefined
+    // an import or training is not a queue change that would arm the timer again when it ends: wait another round
+    if (busy()) return watchIdle(true)
+    log(`[app] ${minutes} min without a job: the engines free their models`)
+    unloadEngines()
+  }, minutes * 60_000)
+}
+onSettingChanged((key) => { if (key === 'idleUnloadMinutes') watchIdle(true) })
 
 // one sound when the last waiting job is done, not one for every picture of a series
 function doneSound(): void {
@@ -903,7 +925,6 @@ export function bindWindow(w: BrowserWindow): void {
   // the viewer windows belong to the main window: back in it, they close
   w.on('closed', closeViewers)
   w.on('focus', closeViewers)
-  onViewersChange((open) => send('viewer:opened', open))
 }
 
 export function shutdown(): void {

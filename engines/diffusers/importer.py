@@ -616,8 +616,10 @@ def make_plan(info, quant="auto", ram_gb=None):
                            ram_gb if ram_gb is not None else memory.total_ram_gb(),
                            quant="q4" if quant == "auto" else quant, allow_staging=bool(spec.get("mlx_staged")))
     ram = ram_gb if ram_gb is not None else memory.total_ram_gb()
-    plan = memory.plan(info["components"], info["denoiser"], spec["family"], ram,
-                       quant=quant, denoiser_fixed_gb=info.get("denoiser_fixed_gb"))
+    # a whole checkpoint file loads in one piece (engine.py): no 4 bit text encoder, no stages
+    planner = memory.plan if info.get("layout") == "single_full" else memory.fitting_plan
+    plan = planner(info["components"], info["denoiser"], spec["family"], ram,
+                   quant=quant, denoiser_fixed_gb=info.get("denoiser_fixed_gb"))
     if plan["fits"] or not _streamable(info):
         return plan
     # too large for the memory: the engine then streams the denoiser block by block from the SSD, in 16 bit (a GGUF

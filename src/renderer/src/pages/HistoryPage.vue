@@ -7,11 +7,12 @@
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Check, Copy, Download, FolderSearch, Heart, ImageOff, Play, Repeat, Search, Share, Trash2, X } from 'lucide-vue-next'
+import OpenHint from '../components/OpenHint.vue'
 import PageFrame from '../components/PageFrame.vue'
 import { useAssetsStore } from '../stores/assets'
 import { useHandoffStore } from '../stores/handoff'
 import { cleanError } from '../stores/runtimes'
-import { pageName } from '../util/format'
+import { formatDuration, pageName, perStep } from '../util/format'
 import { formPage } from '../util/job_form'
 import { dateLocale, t, type PlainKey } from '../i18n'
 import { canCopyImage, canShare, copyPicture, sharePicture } from '../share'
@@ -112,10 +113,7 @@ function key(event: KeyboardEvent): void {
 
 let observer: IntersectionObserver | undefined
 let stopListening: (() => void) | undefined
-let stopViewer: (() => void) | undefined
 let stale = false
-/** a large view is open: the panel shows only the buttons */
-const viewerOpen = ref(false)
 onMounted(() => {
   void load(true)
   observer = new IntersectionObserver((hits) => {
@@ -124,7 +122,6 @@ onMounted(() => {
   if (sentinel.value) observer.observe(sentinel.value)
   // new results arrive while another page is shown: refresh when this one comes back
   stopListening = window.vk.history.onChange(() => { stale = true })
-  stopViewer = window.vk.viewer.onOpen((open) => { viewerOpen.value = open })
 })
 onActivated(() => {
   window.addEventListener('keydown', key)
@@ -138,7 +135,6 @@ onBeforeUnmount(() => {
   clearTimeout(searchTimer)
   observer?.disconnect()
   stopListening?.()
-  stopViewer?.()
   window.removeEventListener('keydown', key)
 })
 
@@ -163,6 +159,9 @@ const facts = computed(() => {
   if (j.sampler) rows.push(['library.facts.sampler', j.sigmaSchedule ? `${j.sampler} · ${j.sigmaSchedule}` : j.sampler])
   if (j.strength !== undefined) rows.push(['library.facts.strength', String(j.strength)])
   if (j.videoSeconds) rows.push(['library.facts.length', `${j.videoSeconds} s`])
+  if (e.seconds !== undefined) {
+    rows.push(['library.facts.duration', formatDuration(e.seconds) + (e.secondsPerStep ? ' · ' + perStep(e.secondsPerStep) : '')])
+  }
   if (j.loras?.length) rows.push(['library.facts.loras', j.loras.map((l) => `${l.path.split('/').pop()} (${l.scale})`).join(', ')])
   if (j.controlnet) rows.push(['library.facts.controlnet', `${j.controlnet.type} (${j.controlnet.weight})`])
   if (j.label) rows.push(['library.facts.label', jobLabel(j.label)])
@@ -287,8 +286,11 @@ async function copyImage(path: string): Promise<void> {
         <template v-for="f in pictures(selected)" :key="f">
           <video v-if="selected.kind === 'video'" :src="url(f)" controls loop class="big" :class="{ tall: tall.has(f) }"
             @loadedmetadata="(ev) => measure(f, (ev.target as HTMLVideoElement).videoWidth, (ev.target as HTMLVideoElement).videoHeight)" />
-          <img v-else :src="url(f)" class="big zoom" :class="{ tall: tall.has(f) }" draggable="false" :title="t('library.largeView')" @click="view(selected)"
-            @load="(ev) => measure(f, (ev.target as HTMLImageElement).naturalWidth, (ev.target as HTMLImageElement).naturalHeight)" />
+          <span v-else class="frame" :class="{ tall: tall.has(f) }" @click="view(selected)">
+            <img :src="url(f)" class="big zoom" :class="{ tall: tall.has(f) }" draggable="false"
+              @load="(ev) => measure(f, (ev.target as HTMLImageElement).naturalWidth, (ev.target as HTMLImageElement).naturalHeight)" />
+            <OpenHint />
+          </span>
         </template>
         <!-- buttons in the left third, the settings and prompts beside them -->
         <div class="info">
@@ -312,8 +314,7 @@ async function copyImage(path: string): Promise<void> {
               <button class="btn small danger" @click="remove(true)"><Trash2 :size="12" /> {{ t('library.moveToTrash') }}</button>
             </div>
           </div>
-          <!-- while the large view is open, the panel holds only the buttons -->
-          <div v-if="!viewerOpen" class="facts">
+          <div class="facts">
             <dl>
               <template v-for="[k, v] in facts" :key="k">
                 <dt class="dim">{{ t(k) }}</dt>
@@ -483,6 +484,19 @@ async function copyImage(path: string): Promise<void> {
 
 .zoom {
   cursor: zoom-in;
+}
+
+/* the picture with its OpenHint band; a portrait picture keeps its own width */
+.frame {
+  position: relative;
+  display: block;
+  line-height: 0;
+  border-radius: var(--radius-m);
+  overflow: hidden;
+}
+
+.frame.tall {
+  justify-self: center;
 }
 
 .stack {

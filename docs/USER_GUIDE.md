@@ -789,6 +789,12 @@ What happens on import:
   **Compression** stores large parts in 8 or 4 bit; when even that is not enough and the model allows it, the model is
   marked for SSD streaming (see below). A model that still does not fit is marked *Needs more memory than this Mac
   has*, and **Import anyway** imports it all the same.
+- **In stages**: before streaming, a model that does not fit beside its text encoder runs in stages: a new prompt is
+  encoded with the text encoder alone (the model is not in memory meanwhile), then the model is loaded in 8 bit and
+  makes the picture. A prompt from the prompt cache needs neither step. Qwen-Image 2.1 on a 16 GB Mac runs like this:
+  about as fast as streamed in 16 bit (1 830 s instead of 1 700–1 860 s at 1024 px with 40 steps), with less memory
+  and without reading about 380 GB from the SSD per picture. *Always* under Settings → Engine → *Load large models
+  piece by piece from the SSD* streams in 16 bit instead.
 - **SSD streaming**: a 16 bit model that does not fit into memory can run anyway: its denoiser is written once, block
   by block, into the *SSD streaming cache* (about twice the model's size, in the model's folder or in the folder set in
   Settings), and while a picture is made each block is loaded right before it runs. It is slow, as every step reads the
@@ -821,8 +827,9 @@ Every finished job, newest first, with all its settings.
 
 The panel of a single entry shows the picture large (up to half the window wide; a portrait picture only as high as a square one), and below it, in the left third, all its
 buttons one under the other: **Favourite**, **Save as**, **Show in Finder**, **Share** and **Copy picture** for each picture, then
-the three buttons of the entry. Beside them, behind a line, are the settings, then the prompt and the negative prompt under headings of their own. While the large view
-is open, the panel shows only the buttons.
+the three buttons of the entry. Beside them, behind a line, are the settings, then the prompt and the negative prompt under headings of their own. They stay
+there while the large view is open. **Run time** tells how long the job ran, loading included, and its seconds per step
+(entries from 0.7.10 on): a picture much slower than the ones before stands out.
 
 - **Use these settings** puts prompt, model, style, size, seed, LoRAs and all other settings back into the page the
   job came from. The model is found again even when its folder has moved.
@@ -872,7 +879,8 @@ wants (prompt style, steps, guidance, negative prompt yes or no, sizes) from SD 
 
 ![Large view](screenshots/viewer.jpg)
 
-Clicking a result opens it in a **window of its own**. Several large views can be open at a time; going back to the
+Clicking a result opens it in a **window of its own**; a see-through band along the bottom of every such picture says
+so ("Click to show preview"; in the remote web UI "Click for the large view"). Several large views can be open at a time; going back to the
 main window closes them all. When the app is in full screen, the large view opens as a window over it in the same space (instead of a full-screen space of
 its own without a title bar), so it never hides the app out of reach.
 
@@ -919,11 +927,13 @@ No token is sent and nothing about your files; only the public version lists are
 
 #### App updates
 
-With the same daily check (and **Look for an update** on the Changelog page) VulKara asks GitHub for its newest
+With the same daily check (and **Check for update** on the Changelog page) VulKara asks GitHub for its newest
 release. When there is a newer one, a card in the corner says so: **Update and restart** downloads it, checks it
 (the SHA-256 checksum GitHub lists for the file, the version inside, the Developer ID signature of the VulKara releases
 and Gatekeeper) and puts it in place of the app once VulKara has quit; then the new version starts. **What's new** opens
-the release notes, **Later** hides the card until the next version. It updates only while nothing is being made or
+the release notes, **Later** hides the card until the next version. The title row of every page shows the version
+(*v0.7.9*, a click opens the Changelog) or, with a newer one, *Update to version … available!*: a click brings the
+card back. It updates only while nothing is being made or
 installed, and only an app in a folder it may write to (in Applications, not started from the disk image). Installed
 with Homebrew? It works the same; `brew upgrade --cask vulkara` does too.
 
@@ -956,6 +966,9 @@ All folders can be on an external drive. **Choose** opens the macOS folder dialo
   memory and reads the rest from its file for each step. Measured with Pony V7 (Q8_0, 1024 px): on 16 GB about 88 s
   per step instead of 225 s with the whole model in memory (macOS swaps); on 24 GB the model fits and loads whole
   (44 s; piece by piece it would take 50 s). Models that fit are not affected; safetensors are always read whole.
+- **Free the memory when idle**: *After 10 min* (default), 5, 30 or 60 min, or *Never*. Without a job for that
+  long, the engines free their loaded model, so the memory goes back to other programs; the next picture loads it again.
+  Measured with Z-Image Turbo (MLX): the engines held 7.5 GB after a picture and 1.1 GB once freed.
 - **Step caching**: *Off* (default), *Light* or *Strong*. Steps that barely change the picture reuse the step before
   instead of being computed in full; a streamed model does not even read those blocks from the SSD. FLUX.1 [dev]
   with 28 steps: *Light* reuses about 5 steps (about 1.2× faster, the picture practically the same), *Strong* about

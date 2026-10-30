@@ -217,8 +217,10 @@ class LoadedModel:
         if self.m.get("file_format") == "gguf":
             fixed_gb = os.path.getsize(self._path(self.m["file"])) / 1024 ** 3
         ram = ram_gb if ram_gb is not None else memory.total_ram_gb()
-        self.plan = memory.plan(self.m["components"], self.m["denoiser"], self.spec["family"], ram,
-                                quant=self.m.get("quant_request", "auto"), denoiser_fixed_gb=fixed_gb)
+        # a whole checkpoint file loads in one piece: no 4 bit text encoder, no stages (memory.plan alone)
+        planner = memory.plan if self.m["layout"] == "single_full" else memory.fitting_plan
+        self.plan = planner(self.m["components"], self.m["denoiser"], self.spec["family"], ram,
+                            quant=self.m.get("quant_request", "auto"), denoiser_fixed_gb=fixed_gb)
         self.stream = False
         self.stream_keep = 0.0  # share of a streamed denoiser kept on the GPU
         self.stream_release = False  # the kept blocks make room while a new prompt is encoded
@@ -250,6 +252,8 @@ class LoadedModel:
             raise MemoryError("%s needs about %d GB RAM with the Diffusers runtime, this Mac has %d GB.%s"
                               % (self.spec["label"], self.plan["min_ram_gb"], round(self.plan["ram_gb"]), hint))
         self.staged = self.plan["staged_text_encoder"] and self.m["layout"] != "single_full"
+        # stages: the denoiser makes room while a new prompt is encoded (memory.fitting_plan, MEASUREMENTS 7z)
+        self.release_denoiser = self.staged and bool(self.plan.get("releases_denoiser")) and not self.stream
         # text encoders in their own pipeline: loaded per new prompt (staged) or kept (mixed dtypes)
         self.separate_text = self.staged or (self.text_dtype != self.dtype and self.m["layout"] != "single_full")
         self.text_pipe = None     # resident text encoder pipeline (separate_text without staging)
@@ -453,6 +457,13 @@ class LoadedModel:
     def load(self):
         m = self.m
         skip = self.text_components if self.separate_text else []
+        if self.release_denoiser:
+            # loaded once the prompt is encoded (ensure_denoiser)
+            self.pipe = self._from_pretrained(skip=skip + [m["denoiser"]])
+            self.default_scheduler = samplers.own_default(self.pipe.scheduler, self.spec["family"])
+            self.pipe.scheduler = self.default_scheduler
+            self._setup_vae()
+            return
         if m["layout"] == "single_full":
             pipe = self._pipeline_class().from_single_file(self._path(m["file"]), config=self._path(m["base_dir"]),
                                                            dtype=self.dtype, **self.spec.get("pipeline_kwargs", {}))
@@ -474,6 +485,29 @@ class LoadedModel:
                 protocol.log("[diffusers] step caching on (threshold %.2f)" % level)
             else:
                 protocol.log("[diffusers] step caching: not available for %s" % type(denoiser).__name__)
+
+    def ensure_denoiser(self):
+        """A plan in stages: the denoiser back in the pipeline after a new prompt was encoded without it."""
+        m = self.m
+        if not self.release_denoiser or getattr(self.pipe, m["denoiser"], None) is not None:
+            return
+        if m["layout"] == "single_denoiser":
+            model = self._load_denoiser_single_file()
+        else:
+            folder = self._path(m["weights_dir"])
+            q = self.plan["quant"].get(m["denoiser"], "none")
+            cfg = _quanto_configs({m["denoiser"]: q}, m["denoiser"]).get(m["denoiser"])
+            if cfg is not None:
+                model = self._load_component(folder, m["denoiser"], cfg, q, registry.file_variant(m))
+            else:
+                protocol.status("Loading %s" % m["denoiser"])
+                model = self._component_class(folder, m["denoiser"]).from_pretrained(
+                    folder, subfolder=m["denoiser"], dtype=self.dtype, variant=registry.file_variant(m))
+        self.pipe.register_modules(**{m["denoiser"]: model.to(self.device)})
+        self.lora_key = ()  # the LoRAs go onto the new denoiser
+        level = step_cache.threshold()
+        if level is not None:
+            step_cache.attach(model, level)
 
     def set_sampler(self, sampler, sigmas):
         """Scheduler for the next job (the model's own for "default")."""
@@ -786,6 +820,10 @@ class LoadedModel:
             protocol.log("[diffusers] prompt embeddings from the prompt cache")
             self.embed_cache = (key, kwargs)
             return kwargs
+        if getattr(self, "release_denoiser", False) and getattr(self.pipe, self.m["denoiser"], None) is not None:
+            # stages: the denoiser makes room for the text encoder and is loaded again after (ensure_denoiser)
+            self.pipe.register_modules(**{self.m["denoiser"]: None})
+            _free_memory()
         # the kept blocks of a streamed model make room for the text encoder (16 GB Macs), and come back after
         release = getattr(self, "stream_release", False) and getattr(self, "stream_model", None) is not None
         if release:
@@ -1250,15 +1288,21 @@ class DiffusersEngine:
             if guidance > 1 and not negative and spec.get("empty_negative"):
                 negative = spec["empty_negative"]  # these pipelines only guide with a negative prompt
         loras = self._resolve_loras(d.get("loras") or [], spec, m)
-        if loras:
-            self._state("Loading LoRA")
-        model.apply_loras(loras)
         # a model with LoRAs baked in (merge.py) takes their trigger words as the LoRAs would have brought them
         baked = (m.get("trigger_words") or []) if (m.get("source") or {}).get("type") == "merge" else []
         for words in [l["trigger_words"] for l in loras] + [baked]:
             for w in words:
                 if w and w.lower() not in prompt.lower():
                     prompt = w + ", " + prompt
+        if model.release_denoiser:
+            # stages: a new prompt is encoded while the denoiser is out, then the denoiser comes (back); the encoding
+            # below finds the prompt in the model's cache
+            self._state("Encoding prompt")
+            model.encode(prompt, negative, guidance)
+            model.ensure_denoiser()
+        if loras:
+            self._state("Loading LoRA")
+        model.apply_loras(loras)
         # no sampler chosen: the one the model's maker recommends (maker_settings.py), else the model's own
         if d.get("sampler") and str(d["sampler"]).lower() != "default":
             model.set_sampler(d.get("sampler"), d.get("sigma_schedule"))

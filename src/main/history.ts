@@ -58,11 +58,11 @@ export class History {
     return out
   }
 
-  add(job: Job, files: string[], createdAt = Date.now()): HistoryEntry {
+  add(job: Job, files: string[], createdAt = Date.now(), timing: { seconds?: number; secondsPerStep?: number } = {}): HistoryEntry {
     const { consent: _consent, ...kept } = job
     const entry: HistoryEntry = {
       id: job.id, createdAt, job: kept, modelName: basename(job.modelDir) || (job.upscale ? 'Real-ESRGAN' : ''), files,
-      kind: files.some((f) => VIDEO.has(extname(f).toLowerCase())) ? 'video' : 'image',
+      kind: files.some((f) => VIDEO.has(extname(f).toLowerCase())) ? 'video' : 'image', ...timing,
     }
     this.load().push(entry)
     for (const f of [...files, job.inputImage, job.maskImage, job.controlnet?.image]) if (typeof f === 'string' && f) this.files?.add(f)

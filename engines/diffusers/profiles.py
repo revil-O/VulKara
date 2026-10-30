@@ -76,7 +76,9 @@ def _describe(p):
     parts.append("model " + QUANT_TEXT.get(den[0], den[0]) if den else "model 16 bit")
     if tes:
         parts.append("text encoder " + QUANT_TEXT.get(tes[0], tes[0]))
-    if p.get("staged_text_encoder"):
+    if p.get("releases_denoiser"):
+        parts.append("text encoder and model one after the other for each new prompt")
+    elif p.get("staged_text_encoder"):
         parts.append("text encoder loaded per prompt")
     return ", ".join(parts)
 
@@ -129,7 +131,7 @@ def recommendations(ram_gb, bf16_native=True):
     for model in MODELS:
         row = {"id": model["id"], "title": model["title"]}
         if not model.get("mlx_only"):
-            side, p = _best_side(model, ram_gb, lambda act: memory.plan(
+            side, p = _best_side(model, ram_gb, lambda act: memory.fitting_plan(
                 model["components"], model["denoiser"], model["family"], ram_gb, activations_gb=act))
             row["diffusers"] = {"fits": side is not None, "side": side, "mode": _describe(p),
                                 "min_ram_gb": p["min_ram_gb"],

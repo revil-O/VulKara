@@ -628,8 +628,6 @@ export interface VulkaraApi {
     /** in a viewer window: hand something back to the main window */
     act(action: ViewerAction): Promise<void>
     onAction(fn: (action: ViewerAction) => void): () => void
-    /** whether a large view is open (a window of its own, or the overlay of the remote web UI) */
-    onOpen(fn: (open: boolean) => void): () => void
   }
   licences: {
     /** the licence of an installed model or LoRA: read once from its origin and kept in its folder */

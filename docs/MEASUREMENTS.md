@@ -781,6 +781,135 @@ fixed: the key of what a staged model had encoded held neither the negative prom
 encodings depend on. Not done: a model loaded for a prompt from the cache still loads its text encoder (mflux loads
 every part at once).
 
+## 7y. Engines without a job, and after the app is gone (2026-10-29, M2 24 GB)
+
+**Idle.** The engines kept their model after the last picture until the next job or the end of the app. Now they free it
+after a time without a job (Settings → Engine, default 10 min). Z-Image Turbo (MLX, 512 px), then the footprint of the
+engine processes every 30 s with the time set to 5 min:
+
+| After the picture | engines' footprint |
+| --- | --- |
+| 0–4.5 min | 7 486 MB |
+| from 4 min 54 s (freed) | 1 103 MB |
+
+The next picture loads the model again (Z-Image Turbo 8 bit: 2–3 s from the file cache of macOS, 7x).
+
+**After the app.** Whether engines outlive a crashed app (needed for a watchdog): a parent that starts an engine and
+ends with `os._exit` (as a crash: the kernel closes its pipes). An idle Diffusers or MLX engine ends at once; an MLX
+engine in the middle of a Z-Image picture at 1024 px ended 45 s later without a picture (its next progress line fails
+on the closed pipe, the job ends, then the engine reads the closed stdin). The app told to quit ends both engines; the
+ComfyUI engine stops its server when it ends. A watchdog thread would add nothing, so there is none.
+
+## 7z. Qwen-Image 2.1 in stages instead of streamed (2026-10-29, M2 24 GB, memory kept free 12 GB)
+
+Step 2 of the memory plan: on a 16 GB plan the prompt is encoded with the text encoder alone, then the transformer
+stays whole in memory in 8 bit (no SSD streaming) beside the VAE. A probe with the engine's own loading
+(`LoadedModel`, quantized caches), against the 16 GB plan's streamed run of 7w (16 bit, 9 blocks kept), the same
+prompt, seed 12, 1024 px, 40 steps:
+
+| | streamed, 16 bit (now) | in stages, 8 bit |
+| --- | --- | --- |
+| encoding a new prompt | text encoder 4 bit, kept blocks released | 30.6 s, peak 9.9 GB (text encoder alone) |
+| loading the transformer | 11–16 s (streaming prepared) | 15–21 s from its 8 bit cache (each new prompt) |
+| per step | about 41 s | about 44 s |
+| 40 steps and decoding | 1 692 s | 1 781 s |
+| peak while denoising | 12.1 GB | 10.5 GB |
+| read from the SSD per picture | 382 GB | 0 |
+
+The two pictures: 37.0 dB PSNR, mean difference 1.1 of 255; same composition, lighthouse and rocks, the person
+slightly different and a small second figure missing in the 8 bit picture. Not faster on the M2 (quanto's int8 layers on
+MPS cost what the SSD waits cost), but 1.6 GB less and no reads from the SSD.
+
+Built in (`memory.fitting_plan`: before streaming, a big text encoder may go to 4 bit, then the denoiser makes room
+while a new prompt is encoded). The engine on the 16 GB plan picks the text encoder in 8 bit (alone it fits); the
+benchmark, the same prompt, a new prompt and then the same from the prompt cache:
+
+| Run | phases | whole | engine at most | read from disk |
+| --- | --- | --- | --- | --- |
+| new prompt | text encoder 34.8 s, transformer 11.9 s, generating 1 790 s | 1 847 s | 12.2 GB (loading the 8 bit text encoder) | 20 GB |
+| from the prompt cache | transformer 12.9 s, generating 1 813 s | 1 832 s | 9.9 GB | 9 GB |
+| streamed before (7w, 7v) | | 1 705–1 863 s | 12.1 GB | 382–402 GB |
+
+The two runs give the same picture to the pixel. Against the streamed one with its 4 bit text encoder: 26.3 dB, same
+scene, the people on the rock placed differently (the 8 bit text encoder's prompt, not the transformer). `ACTIVATIONS_GB`
+of Qwen-Image 2.1 is 2.8 now (was 3.0; 10.5 GB measured in stages): with 3.0 the plan missed the 16 GB budget by
+0.15 GB.
+
+## 7aa. MLX wired limit (2026-10-30, M2 24 GB)
+
+Step 4 of the memory plan, measured only: `mx.set_wired_limit` set when the MLX engine starts, Z-Image Turbo, FLUX.2
+[klein] 9B and Krea 2 Turbo through the benchmark, 1024 px, seed 12, the makers' steps. Limits: off, 68 % of the RAM
+(16.3 GB) and MLX's recommended working set (17.75 GB; 17.8 is refused: "larger than the maximum working set size").
+Whole picture, engine at most:
+
+| Plan, round | limit | Z-Image Turbo | FLUX.2 [klein] 9B | Krea 2 Turbo |
+| --- | --- | --- | --- | --- |
+| 24 GB, 1 | off | 308 s, 13.5 GB | 196 s, 15.3 GB | 513 s, 14.5 GB |
+| 24 GB, 1 | 16.3 GB | 486 s, 13.5 GB | 308 s, 15.2 GB | 917 s, 13.9 GB |
+| 24 GB, 2 | off | 933 s, 13.4 GB | 562 s, 15.3 GB | 1 709 s, 14.6 GB |
+| 24 GB, 2 | 17.75 GB | 913 s, 13.6 GB | 552 s, 15.1 GB | 1 672 s, 14.5 GB |
+| 24 GB, 2 | 16.3 GB | 899 s, 13.6 GB | 611 s, 15.1 GB | 1 694 s, 16.3 GB |
+| 16 GB (memory kept free 12 GB), 1 | off | 1 266 s, 9.5 GB | (Diffusers, streamed) | 2 000 s, 12.9 GB |
+| 16 GB, 1 | 10.9 GB | 895 s, 9.6 GB | (Diffusers, streamed) | 1 675 s, 16.8 GB |
+| 16 GB, 1 | 11.8 GB | 874 s, 13.8 GB | (Diffusers, streamed) | 1 663 s, 13.3 GB |
+
+The Mac had 8–17 GB swapped out and other programs open (19–22 GB used): round 2 took three times as long as round 1
+with the same settings. Within a round no limit is faster in all three models: in round 1 on 24 GB it was 50–80 %
+slower, in round 2 within ±9 %, on the 16 GB plan 16–31 % faster but with up to 16.8 GB at most (over the plan). Swap
+read during a picture: 0.2–2.6 GB without a limit, 0.04–0.4 GB with one in round 2, but there the run without a limit
+came first each time (it pushed the other programs out). Not built in: no limit is measurably faster, and less swap is
+not shown apart from the order. On the 16 GB plan FLUX.2 [klein] 9B went from MLX to Diffusers with streaming in every
+run (MLX did not fit); there Diffusers used 17.7–21.1 GB at most, above the budget (streamed blocks queued on the busy GPU, 7ac).
+
+## 7ab. Anima in ComfyUI: bfloat16 against float16 on MPS (2026-10-30, M2 24 GB)
+
+MiaoMiao RealSkin (Anima, 2 B) at 1024 × 1536 with CFG 5 and 60 steps ran at 117–130 s per step: about two hours a
+picture. Nothing in ComfyUI's path changed since 0.7.9. Anima-Turbo at 1024², 10 steps, CFG 1 took 140 s on
+2026-10-04 and 151 s on 2026-10-19 (12–14 s per step), so the speed of the M2 has not dropped; a picture with CFG
+(two passes) at 1.5 times the pixels is simply this slow. Where the time goes:
+
+- ComfyUI picks bfloat16 for Anima (its first supported type, and MPS reports bfloat16 as supported). MPS on the M2
+  computes it at half the speed of float16, at Anima's shapes (2 × 6144 tokens, 2048 wide, 16 heads of 128):
+
+  | | matmul 12288 × 2048 × 8192 | attention 2 × 16 × 6144 × 128 |
+  | --- | --- | --- |
+  | float16 | 300 ms (1.37 TFLOPS) | 646 ms |
+  | bfloat16 | 584 ms (0.71 TFLOPS) | 1 171 ms |
+
+- The GPU was shared: over 60 s of a running picture ComfyUI got 46 % of the GPU time, the window server 26 % (Screen
+  Sharing), the Claude app 26 %, other apps 13 %; the GPU stood at 95–100 % even without a picture.
+
+Now ComfyUI on MPS runs a model in float16 where the model allows it and would get bfloat16 (`vulkara_memory`;
+Anima, also Chroma and FLUX; Lumina 2, Z-Image, Qwen-Image and HiDream allow only bfloat16 and keep it). MiaoMiao,
+the same prompt and seed:
+
+| | bfloat16 | float16 |
+| --- | --- | --- |
+| 512 × 768, 8 steps | 21.2 s/step | 18.1 s/step |
+| 1024 × 1536 | 117–130 s/step | 92 s/step |
+
+The two 512 × 768 pictures: 23.6 dB, same composition and person. 60 steps at 1024 × 1536 stay at about 90 minutes
+on this M2 with the GPU shared as above.
+
+## 7ac. Streamed blocks waiting on a busy GPU (2026-10-30, M2 24 GB, memory kept free 12 GB)
+
+FLUX.2 [klein] 9B through Diffusers on the 16 GB plan (23 blocks streamed, 9 kept, 4.5 GB; 1024 px, 4 steps, prompt
+from the prompt cache) peaked at 17.7–21.1 GB in the runs of 7aa, planned 12 GB. A profiled run stayed at 13.1 GB
+(peak on the GPU 8.4 GB): the profile waits for the GPU after every block. Without it Python runs ahead of the GPU
+(MPS is asynchronous), and every block queued for computing holds its weights (a double block 0.87 GB) until it ran.
+On a GPU busy with other programs (here a loop of float16 matmuls beside it, as Screen Sharing and other apps did) the
+queue grew. Now a streamed block is loaded only when at most two before it still wait on the GPU (an MPS event after
+each). The engine's footprint sampled every 0.5 s, the same picture:
+
+| GPU shared with a busy program | footprint while denoising | engine at most | swap read | whole |
+| --- | --- | --- | --- | --- |
+| no bound (before) | 12.8–18.2 GB | 19.6 GB | 43.6 GB | 279 s |
+| at most two blocks waiting | 12.2–13.9 GB | 14.3 GB | 0.5 GB | 225 s |
+
+Faster too, as the Mac no longer swaps. The rest above the plan (12 GB) is the blocks in flight: the plan counts 15 %
+of the model for them (2.7 GB), while three blocks of klein 9B in flight on the GPU and two read ahead come to more;
+the plan is not changed yet.
+
 ## 8. Earlier references (from the user guide and the changelog)
 
 - Training on the M2 (2025–26): SDXL about 2.5 s per step at 768 px, FLUX.2 [klein] 4B about 15 s, 9B about 30 s,

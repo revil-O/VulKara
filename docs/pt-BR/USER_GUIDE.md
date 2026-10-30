@@ -811,6 +811,12 @@ O que acontece na importação:
   Quando não cabe, a **Compressão** armazena partes grandes em 8 ou 4 bits; quando nem isso basta e o modelo permite, ele
   é marcado para streaming do SSD (veja abaixo). Um modelo que ainda assim não cabe é marcado com *Precisa de mais
   memória do que este Mac tem*, e **Importar mesmo assim** o importa de qualquer forma.
+- **Em etapas**: antes do streaming, um modelo que não cabe junto com o codificador de texto roda em etapas: um prompt
+  novo é codificado só com o codificador de texto (o modelo não fica na memória enquanto isso) e depois o modelo é
+  carregado em 8 bits e faz a imagem. Um prompt do cache de prompts não precisa de nenhum dos dois passos. É assim que
+  o Qwen-Image 2.1 roda num Mac de 16 GB: mais ou menos tão rápido quanto em streaming de 16 bits (1830 s em vez de
+  1700–1860 s a 1024 px e 40 passos), com menos memória e sem ler cerca de 380 GB do SSD por imagem. *Sempre* em
+  Ajustes → Motor → *Carregar modelos grandes parte por parte do SSD* faz streaming em 16 bits no lugar disso.
 - **Streaming do SSD**: um modelo de 16 bits que não cabe na memória pode rodar mesmo assim: o denoiser dele é gravado
   uma vez, bloco por bloco, no *Cache do streaming do SSD* (cerca do dobro do tamanho do modelo, na pasta do modelo ou
   na pasta definida em Ajustes), e enquanto uma imagem é gerada cada bloco é carregado logo antes de rodar. É lento,
@@ -844,8 +850,9 @@ Todas as tarefas concluídas, as mais recentes primeiro, com todos os ajustes.
 
 O painel de um item mostra a imagem grande (até metade da largura da janela; uma imagem em retrato só tão alta quanto uma quadrada) e, abaixo dela, no terço esquerdo,
 todos os seus botões, um embaixo do outro: **Favorito**, **Salvar como**, **Mostrar no Finder**, **Compartilhar** e **Copiar imagem** para cada
-imagem, depois os três botões do item. Ao lado, separados por uma linha, ficam os ajustes e depois o prompt e o prompt negativo, cada um com seu título. Enquanto a
-visualização grande está aberta, o painel mostra só os botões.
+imagem, depois os três botões do item. Ao lado, separados por uma linha, ficam os ajustes e depois o prompt e o prompt negativo, cada um com seu título. Eles continuam
+ali enquanto a visualização grande está aberta. **Tempo de geração** mostra quanto a tarefa levou (com o carregamento) e
+seus segundos por passo (itens a partir da 0.7.10): uma imagem muito mais lenta que as anteriores chama a atenção.
 
 - **Usar estes ajustes** devolve prompt, modelo, estilo, tamanho, seed, LoRAs e todos os outros ajustes à página de
   onde a tarefa veio. O modelo é encontrado mesmo quando a pasta dele foi movida.
@@ -898,7 +905,9 @@ Wan 2.2.
 
 ![Visualização grande](../screenshots/pt-BR/viewer.jpg)
 
-Clicar em um resultado o abre em uma **janela própria**. Várias visualizações grandes podem ficar abertas ao
+Clicar em um resultado o abre em uma **janela própria**; uma faixa translúcida na parte de baixo de cada uma dessas imagens
+avisa isso ("Clique para ver a prévia"; na interface web remota "Clique para ver a
+visualização grande"). Várias visualizações grandes podem ficar abertas ao
 mesmo tempo; voltar para a janela principal fecha todas. Quando o app está em tela cheia, a visualização grande abre como uma janela sobre ele, no mesmo espaço (em vez
 de um espaço de tela cheia próprio sem barra de título), assim ela nunca deixa o app fora de alcance.
 
@@ -948,11 +957,13 @@ Nenhum token é enviado, nem nada sobre seus arquivos; só as listas públicas d
 
 #### Atualizações do app
 
-Com a mesma verificação diária (e **Procurar atualização** na página Novidades) o VulKara pergunta ao GitHub pela sua
+Com a mesma verificação diária (e **Verificar atualização** na página Novidades) o VulKara pergunta ao GitHub pela sua
 versão mais recente. Se houver uma mais nova, um cartão no canto avisa: **Atualizar e reiniciar** baixa a versão,
 verifica (o checksum SHA-256 que o GitHub informa para o arquivo, a versão dentro dele, a assinatura Developer ID das
 versões do VulKara e o Gatekeeper) e a coloca no lugar do app quando o VulKara é encerrado; depois a nova versão
-inicia. **Notas da versão** abre as notas da versão, **Mais tarde** esconde o cartão até a próxima versão. Só atualiza
+inicia. **Notas da versão** abre as notas da versão, **Mais tarde** esconde o cartão até a próxima versão.
+A barra de título de cada página mostra a versão (*v0.7.9*, um clique abre Novidades) ou, com uma mais nova,
+*Atualização para a versão … disponível!*: um clique traz o cartão de volta. Só atualiza
 enquanto nada está sendo gerado ou instalado, e só um app numa pasta onde ele pode escrever (em Aplicativos, não aberto
 pela imagem de disco). Instalado com o Homebrew? Funciona igual; `brew upgrade --cask vulkara` também.
 
@@ -986,6 +997,9 @@ definir uma pasta; **Padrão** volta à pasta padrão.
   88 s por passo em vez de 225 s com o modelo inteiro na memória (o macOS usa a troca); em 24 GB o modelo cabe e é
   carregado inteiro (44 s; por partes levaria 50 s). Modelos que cabem não são afetados; os safetensors são sempre
   lidos inteiros.
+- **Liberar a memória quando ocioso**: *Após 10 min* (padrão), 5, 30 ou 60 min, ou *Nunca*. Sem nenhum trabalho por
+  esse tempo, os motores liberam o modelo carregado e a memória volta para os outros programas; a próxima imagem o
+  carrega de novo. Medido com Z-Image Turbo (MLX): depois de uma imagem os motores ocupavam 7,5 GB e, liberados, 1,1 GB.
 - **Cache de passos**: *Desativado* (padrão), *Leve* ou *Forte*. Passos que mal mudam a imagem reaproveitam o passo
   anterior em vez de serem calculados por completo; um modelo em streaming nem lê esses blocos do SSD. FLUX.1 [dev]
   com 28 passos: *Leve* reaproveita cerca de 5 passos (cerca de 1,2× mais rápido, a imagem praticamente igual), *Forte*

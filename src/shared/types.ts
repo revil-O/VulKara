@@ -192,6 +192,9 @@ export interface HistoryEntry {
   /** the files marked as favourites, in the order of files; missing when there are none */
   favorites?: string[]
   kind: 'image' | 'video'
+  /** how long the job ran, loading included, and its seconds per step (entries since 0.7.10) */
+  seconds?: number
+  secondsPerStep?: number
 }
 
 /** Events of the engines (protocol v2) as the main process passes them on. */

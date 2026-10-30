@@ -62,7 +62,9 @@ def test_the_memory_switch_takes_only_its_two_modes(monkeypatch):
     mm.vram_state = mm.VRAMState.SHARED
     # ComfyUI keeps an FP8 file in FP8 where 16 bit does not fit
     mm.FLOAT8_TYPES = ["fp8"]
-    mm.unet_dtype = lambda model_params=0, weight_dtype=None: weight_dtype if weight_dtype == "fp8" and model_params > 10 else "bf16"
+    import torch
+    mm.unet_dtype = lambda model_params=0, supported_dtypes=(), weight_dtype=None: \
+        weight_dtype if weight_dtype == "fp8" and model_params > 10 else torch.bfloat16
     mm.get_torch_device = lambda: types.SimpleNamespace(type="mps")
     comfy = types.ModuleType("comfy")
     comfy.model_management = mm
@@ -75,7 +77,6 @@ def test_the_memory_switch_takes_only_its_two_modes(monkeypatch):
     queue = types.SimpleNamespace(get_flags=lambda reset=True: reads.append(pending.pop(0) if pending else {}) or reads[-1])
     server.PromptServer = types.SimpleNamespace(instance=types.SimpleNamespace(routes=routes, prompt_queue=queue))
     monkeypatch.setitem(sys.modules, "server", server)
-    import torch
     import torch.nn.functional as F
     monkeypatch.setattr(F, "scaled_dot_product_attention", F.scaled_dot_product_attention)  # the node patches it
     spec = importlib.util.spec_from_file_location("vulkara_memory_test", node)
@@ -83,7 +84,10 @@ def test_the_memory_switch_takes_only_its_two_modes(monkeypatch):
     # the VAE keeps split attention; heads of 40 are padded to the same result
     assert mm.pytorch_attention_enabled_vae() is False
     # MPS cannot cast FP8: such a model stays in 16 bit
-    assert (mm.unet_dtype(model_params=20, weight_dtype="fp8"), mm.unet_dtype(model_params=1, weight_dtype="fp8")) == ("bf16", "bf16")
+    assert (mm.unet_dtype(model_params=20, weight_dtype="fp8"), mm.unet_dtype(model_params=1, weight_dtype="fp8")) == (torch.bfloat16,) * 2
+    # MPS computes bfloat16 at half the speed: float16 where the model allows it (Anima), else bfloat16 stays (Lumina 2)
+    anima, lumina = [torch.bfloat16, torch.float16, torch.float32], [torch.bfloat16, torch.float32]
+    assert (mm.unet_dtype(supported_dtypes=anima), mm.unet_dtype(supported_dtypes=lumina)) == (torch.float16, torch.bfloat16)
     if torch.backends.mps.is_available():
         q, k, v = (torch.randn(1, 8, 256, 40, device="mps") for _ in range(3))
         ref = torch.softmax(q @ k.transpose(-1, -2) * 40 ** -0.5, -1) @ v

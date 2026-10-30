@@ -42,6 +42,8 @@ export interface Settings {
   runtime: 'auto' | 'diffusers' | 'mlx'
   /** steps that barely change are reused (engines/diffusers/step_cache.py): faster, pictures differ slightly */
   stepCache: 'off' | 'light' | 'strong'
+  /** the engines free their models after this many minutes without a job; 0 = never */
+  idleUnloadMinutes: number
   /** false = safe mode: no nudity in results, no explicit preview pictures */
   allowExplicit: boolean
   notifySound: boolean
@@ -88,6 +90,7 @@ export const DEFAULT_SETTINGS: Settings = {
   streamCacheDir: '',
   runtime: 'auto',
   stepCache: 'off',
+  idleUnloadMinutes: 10,
   allowExplicit: false,
   notifySound: true,
   theme: 'system',

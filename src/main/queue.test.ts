@@ -167,6 +167,27 @@ describe('job queue', () => {
     expect(discarded).toEqual(['/images/x.png', '/images/x.png'])
   })
 
+  it('hands the run time and seconds per step of a finished job to the history', async () => {
+    let time = 0
+    const sent: ((e: QueueEvent) => void)[] = []
+    const timings: unknown[] = []
+    const queue = new JobQueue<string>({
+      dispatch: (_job, listener) => { sent.push(listener); return 'diffusers' },
+      stop: () => {}, check: async () => ({ ok: true }), now: () => time, changed: () => {},
+      finished: (_job, _results, timing) => { timings.push(timing) },
+    })
+    queue.add(JOB)
+    time = 3000
+    sent[0]({ event: 'progress', value: 10 })
+    time = 7000
+    sent[0]({ event: 'progress', value: 30 })
+    time = 12345
+    sent[0]({ event: 'result', path: '/images/a.png' })
+    sent[0]({ event: 'state', state: 'idle' })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(timings).toEqual([{ seconds: 12.3, secondsPerStep: 2 }])
+  })
+
   it('goes on with the next job when the finished one can not be saved', async () => {
     const sent: ((e: QueueEvent) => void)[] = []
     const logged: string[] = []

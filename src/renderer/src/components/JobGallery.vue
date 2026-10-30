@@ -4,6 +4,7 @@
 import { jobLabel } from '../util/labels'
 import { computed, ref } from 'vue'
 import { CircleAlert, FileX, Heart, Info, Square, X } from 'lucide-vue-next'
+import OpenHint from './OpenHint.vue'
 import { useAssetsStore } from '../stores/assets'
 import { useFavoritesStore } from '../stores/favorites'
 import { useQueueStore } from '../stores/queue'
@@ -55,13 +56,19 @@ const details = (q: QueuedJob): string => [
           <small class="selectable">{{ fileName(file) }}</small>
           <small>{{ t('library.gallery.fileMissingHint') }}</small>
         </div>
-        <video v-else-if="isVideo(file)" :src="url(file)" muted loop autoplay @error="gone(file)" />
-        <img v-else :src="url(file)" draggable="false" @error="gone(file)" />
-        <span v-if="q.job.label" class="label">{{ jobLabel(q.job.label) }}</span>
-        <template v-if="q.job.note">
-          <span class="note" tabindex="0" :aria-label="t('library.gallery.note')" @click.stop @keydown.enter.stop><Info :size="12" /></span>
-          <div class="details-panel note-panel selectable" @click.stop>{{ q.job.note }}</div>
-        </template>
+        <span v-else class="frame">
+          <video v-if="isVideo(file)" :src="url(file)" muted loop autoplay @error="gone(file)" />
+          <img v-else :src="url(file)" draggable="false" @error="gone(file)" />
+          <OpenHint>
+            <template #start>
+              <span v-if="q.job.label" class="label">{{ jobLabel(q.job.label) }}</span>
+            </template>
+            <template v-if="q.job.note">
+              <span class="note" tabindex="0" :aria-label="t('library.gallery.note')" @click.stop @keydown.enter.stop><Info :size="12" /></span>
+              <div class="details-panel note-panel selectable" @click.stop>{{ q.job.note }}</div>
+            </template>
+          </OpenHint>
+        </span>
         <button
           v-if="over(q) && !missing.has(file)" class="heart" :class="{ on: favorites.has(file) }"
           :title="favorites.has(file) ? t('library.removeFavorite') : t('library.addFavorite')"
@@ -128,12 +135,20 @@ const details = (q: QueuedJob): string => [
   cursor: pointer;
   display: grid;
   place-items: center;
+  container-type: inline-size;
 }
 
+/* the picture's own outline, so that the band of OpenHint lies on the picture, not on the tile around it */
+.frame {
+  position: relative;
+  display: block;
+}
+
+/* the tile is square: its width bounds both sides */
 .picture img,
 .picture video {
-  max-width: 100%;
-  max-height: 100%;
+  max-width: 100cqw;
+  max-height: 100cqw;
   display: block;
 }
 
@@ -167,11 +182,10 @@ const details = (q: QueuedJob): string => [
   background: repeating-conic-gradient(rgba(128, 128, 128, 0.22) 0% 25%, transparent 0% 50%) 50% / 16px 16px;
 }
 
+/* in the band of OpenHint, left of its text */
 .label {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  max-width: calc(100% - 16px);
+  flex-shrink: 0;
+  max-width: 40%;
   padding: 2px 8px;
   border-radius: 9px;
   background: rgba(0, 0, 0, 0.65);
@@ -316,15 +330,16 @@ const details = (q: QueuedJob): string => [
   bottom: 100%;
   left: 0;
   width: 20px;
-  height: 8px;
+  height: 12px;
 }
 
-/* the note of a picture opens above its (i) in the lower corner */
+/* the note of a picture opens above the band, from its (i) */
 .note-panel {
   top: auto;
-  bottom: 34px;
-  max-height: calc(100% - 44px);
+  bottom: calc(100% + 6px);
+  max-height: 60cqw;
   cursor: auto;
+  pointer-events: auto;
 }
 
 .job.running {
@@ -361,10 +376,10 @@ const details = (q: QueuedJob): string => [
 }
 
 .note {
-  position: absolute;
+  position: relative;
   z-index: 2;
-  right: 8px;
-  bottom: 8px;
+  flex-shrink: 0;
+  pointer-events: auto;
   display: grid;
   place-items: center;
   width: 20px;

@@ -1173,7 +1173,8 @@
   "search": "Buscar en prompts y modelos",
   "removeFavorite": "Quitar de Favoritos",
   "addFavorite": "Añadir a Favoritos",
-  "largeView": "Vista grande",
+  "openHint": "Clic para ver la vista previa",
+  "openHintRemote": "Haz clic para ver la vista grande",
   "favourite": "Favorito",
   "saveAs": "Guardar como",
   "showInFinder": "Mostrar en el Finder",
@@ -1209,6 +1210,7 @@
    "sampler": "Sampler",
    "strength": "Intensidad",
    "length": "Duración",
+   "duration": "Tiempo de generación",
    "loras": "LoRAs",
    "controlnet": "ControlNet",
    "label": "Etiqueta",
@@ -1307,7 +1309,10 @@
    "stepCacheHint": "Los pasos que apenas cambian la imagen reutilizan el paso anterior en lugar de calcularse por completo: más rápido (también con streaming desde el SSD), la imagen cambia ligeramente. Modelos FLUX.1 con el runtime Diffusers; los demás modelos se calculan por completo.",
    "off": "Desactivada",
    "light": "Ligera",
-   "strong": "Fuerte"
+   "strong": "Fuerte",
+   "idleUnload": "Liberar la memoria en reposo",
+   "idleUnloadHint": "Si no llega ningún trabajo durante este tiempo, el modelo cargado deja la memoria a otros programas; la siguiente imagen lo vuelve a cargar.",
+   "afterMinutes": "Tras {n} min"
   },
   "appearance": {
    "title": "Apariencia",
@@ -1592,12 +1597,12 @@
    "unreleased": "Aún no publicada",
    "version": "Versión {version}",
    "installed": "instalada",
-   "checkNow": "Buscar actualización",
-   "checking": "Buscando una versión más nueva en GitHub…",
+   "checkNow": "Comprobar actualización",
+   "checking": "Comprobando en GitHub si hay una versión más nueva…",
    "newer": "La versión {version} está disponible.",
-   "upToDate": "Esta es la versión más nueva (buscado {when}).",
-   "notChecked": "Aún no se ha buscado una versión más nueva.",
-   "checkFailed": "No se pudo buscar una versión más nueva ({reason})."
+   "upToDate": "Esta es la versión más nueva (comprobado {when}).",
+   "notChecked": "Aún no se ha comprobado si hay una versión más nueva.",
+   "checkFailed": "No se pudo comprobar si hay una versión más nueva ({reason})."
   },
   "update": {
    "available": "VulKara {version} está disponible",
@@ -1612,7 +1617,8 @@
    "failed": "La actualización no funcionó: {reason}",
    "notPackaged": "esta no es una app instalada (una compilación de desarrollo)",
    "notInstalled": "VulKara se ejecuta desde la imagen de disco; muévela antes a Aplicaciones",
-   "readOnly": "VulKara no puede reemplazarse en su carpeta; descarga la nueva versión desde la página de la versión"
+   "readOnly": "VulKara no puede reemplazarse en su carpeta; descarga la nueva versión desde la página de la versión",
+   "header": "¡Actualización a la versión {version} disponible!"
   },
   "licenses": {
    "title": "Licencias",
