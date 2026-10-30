@@ -1025,12 +1025,12 @@ Weg, einen Ordner festzulegen; **Standard** kehrt zum Standardordner zurück.
 - **Große Modelle Stück für Stück von der SSD laden**: *Bei Bedarf* (Standard), *Immer* oder *Nie*. Lässt Modelle
   laufen, die nicht in den Arbeitsspeicher passen, mit geringerer Geschwindigkeit; siehe [SSD-Streaming](#hinzufügen). Wohin
   die Blöcke kommen, legst du unter Ordner → *Cache für SSD-Streaming* fest.
-- **ComfyUI: GGUF-Modelle stückweise von der SSD laden**: an (Standard). Ein ComfyUI-Modell in GGUF (Pony V7, Wan
-  2.2 14B), das neben seinem Text-Encoder nicht in den Arbeitsspeicher passt, etwa auf Macs mit 16 GB, hält nur einen
-  Teil im Speicher und liest den Rest für jeden Schritt aus seiner Datei. Gemessen mit Pony V7 (Q8_0, 1024 px): auf
-  16 GB etwa 88 s pro Schritt statt 225 s mit dem ganzen Modell im Speicher (macOS lagert aus); auf 24 GB passt das
-  Modell und wird ganz geladen (44 s; stückweise wären es 50 s). Modelle, die passen, betrifft das nicht; safetensors
-  werden immer ganz gelesen.
+- **ComfyUI: GGUF-Modelle stückweise von der SSD laden**: an (Standard). ComfyUI gibt den Text-Encoder eines
+  Modells nach dem Kodieren des Prompts frei, wenn weniger Speicher übrig ist, als die Einstellungen frei halten. Ein
+  ComfyUI-Modell in GGUF (Wan 2.2 14B), das auch so nicht in den Arbeitsspeicher passt, hält nur einen Teil im
+  Speicher und liest den Rest für jeden Schritt aus seiner Datei. Pony V7 (Q8_0, 1024 px) passt auf 16 GB jetzt ohne
+  seinen Text-Encoder und wird ganz geladen: 47 s pro Schritt statt 65 s stückweise; auf 24 GB 44 s (stückweise wären
+  es 50 s). Modelle, die passen, betrifft das nicht; safetensors werden immer ganz gelesen.
 - **Speicher im Leerlauf freigeben**: *Nach 10 Min.* (Standard), 5, 30 oder 60 Min. oder *Nie*. Kommt so lange kein
   Job, geben die Engines ihr geladenes Modell frei, und der Speicher steht anderen Programmen zur Verfügung; das nächste
   Bild lädt es wieder. Gemessen mit Z-Image Turbo (MLX): nach einem Bild hielten die Engines 7,5 GB, freigegeben 1,1 GB.

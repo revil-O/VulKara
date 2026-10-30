@@ -961,11 +961,12 @@ All folders can be on an external drive. **Choose** opens the macOS folder dialo
 - **Load large models piece by piece from the SSD**: *When needed* (default), *Always* or *Never*. Lets models run
   that do not fit into memory, at lower speed; see [SSD streaming](#add). Where the blocks go is set under Folders →
   *SSD streaming cache*.
-- **ComfyUI: load GGUF models piece by piece from the SSD**: on (default). A ComfyUI model in GGUF (Pony V7, Wan
-  2.2 14B) that does not fit into memory beside its text encoder, as on Macs with 16 GB, keeps only part of itself in
-  memory and reads the rest from its file for each step. Measured with Pony V7 (Q8_0, 1024 px): on 16 GB about 88 s
-  per step instead of 225 s with the whole model in memory (macOS swaps); on 24 GB the model fits and loads whole
-  (44 s; piece by piece it would take 50 s). Models that fit are not affected; safetensors are always read whole.
+- **ComfyUI: load GGUF models piece by piece from the SSD**: on (default). ComfyUI drops a model's text encoder
+  once the prompt is encoded when less memory is left than Settings keep free. A ComfyUI model in GGUF (Wan 2.2 14B)
+  that does not fit into memory even so keeps only part of itself in memory and reads the rest from its file for each
+  step. Pony V7 (Q8_0, 1024 px) now fits on 16 GB without its text encoder and loads whole: 47 s per step instead of
+  65 s piece by piece; on 24 GB 44 s (piece by piece it would take 50 s). Models that fit are not affected;
+  safetensors are always read whole.
 - **Free the memory when idle**: *After 10 min* (default), 5, 30 or 60 min, or *Never*. Without a job for that
   long, the engines free their loaded model, so the memory goes back to other programs; the next picture loads it again.
   Measured with Z-Image Turbo (MLX): the engines held 7.5 GB after a picture and 1.1 GB once freed.

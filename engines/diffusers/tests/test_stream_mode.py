@@ -33,9 +33,9 @@ def test_stream_mode_from_environment(monkeypatch, value, mode):
 
 @pytest.mark.parametrize("mode, transformer_gb, streamed", [
     ("auto", 4, False),      # fits: loaded normally
-    ("auto", 60, True),      # too large: emergency streaming
+    ("auto", 30, True),      # too large: emergency streaming
     ("always", 4, True),     # fits, streamed anyway
-    ("always", 60, True),
+    ("always", 30, True),
 ])
 def test_when_the_model_is_streamed(tmp_path, monkeypatch, mode, transformer_gb, streamed):
     monkeypatch.setenv("VK_SSD_STREAMING", mode)

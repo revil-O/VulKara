@@ -136,10 +136,10 @@ def bit_sizes(model_dir, m, mode):
 
 
 def memory_mode(m, files, ram_gb):
-    """ComfyUI's memory mode for a model (m: its model.json): LOW_VRAM when SHARED would not hold it. SHARED keeps the
-    text encoder loaded next to the model, so it is counted without staging (Pony V7 Q8_0: 14 GB, docs/MEASUREMENTS.md
-    7h). Only a GGUF model streams from its file; Settings → ComfyUI streaming off (VK_COMFY_STREAMING=off) keeps
-    SHARED."""
+    """ComfyUI's memory mode for a model (m: its model.json): LOW_VRAM when SHARED would not hold it. In SHARED ComfyUI
+    drops the text encoder once the prompt is encoded when less than the memory kept free is left (--cache-ram), so it
+    is counted staged (Pony V7 Q8_0 on 16 GB: SHARED, 10.6 GB, docs/MEASUREMENTS.md 7ae). Only a GGUF model streams
+    from its file; Settings → ComfyUI streaming off (VK_COMFY_STREAMING=off) keeps SHARED."""
     if os.environ.get("VK_COMFY_STREAMING", "on").strip().lower() in ("off", "0"):
         return "SHARED"
     if not str(files.get("diffusion_model", "")).lower().endswith(".gguf"):
@@ -148,10 +148,11 @@ def memory_mode(m, files, ram_gb):
 
 
 def shared_plan(m, ram_gb):
-    """The memory plan of a model held whole in memory (SHARED), text encoder included."""
+    """The memory plan of a model held whole in memory (SHARED), its text encoder loaded only while encoding (not
+    measured for video: Wan 2.2 14B has two experts the plan counts as one, so it keeps the text encoder counted)."""
     spec = registry.ARCHS[m["arch"]]
     return memory.plan(m.get("components") or spec["fallback_params"], spec["denoiser"], spec["family"], ram_gb,
-                       quant="none", allow_staging=False)
+                       quant="none", allow_staging=spec.get("kind") != "video")
 
 
 class ComfyServer:
@@ -195,12 +196,16 @@ class ComfyServer:
         self.token = secrets.token_urlsafe(32)
         self.port = _free_port()
         self.mode = "SHARED"
-        # only on the loopback interface; API nodes (paid online services) are not loaded; attention: vulkara_memory
+        # only on the loopback interface; API nodes (paid online services) are not loaded; attention: vulkara_memory;
+        # --cache-ram: ComfyUI drops cached node outputs (the text encoder once the prompt is encoded) when less than
+        # the memory kept free is left, not only below its own 10 % (MEASUREMENTS 7ae)
+        ram = memory.total_ram_gb()
         with open(WORK / "comfyui.log", "w") as log:
             self.proc = subprocess.Popen(
                 [sys.executable, "main.py", "--listen", "127.0.0.1", "--port", str(self.port), "--disable-auto-launch",
                  "--disable-api-nodes", "--disable-metadata", "--disable-all-custom-nodes", "--use-pytorch-cross-attention",
                  "--whitelist-custom-nodes", "ComfyUI-GGUF", "vulkara_guard", "vulkara_memory",
+                 "--cache-ram", "%.1f" % min(ram - memory.budget_gb(ram), ram / 2),
                  "--extra-model-paths-config", str(cfg),
                  "--output-directory", str(WORK / "output"), "--temp-directory", str(WORK / "temp"),
                  "--input-directory", str(WORK / "input"), "--user-directory", str(WORK / "user")],

@@ -33,8 +33,6 @@ def stream_mode():
     return {"0": "off", "1": "always"}.get(v, v if v in ("auto", "always", "off") else "auto")
 
 
-# share of a streamed denoiser counted as resident (one block plus the rest of the model)
-STREAM_RESIDENT_SHARE = 0.15
 # what the memory plan leaves free beyond that may keep blocks of a streamed model on the GPU, less this margin
 STREAM_KEEP_MARGIN = 0.05
 SLICE_ABOVE_PIXELS = 1536 * 1536
@@ -230,7 +228,7 @@ class LoadedModel:
             # the denoiser's blocks come from the SSD one at a time (streaming.py); "auto" only as an
             # emergency mode for models that do not fit otherwise
             comps = dict(self.m["components"])
-            comps[self.m["denoiser"]] = comps[self.m["denoiser"]] * STREAM_RESIDENT_SHARE
+            comps[self.m["denoiser"]] = comps[self.m["denoiser"]] * memory.stream_resident_share(self.spec["family"])
             plan = memory.plan(comps, self.m["denoiser"], self.spec["family"], ram, quant="auto")
             te_opts = None
             if not plan["fits"]:
@@ -1017,10 +1015,11 @@ def keep_plan(components, denoiser, family, ram_gb, streamed_plan, text_quant_op
     while a new prompt is encoded and are read back after (once per prompt, not per step): then only the denoising
     has to fit. Returns (share, plan, release), release: free the kept blocks while encoding."""
     full_gb = memory._gb(components[denoiser], "none")
+    resident = memory.stream_resident_share(family)
     worst = max([1] + [_TE_RANK.get(q, 0) for n, q in streamed_plan["quant"].items() if n != denoiser])
     for twentieths in range(20, 3, -1):
         share = twentieths / 20
-        keep = round(share - STREAM_RESIDENT_SHARE - STREAM_KEEP_MARGIN, 2)
+        keep = round(share - resident - STREAM_KEEP_MARGIN, 2)
         if keep <= 0:
             break
         # the denoiser at its real size (16 bit), only the text encoders' precision and staging are for the plan to pick
@@ -1029,15 +1028,15 @@ def keep_plan(components, denoiser, family, ram_gb, streamed_plan, text_quant_op
         te_ok = all(_TE_RANK.get(q, 0) <= worst for n, q in p["quant"].items() if n != denoiser)
         if p["fits"] and te_ok:
             p["quant"][denoiser] = "none"
-            return min(keep, 1.0 - STREAM_RESIDENT_SHARE), p, False
+            return min(keep, 1.0 - resident), p, False
         # the streamed plan's encoding (blocks in flight only) stays as it is; denoising holds the kept blocks
-        denoising = streamed_plan["denoise_peak_gb"] + full_gb * (share - STREAM_RESIDENT_SHARE)
+        denoising = streamed_plan["denoise_peak_gb"] + full_gb * (share - resident)
         if streamed_plan["staged_text_encoder"] and denoising <= streamed_plan["budget_gb"]:
             # the kept blocks count while denoising (the job's planned peak, the room for a ControlNet), not while
             # encoding, when they are released
             p = dict(streamed_plan, denoise_peak_gb=round(denoising, 1),
                      est_peak_gb=round(max(streamed_plan["est_peak_gb"], denoising), 1))
-            return min(keep, 1.0 - STREAM_RESIDENT_SHARE), p, True
+            return min(keep, 1.0 - resident), p, True
     return 0.0, streamed_plan, False
 
 

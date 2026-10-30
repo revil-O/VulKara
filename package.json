@@ -1,7 +1,7 @@
 {
   "name": "vulkara",
   "productName": "VulKara",
-  "version": "0.7.10",
+  "version": "0.7.11",
   "description": "Local image and video generation for Apple Silicon Macs",
   "private": true,
   "license": "LicenseRef-PolyForm-Noncommercial-1.0.0",

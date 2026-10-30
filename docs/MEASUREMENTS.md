@@ -908,7 +908,47 @@ each). The engine's footprint sampled every 0.5 s, the same picture:
 
 Faster too, as the Mac no longer swaps. The rest above the plan (12 GB) is the blocks in flight: the plan counts 15 %
 of the model for them (2.7 GB), while three blocks of klein 9B in flight on the GPU and two read ahead come to more;
-the plan is not changed yet.
+the plan counts them since 7ad.
+
+## 7ad. The plan of a streamed FLUX.2 counts its large blocks (2026-10-30, M2 24 GB, memory kept free 12 GB)
+
+After 7ac klein 9B on the 16 GB plan still peaked 2.3 GB above its plan: the plan counted 15 % of a streamed model
+for the blocks in flight and the rest of the model, true for Qwen-Image 2.1 (60 blocks, 7w), but a FLUX.2 double block
+is 4.8 % of the model and up to five are in flight (three on the GPU, two read ahead). Now the share is per family
+(`memory.stream_resident_share`): 27 % for FLUX.2, 15 % for the others. The engine keeps 2 blocks (0.8 GB) instead of 9
+(4.5 GB). The same picture as 7ac (1024 px, 4 steps, prompt from the prompt cache):
+
+| | planned | engine at most | swap read | whole |
+| --- | --- | --- | --- | --- |
+| 15 %, 9 blocks kept, busy GPU (7ac) | 12.0 GB | 14.3 GB | 0.5 GB | 225 s |
+| 27 %, 2 blocks kept, GPU free | 11.5 GB | 11.9 GB | 0.2 GB | 310 s |
+| 27 %, 2 blocks kept, busy GPU | 11.5 GB | 10.6 GB | 0.1 GB | 237 s |
+
+Within the plan now; reading 7 more blocks per step costs about 5 % (237 against 225 s under the same load; the run
+with the GPU free was slower, the Mac was busy with other programs then).
+
+## 7ae. ComfyUI drops the text encoder when memory runs short (2026-10-30, M2 24 GB)
+
+Step 2 of the memory plan for ComfyUI. On the 24 GB Mac ComfyUI kept the text encoder through the whole picture
+("0 models unloaded"): it frees cached node outputs only when less than 10 % of the RAM is left. NetaYume v4
+(Lumina 2, Gemma 2 2B text encoder, 5.2 GB) peaked at 14.1 GB. The engine now starts ComfyUI with `--cache-ram` set
+to the memory the app keeps free: below that ComfyUI drops the text encoder once the prompt is encoded (the
+footprint falls from 5.7 to 2.0 GB before the model loads), and the plan counts ComfyUI's models staged, so Pony V7
+Q8_0 on 16 GB stays whole in memory (SHARED) instead of loading piece by piece from the SSD (LOW_VRAM, 7h).
+
+1024 px, the engine's footprint every 0.5 s with ComfyUI's log; first with 12 GB kept free on the 24 GB Mac (6 steps),
+then with 8 GB wired by `mlock` as well, so that ComfyUI really has the memory of a 16 GB Mac (3 steps, as in 7h):
+
+| | before | after |
+| --- | --- | --- |
+| NetaYume v4, 12 GB kept free | 14.1 GB, 30.8 s/step | 9.2 GB, 29.3 s/step (planned 11.6 GB) |
+| NetaYume v4, 8 GB wired | 10.6 GB, 30.6 s/step, 6.1 GB read from swap, 155 s | 8.7 GB, 28.3 s/step, 2.1 GB, 136 s |
+| Pony V7 Q8_0, 8 GB wired | LOW_VRAM: 64.7 s/step, 19.4 GB read from swap, 226 s | SHARED: 9.7 GB, 46.9 s/step, 4.6 GB, 185 s |
+
+A new prompt loads the text encoder again (NetaYume 13 s, Pony 6 s); the same prompt again comes from ComfyUI's
+cache of the encoded prompt. Not changed for MLX: freeing the model before decoding would not lower a job's peak, as
+a Mac short of memory decodes in tiles (no visible difference, 7m) and then the denoising is the peak; the next
+picture would have to load the model again.
 
 ## 8. Earlier references (from the user guide and the changelog)
 

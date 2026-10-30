@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.11 – 2026-10-30
+
+- **FLUX.2 [klein] 9B streamed on a 16 GB Mac stays within its memory plan.** The plan counts the model's large
+  blocks in flight (27 % of the model instead of 15 %) and keeps fewer blocks on the GPU: at most 10.6–11.9 GB
+  instead of 14.3 GB (planned 11.5 GB), about 5 % slower.
+- **ComfyUI models need less memory on small Macs.** ComfyUI now drops the text encoder after the prompt is encoded
+  when memory runs short (below what Settings keep free), instead of holding it through the whole picture: NetaYume v4
+  9.2 instead of 14.1 GB; Pony V7 Q8_0 on a 16 GB Mac stays whole in memory instead of loading piece by piece from the
+  SSD (47 instead of 65 s per step).
+
 ## 0.7.10 – 2026-10-30
 
 - **Qwen-Image 2.1 on a 16 GB Mac without SSD streaming.** A model that does not fit beside its text encoder now runs

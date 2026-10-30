@@ -991,12 +991,12 @@ definir uma pasta; **Padrão** volta à pasta padrão.
 - **Carregar modelos grandes parte por parte do SSD**: *Quando necessário* (padrão), *Sempre* ou *Nunca*. Permite
   executar modelos que não cabem na memória, com velocidade menor; veja [streaming do SSD](#adicionar). O lugar dos blocos é
   definido em Pastas → *Cache do streaming do SSD*.
-- **ComfyUI: carregar modelos GGUF por partes a partir do SSD**: ligado (padrão). Um modelo do ComfyUI em GGUF
-  (Pony V7, Wan 2.2 14B) que não cabe na memória junto com o codificador de texto, como em Macs com 16 GB, mantém só
-  uma parte na memória e lê o resto do arquivo a cada passo. Medido com o Pony V7 (Q8_0, 1024 px): em 16 GB cerca de
-  88 s por passo em vez de 225 s com o modelo inteiro na memória (o macOS usa a troca); em 24 GB o modelo cabe e é
-  carregado inteiro (44 s; por partes levaria 50 s). Modelos que cabem não são afetados; os safetensors são sempre
-  lidos inteiros.
+- **ComfyUI: carregar modelos GGUF por partes a partir do SSD**: ligado (padrão). O ComfyUI libera o codificador de texto de
+  um modelo depois de codificar o prompt quando sobra menos memória do que os ajustes mantêm livre. Um modelo do
+  ComfyUI em GGUF (Wan 2.2 14B) que nem assim cabe na memória mantém só uma parte nela e lê o resto do arquivo a cada
+  passo. O Pony V7 (Q8_0, 1024 px) agora cabe em 16 GB sem o codificador de texto e é carregado inteiro: 47 s por passo
+  em vez de 65 s por partes; em 24 GB 44 s (por partes levaria 50 s). Modelos que cabem não são afetados; os
+  safetensors são sempre lidos inteiros.
 - **Liberar a memória quando ocioso**: *Após 10 min* (padrão), 5, 30 ou 60 min, ou *Nunca*. Sem nenhum trabalho por
   esse tempo, os motores liberam o modelo carregado e a memória volta para os outros programas; a próxima imagem o
   carrega de novo. Medido com Z-Image Turbo (MLX): depois de uma imagem os motores ocupavam 7,5 GB e, liberados, 1,1 GB.

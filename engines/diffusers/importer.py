@@ -626,7 +626,7 @@ def make_plan(info, quant="auto", ram_gb=None):
     # file is unpacked for that once)
     # (engine.py); the model fits if that does
     comps = dict(info["components"])
-    comps[info["denoiser"]] *= STREAM_RESIDENT_SHARE
+    comps[info["denoiser"]] *= memory.stream_resident_share(spec["family"])
     streamed = memory.plan(comps, info["denoiser"], spec["family"], ram, quant=quant)
     if not streamed["fits"] and quant == "auto":
         # as the engine: a big text encoder in 4 bit as the last resort
@@ -639,7 +639,7 @@ def make_plan(info, quant="auto", ram_gb=None):
     return plan
 
 
-# share of a streamed denoiser counted as resident, as engine.py counts it
+# share of a GGUF denoiser ComfyUI keeps resident in LOW_VRAM (the Diffusers engine's: memory.stream_resident_share)
 STREAM_RESIDENT_SHARE = 0.15
 
 

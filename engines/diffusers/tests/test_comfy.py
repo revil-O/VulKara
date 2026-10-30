@@ -300,12 +300,16 @@ def test_comfyui_streams_a_gguf_model_only_where_shared_would_not_hold_it(monkey
     monkeypatch.delenv("VK_MEMORY_RESERVE_GB", raising=False)
     pony = {"arch": "auraflow", "components": {"transformer": 3.67, "text_encoder": 1.47, "vae": 0.08}}
     gguf = {"diffusion_model": "pony__diffusion_model.gguf"}
-    # SHARED keeps the text encoder beside it: about 14 GB, as measured
-    assert main.memory_mode(pony, gguf, 16) == "LOW_VRAM"
-    assert main.memory_mode(pony, gguf, 24) == "SHARED"
-    assert main.memory_mode(pony, {"diffusion_model": "x.safetensors"}, 16) == "SHARED"  # read into memory anyway
-    monkeypatch.setenv("VK_COMFY_STREAMING", "off")
+    # SHARED with the text encoder dropped after encoding (--cache-ram): 10.6 GB on 16 GB, faster than LOW_VRAM (7ae)
     assert main.memory_mode(pony, gguf, 16) == "SHARED"
+    assert main.memory_mode(pony, gguf, 14) == "LOW_VRAM"
+    assert main.memory_mode(pony, gguf, 24) == "SHARED"
+    # a video model keeps its text encoder counted (two experts, not measured staged): Wan 2.2 14B streams on 24 GB
+    wan = {"arch": "wan22_i2v_14b", "components": {"transformer": 5.4, "text_encoder": 2.9, "vae": 0.13}}
+    assert main.memory_mode(wan, {"diffusion_model": "high.gguf"}, 24) == "LOW_VRAM"
+    assert main.memory_mode(pony, {"diffusion_model": "x.safetensors"}, 14) == "SHARED"  # read into memory anyway
+    monkeypatch.setenv("VK_COMFY_STREAMING", "off")
+    assert main.memory_mode(pony, gguf, 14) == "SHARED"
 
 
 def test_a_comfyui_gguf_too_large_for_memory_is_planned_streamed(monkeypatch):

@@ -38,7 +38,6 @@ MODELS = [
      "components": {"transformer": 9.28, "unconditional_transformer": 9.28, "text_encoder": 8.2, "vae": 0.08}},
 ]
 SIDES = [1024, 768, 512]
-STREAM_RESIDENT_SHARE = 0.15  # as engine.py counts a streamed denoiser
 QUANT_TEXT = {"none": "16 bit", "q8": "8 bit", "q4": "4 bit", "gguf": "GGUF"}
 
 
@@ -139,7 +138,7 @@ def recommendations(ram_gb, bf16_native=True):
             if side is None:
                 # emergency mode of the engine: the denoiser's blocks come from the SSD (engine.py)
                 comps = dict(model["components"])
-                comps[model["denoiser"]] *= STREAM_RESIDENT_SHARE
+                comps[model["denoiser"]] *= memory.stream_resident_share(model["family"])
                 sp = memory.plan(comps, model["denoiser"], model["family"], ram_gb)
                 if not sp["fits"]:
                     # as the engine: a big text encoder in 4 bit as the last resort

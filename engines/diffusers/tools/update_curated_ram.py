@@ -16,7 +16,6 @@ sys.path.insert(0, os.path.dirname(HERE))
 import memory  # noqa: E402
 import registry  # noqa: E402
 
-STREAM_RESIDENT_SHARE = 0.15  # as engine.py counts a streamed denoiser
 MLX_ARCHS = ("flux1_schnell", "flux1_dev", "flux2_klein", "z_image")
 CURATED = os.path.join(HERE, "..", "..", "..", "src", "shared", "data", "curated_models.json")
 
@@ -50,7 +49,7 @@ def figures(arch, params, fixed):
     # the denoiser streams from the SSD in 16 bit blocks (a GGUF one unpacked into the stream cache once), with a
     # big text encoder in 4 bit as the last resort (engine.py)
     streamed = dict(comps)
-    streamed[den] *= STREAM_RESIDENT_SHARE
+    streamed[den] *= memory.stream_resident_share(spec["family"])
     need = memory.plan(streamed, den, spec["family"], 256, text_quant_opts=memory.QUANT_ORDER)["min_ram_gb"]
     if need < out["min_ram_gb"]:
         out["min_ram_gb_streamed"] = need

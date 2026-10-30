@@ -49,19 +49,27 @@ def test_a_streamed_model_keeps_what_the_memory_plan_allows():
     import memory
     comps = {"text_encoder": 0.1, "text_encoder_2": 4.8, "transformer": 11.9, "vae": 0.1}  # FLUX.1 [dev]
     full_gb = memory._gb(11.9, "none")
+    resident = memory.stream_resident_share("flux")
     for ram, low, high in ((16, 0.05, 0.35), (24, 0.3, 0.8)):
-        streamed = dict(comps, transformer=comps["transformer"] * engine.STREAM_RESIDENT_SHARE)
+        streamed = dict(comps, transformer=comps["transformer"] * resident)
         plan = memory.plan(streamed, "transformer", "flux", ram)
         keep, kept_plan, release = engine.keep_plan(comps, "transformer", "flux", ram, plan)
         assert low <= keep <= high, (ram, keep)
         assert kept_plan["fits"] and kept_plan["quant"]["transformer"] == "none"
         assert kept_plan["quant"]["text_encoder_2"] in ("none", "q8")  # never 4 bit for it
-        share = keep + engine.STREAM_RESIDENT_SHARE + engine.STREAM_KEEP_MARGIN
+        share = keep + resident + engine.STREAM_KEEP_MARGIN
         if release:  # 16 GB: the text encoder is staged and gets the kept blocks' room; denoising fits with them
             assert ram == 16 and kept_plan["staged_text_encoder"]
-            assert plan["denoise_peak_gb"] + full_gb * (share - engine.STREAM_RESIDENT_SHARE) <= plan["budget_gb"]
+            assert plan["denoise_peak_gb"] + full_gb * (share - resident) <= plan["budget_gb"]
             # and the plan the job reports counts them while denoising
-            assert kept_plan["denoise_peak_gb"] == round(plan["denoise_peak_gb"] + full_gb * (share - engine.STREAM_RESIDENT_SHARE), 1)
+            assert kept_plan["denoise_peak_gb"] == round(plan["denoise_peak_gb"] + full_gb * (share - resident), 1)
             assert kept_plan["est_peak_gb"] >= kept_plan["denoise_peak_gb"] > plan["denoise_peak_gb"]
         else:  # with the margin given back it still fits: kept + in flight + margin <= what the plan allowed
             assert memory.plan(comps, "transformer", "flux", ram, denoiser_fixed_gb=full_gb * share)["fits"]
+
+
+def test_flux2_counts_its_large_double_blocks_in_flight():
+    import memory
+    # klein 9B streamed on 16 GB: five 0.87 GB double blocks in flight (MEASUREMENTS 7ac), more than the usual 15 %
+    assert memory.stream_resident_share("flux2") * memory._gb(9.08, "none") >= 4.3
+    assert memory.stream_resident_share("qwen_image") == 0.15

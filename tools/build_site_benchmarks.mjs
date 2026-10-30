@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto'
 
 const MEASURED = 'Apple M2, 24 GB'
 
-// before → after, per step and the engine's peak (MEASUREMENTS 7m, 7n, 7o, 7ab, 7ac; gb left out where not measured)
+// before → after, per step and the engine's peak (MEASUREMENTS 7m, 7n, 7o, 7ab, 7ac, 7ad, 7ae; gb left out where not measured)
 const CHANGES = [
   { ref: '7n', model: 'SD 1.5 (epiCPhotoGasm), 512 px', runtime: 'Diffusers', step: [1.55, 0.72], gb: [7.3, 3.7], why: 'attention heads padded to a size the fused kernel takes' },
   { ref: '7n', model: 'SD 1.5 (epiCPhotoGasm), 1024 px', runtime: 'Diffusers', step: [9.4, 4.8], gb: [9.8, 5.0], why: 'padded heads, no attention slicing' },
@@ -21,6 +21,9 @@ const CHANGES = [
   { ref: '7o', model: 'NetaYume v4 (Lumina 2), 1024 px', runtime: 'ComfyUI', step: [32.45, 28.7], gb: [15.85, 14.7], range: ['31.9–33.0', '28.7', '15.5–16.2', '14.1–15.3'], why: 'PyTorch attention instead of sub-quadratic' },
   { ref: '7o', model: 'Pony V7 Q8_0 (AuraFlow), 1024 px', runtime: 'ComfyUI, GGUF', step: [46.05, 46.7], gb: [15.35, 13.0], range: ['46.0–46.1', '46.7', '14.8–15.9', '12.3–13.7'], why: 'PyTorch attention instead of sub-quadratic' },
   { ref: '7o', model: 'Anima-Turbo, 1024 px', runtime: 'ComfyUI', step: [12.1, 11.8], gb: [10.0, 10.0], why: 'PyTorch attention instead of sub-quadratic' },
+  { ref: '7ae', model: 'NetaYume v4 (Lumina 2), 16 GB (8 GB wired)', runtime: 'ComfyUI', step: [30.6, 28.3], gb: [10.6, 8.7], why: 'the text encoder dropped after encoding' },
+  { ref: '7ae', model: 'Pony V7 Q8_0, 16 GB (8 GB wired)', runtime: 'ComfyUI, GGUF', step: [64.7, 46.9], gb: [6.6, 9.7], why: 'whole in memory without its text encoder instead of LOW_VRAM' },
+  { ref: '7ad', model: 'FLUX.2 [klein] 9B streamed, 16 GB plan, the plan counts its blocks', runtime: 'Diffusers', step: [50.4, 54.3], gb: [14.3, 10.6], why: 'blocks in flight counted at their size: 2 instead of 9 blocks kept' },
   { ref: '7ac', model: 'FLUX.2 [klein] 9B streamed, 16 GB plan, busy GPU', runtime: 'Diffusers', step: [67.0, 50.4], gb: [19.6, 14.3], why: 'at most two streamed blocks wait on the GPU' },
   { ref: '7ab', model: 'MiaoMiao RealSkin (Anima), 1024×1536, CFG 5', runtime: 'ComfyUI', step: [123.5, 92.3], range: ['117–130', '92.3'], why: 'float16 instead of bfloat16, which MPS computes at half the speed' },
   { ref: '7ab', model: 'MiaoMiao RealSkin (Anima), 512×768, CFG 5', runtime: 'ComfyUI', step: [21.2, 18.1], why: 'float16 instead of bfloat16' },

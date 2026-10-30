@@ -27,6 +27,15 @@ NATIVE_SIDE = {"sd1": 512, "sd2": 768}
 # further denoisers that run next to the main one and get its precision (Ideogram 4 denoises with a
 # conditional and an unconditional transformer)
 SECOND_DENOISERS = ("unconditional_transformer",)
+# share of a streamed denoiser counted as resident while denoising: the rest of the model and the blocks in flight (on
+# the GPU up to three, streaming.QUEUED waiting and the one loading, and two read ahead). 15 % holds for models of many
+# small blocks (Qwen-Image 2.1, MEASUREMENTS 7w); a FLUX.2 double block is 4.8 % of the model, five of them in flight
+# 27 % (klein 9B: 14.3 GB with 15 %, planned 12 GB, 7ac)
+STREAM_RESIDENT_SHARE = {"flux2": 0.27}
+
+
+def stream_resident_share(family):
+    return STREAM_RESIDENT_SHARE.get(family, 0.15)
 
 BYTES_PER_PARAM = {"none": 2.0, "q8": 1.05, "q4": 0.6}
 QUANT_ORDER = ["none", "q8", "q4"]  # best quality first
