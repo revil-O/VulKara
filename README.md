@@ -467,4 +467,4 @@ licences are listed in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt). Model
 app; they keep the licences of their publishers, listed in the app under **Licenses**.
 
 VulKara costs nothing. If it is useful to you, you can support its development on
-[Buy Me a Coffee](https://buymeacoffee.com/revil.0). The source code is on [GitHub](https://github.com/revil-O/VulKara).
+[Buy Me a Coffee](https://buymeacoffee.com/revil.0). 
