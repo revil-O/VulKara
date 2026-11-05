@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto'
 
 const MEASURED = 'Apple M2, 24 GB'
 
-// before → after, per step and the engine's peak (MEASUREMENTS 7m, 7n, 7o, 7ab, 7ac, 7ad, 7ae; gb left out where not measured)
+// before → after, per step and the engine's peak (MEASUREMENTS 7m, 7n, 7o, 7ab, 7ac, 7ad, 7ae, 7ag, 7ai; gb left out where not measured)
 const CHANGES = [
   { ref: '7n', model: 'SD 1.5 (epiCPhotoGasm), 512 px', runtime: 'Diffusers', step: [1.55, 0.72], gb: [7.3, 3.7], why: 'attention heads padded to a size the fused kernel takes' },
   { ref: '7n', model: 'SD 1.5 (epiCPhotoGasm), 1024 px', runtime: 'Diffusers', step: [9.4, 4.8], gb: [9.8, 5.0], why: 'padded heads, no attention slicing' },
@@ -25,8 +25,19 @@ const CHANGES = [
   { ref: '7ae', model: 'Pony V7 Q8_0, 16 GB (8 GB wired)', runtime: 'ComfyUI, GGUF', step: [64.7, 46.9], gb: [6.6, 9.7], why: 'whole in memory without its text encoder instead of LOW_VRAM' },
   { ref: '7ad', model: 'FLUX.2 [klein] 9B streamed, 16 GB plan, the plan counts its blocks', runtime: 'Diffusers', step: [50.4, 54.3], gb: [14.3, 10.6], why: 'blocks in flight counted at their size: 2 instead of 9 blocks kept' },
   { ref: '7ac', model: 'FLUX.2 [klein] 9B streamed, 16 GB plan, busy GPU', runtime: 'Diffusers', step: [67.0, 50.4], gb: [19.6, 14.3], why: 'at most two streamed blocks wait on the GPU' },
+  { ref: '7ag', model: 'MOSS-Image (int8 file), 1024 px, CFG 3', runtime: 'ComfyUI', step: [72.8, 48.9], why: 'float16 instead of bfloat16, also for its int8 layers' },
+  { ref: '7ai', model: 'Fibo 2.0 Edit Turbo (int8 file), edit at 1024 px', runtime: 'ComfyUI', step: [110.7, 69.3], why: 'float16 instead of bfloat16, the same picture (PSNR 47 dB)' },
   { ref: '7ab', model: 'MiaoMiao RealSkin (Anima), 1024×1536, CFG 5', runtime: 'ComfyUI', step: [123.5, 92.3], range: ['117–130', '92.3'], why: 'float16 instead of bfloat16, which MPS computes at half the speed' },
   { ref: '7ab', model: 'MiaoMiao RealSkin (Anima), 512×768, CFG 5', runtime: 'ComfyUI', step: [21.2, 18.1], why: 'float16 instead of bfloat16' },
+  { ref: '7bb', model: 'AuraFlow v0.3, 1024 px, 24 GB', runtime: 'Diffusers', step: [79.3, 46.3], gb: [18.7, 12.8], range: ['77.6–81.0', '46.3'], why: '16 bit only with 2 GB of room under the budget: 8 bit instead of weights read again every step' },
+  { ref: '7bc', model: 'Z-Image Turbo, 1024 px, Mac mini M4 16 GB', runtime: 'MLX, 8 bit', step: [121.5, 17.8], gb: [24.8, 12.0], range: ['117–126', '17.8', '23.9–25.6', '12.0'], why: 'the weights read part by part after loading, not all at once in the first step' },
+  { ref: '7bc', model: 'FLUX.2 [klein] 4B, 1024 px, Mac mini M4 16 GB', runtime: 'MLX, 4 bit', step: [16.5, 11.3], gb: [11.4, 7.0], range: ['16.3–16.7', '11.3'], why: 'the weights read part by part after loading' },
+  { ref: '7be', model: 'FLUX.1 dev, 1024 px, Mac mini M4 16 GB, 28 steps → Turbo-Alpha 8 steps (s per picture)', runtime: 'Diffusers, 4 bit', step: [664, 258], gb: [9.6, 9.6], why: 'a step-distilling LoRA: 8 steps at 1.34 times the time each' },
+  { ref: '7be', model: 'FLUX.1 dev, 768 px, Mac mini M4 16 GB', runtime: 'Diffusers', step: [34.4, 18.9], gb: [10.1, 9.95], why: 'transformer in 4 bit in memory instead of 16 bit streamed from the SSD' },
+  { ref: '7be', model: 'FLUX.2 [klein] 9B, 768 px, Mac mini M4 16 GB', runtime: 'Diffusers', step: [22.3, 17.0], gb: [10.7, 9.0], why: 'transformer in 4 bit in memory instead of 16 bit streamed from the SSD' },
+  { ref: '7bf', model: 'Inpainting, remove (empty prompt), FLUX.1 dev, 1024 px, Mac mini M4 16 GB (s per picture)', runtime: 'Diffusers, 4 bit', step: [832, 491], gb: [10.8, 11.5], why: 'LaMa fills the part first, the model refines 40 % of the steps; nothing invented there any more' },
+  { ref: '7bd', model: 'Krea 2 Turbo, 1024 px, Mac mini M4 16 GB (MLX peak)', runtime: 'MLX, 4 bit', step: [41.3, 43.8], gb: [14.3, 11.3], why: 'the picture decoded in 256 px tiles instead of 512' },
+  { ref: '7bd', model: 'Qwen-Image 2.1, 1024 px, Mac mini M4 16 GB', runtime: 'Diffusers, 8 bit', step: [42.4, 43.9], gb: [18.7, 12.3], range: ['42.2–42.5', '43.9', '18.6–20.2', '12.2–12.4'], why: 'the staged text encoder let go after encoding, the one-time quantization in a process of its own' },
 ]
 
 // the memory plan against the engine's measured peak, 1024 px (MEASUREMENTS 7m): [model, runtime, used, planned]
@@ -46,14 +57,58 @@ const PLAN = [
   ['AuraFlow v0.3', 'Diffusers, 8 bit', 14.6, 13.3],
 ]
 
-// the plans brought to the measurements (MEASUREMENTS 7p; used = 7n for SD 1.5, the middle of 7o's range for ComfyUI)
+// the plans brought to the measurements (MEASUREMENTS 7p, 7ag, 7ai, 7aj, 7an; used = 7n for SD 1.5, the middle of 7o's range for ComfyUI)
 const PLAN_AFTER = [
   ['epiCPhotoGasm (SD 1.5), 512 px', 'Diffusers, 16 bit', 3.7, 3.6],
   ['epiCPhotoGasm (SD 1.5), 1024 px', 'Diffusers, 16 bit', 5.0, 5.0],
+  ['FLUX.2 [klein] 4B, 1024 px', 'Diffusers, 8 bit (16 GB plan)', 9.5, 9.4],
+  ['Juggernaut XL (SDXL), 1024 px', 'Diffusers, 16 bit', 9.4, 8.8],
+  ['Juggernaut XL + ControlNet Union, 1024 px', 'Diffusers, 16 bit: the ControlNet counted (7as; 9.4 planned before)', 12.65, 12.2],
+  ['Juggernaut XL + ControlNet Union, 1024 px, 16 GB plan', 'Diffusers, ControlNet in 8 bit: refused before', 11.5, 11.6],
   ['Anima-Turbo', 'ComfyUI', 10.0, 9.1],
   ['NetaYume v4 (Lumina 2)', 'ComfyUI', 14.7, 14.1],
   ['Pony V7 Q8_0 (AuraFlow)', 'ComfyUI, GGUF', 13.0, 13.9],
   ['Qwen-Image 2.1, streamed (16 GB plan)', 'Diffusers, kept blocks counted (7w)', 12.1, 11.8],
+  ['MOSS-Image, 16 GB (8 GB wired)', 'ComfyUI, int8; encoder and model apart (7ag)', 8.4, 9.2],
+  ['NetaYume v4 (Lumina 2), 16 GB (8 GB wired)', 'ComfyUI; encoder and model apart (7ae, 7ag)', 8.7, 8.9],
+  ['Fibo 2.0 Edit Turbo, edit', 'ComfyUI, int8; its activations counted (7ai)', 14.8, 14.6],
+  ['Fibo 2.0 Edit Turbo, edit, 16 GB (8 GB wired)', 'MLX, 8 bit; text encoder dropped first (7aj)', 11.0, 11.5],
+  ['Fibo 2.0 Dev, edit', 'ComfyUI, int8; guidance, two passes per step (7an)', 15.0, 14.6],
+  ['Ideogram 4, 768 px', 'MLX, 4 bit · 94–100 s/step (7bb)', 17.0, 17.2],
+  ['Qwen-Image 2.1, 1024 px', 'Diffusers, streamed · 3.1 GB above its plan (7bb)', 17.5, 14.4],
+  ['Krea 2 Turbo, 768 px', 'MLX, 4 bit · 2.2 GB above its plan (7bb)', 15.6, 13.4],
+  ['AuraFlow v0.3, 1024 px, 24 GB plan', 'Diffusers, 16 bit · 72 s/step, the 8 bit plan of 16 GB does 44 (7bb)', 18.7, 18.7],
+  ['AuraFlow v0.3, 1024 px, 24 GB, 2 GB margin for 16 bit', 'Diffusers, 8 bit · 46 s/step (7bb)', 12.8, 13.3],
+  ['FLUX 3 Image Klein, 768 px, with the upsampler', 'MLX, 6 bit · the upsampler adds 2.8 GB (7bb)', 14.7, 12.5],
+  ['NetaYume v4 (Lumina 2), 768 px', 'ComfyUI (7bb)', 15.3, 14.1],
+]
+
+// 0.7.11 on the Mac mini M4, 16 GB, 1024 px (MEASUREMENTS 7af, 7ah)
+const PLAN_M4 = [
+  ['CyberRealistic Pony v18 (SDXL)', 'Diffusers, 16 bit · 3.8 s/step', 8.8, 9.4],
+  ['NetaYume v4 (Lumina 2)', 'ComfyUI · 13.8 s/step', 10.8, 11.6],
+  ['MiaoMiao RealSkin (Anima)', 'ComfyUI, float16 · 11.7 s/step', 7.0, 9.1],
+  ['FLUX.2 [klein] 9B', 'Diffusers, streamed · 26.4 s/step', 10.5, 11.5],
+  ['MOSS-Image (test build)', 'ComfyUI, int8 · 37.0 s/step', 9.1, 9.2],
+  ['ERNIE-Image Turbo (test build 2026-11-02)', 'MLX, 4 bit · 28.0 s/step', 8.7, 11.2],
+  ['Juggernaut XL v7 (SDXL, test build 2026-11-02)', 'Diffusers, 16 bit · 3.85 s/step', 8.9, 9.4],
+  ['Fibo 2.0 Edit Turbo, 768 px (test build 2026-11-02)', 'MLX, 8 bit · 28.5 s/step, 6.3 GB short: 18.9 GB read back from the swap', 10.2, 10.8],
+  ['Juggernaut XL v7 + ControlNet Canny (test build 2026-11-03)', 'Diffusers, 16 bit · 5.97 s/step (7bc)', 11.6, 11.5],
+  ['Fibo 2.0 Edit Turbo + anime LoRA (test build 2026-11-03)', 'MLX, 8 bit · 29.6 s/step (7bc)', 11.7, 11.5],
+  ['ERNIE-Image Turbo with the enhancer (test build 2026-11-03)', 'MLX, 4 bit · 29.2 s/step (7bc)', 9.5, 11.2],
+  ['FLUX.2 [klein] 4B (test build 2026-11-03)', 'MLX, 4 bit · 16.3 s/step (7bc)', 11.4, 9.9],
+  ['GonzaLomo Chroma, 768 px (test build 2026-11-03)', 'Diffusers, streamed · 38.8 s/step (7bc)', 12.4, 11.5],
+  ['FLUX.1 Fill [dev], new prompt (test build 2026-11-05)', 'Diffusers, 4 bit GGUF · 254 s per picture, 8 steps (7bf)', 10.9, 10.0],
+  ['Fibo 2.0 Edit Turbo, masked edit (test build 2026-11-05)', 'MLX, 8 bit · 250 s; the picture goes along as context tokens (7bg)', 13.5, 14.4],
+  ['Restore, repair with the consistency LoRA, klein 4B', 'Diffusers · 116–130 s (7bh)', 11.7, 12.9],
+  ['Restore, repair, klein 9B', 'Diffusers · 238 s; the reference tokens counted, 9.8 planned before (7bh)', 12.5, 12.6],
+  ['Image to image, Keep the picture, klein 4B', 'Diffusers · 108 s (7bi)', 10.1, 12.9],
+  ['Z-Image Turbo, Electron 44.10.2 and new runtimes', 'Diffusers · 191 s (7bj)', 12.0, 11.9],
+  ['FLUX 3 Image Klein, new runtimes', 'MLX, 8 bit · 74 s (7bj)', 10.6, 10.0],
+  ['FLUX.1 [schnell] 8 bit, streamed, new runtimes', 'Diffusers · 248 s, 98–106 GB read per picture (7bj)', 15.9, 12.0],
+  ['Anima Turbo, ComfyUI 0.44.0', 'ComfyUI · 103 s (7bj)', 8.8, 9.1],
+  ['MOSS-Image 8-step DMD, ComfyUI 0.44.0', 'ComfyUI · 209 s (7bj)', 9.1, 9.2],
+  ['NetaYume v4, ComfyUI 0.44.0, 20 steps', 'ComfyUI · 322 s; planned 11.6 in 0.7.11 (7bj)', 10.7, 8.9],
 ]
 
 // work done once and kept, and a stop that waited (MEASUREMENTS 7r, 7s, 7t, 7u, 7x, 7y, 7z): before, after, unit
@@ -65,6 +120,12 @@ const ONCE = [
   { ref: '7u', what: 'Qwen-Image 2.1, text encoder for a new prompt', sub: 'its 4 bit copy moved to the GPU and the prompt encoded: TinyGemm repacked per layer, then the plain packing', a: 2586, b: 28.9, unit: 's' },
   { ref: '7z', what: 'Qwen-Image 2.1, read from the SSD per picture', sub: 'transformer streamed in 16 bit, then in stages: text encoder alone, then the transformer whole in 8 bit (about as fast)', a: 382, b: 20, unit: 'GB' },
   { ref: '7z', what: 'Qwen-Image 2.1 in stages, memory at most', sub: 'prompt from the prompt cache: streamed (16 bit) against the transformer whole in 8 bit', a: 12.1, b: 9.9, unit: 'GB' },
+  { ref: '7au', what: 'Chroma1 Flash in 8 bit, whole against in stages', sub: 'seconds per step, 1024 px, 12 steps: the text encoder resident (memory kept free 4 GB) against loaded per new prompt (8 GB); same picture to the pixel; 16 bit streamed: 35–63 s, 180–200 GB read', a: 52.8, b: 42.6, unit: 's' },
+  { ref: '7au', what: 'Chroma1 Flash in 8 bit, memory at most', sub: 'the same two routes', a: 17.4, b: 11.1, unit: 'GB' },
+  { ref: '7at', what: 'FLUX.1 [dev] streamed, memory while preparing', sub: '16 GB budget, M2 (float16): loaded whole to check the cache, then built empty from the cache (rest.safetensors)', a: 23.5, b: 11.0, unit: 'GB' },
+  { ref: '7at', what: 'FLUX.1 [dev] streamed, preparation', sub: 'the same two runs: the first writes the cache', a: 100.2, b: 8.1, unit: 's' },
+  { ref: '7ar', what: 'Chroma1 Flash, cancelled while loading', sub: '16 GB plan, Diffusers: from the cancel to the end of the job; the load now stops between two tensors', a: 61.6, b: 0.8, unit: 's' },
+  { ref: '7ap', what: 'FLUX.2 [klein] 9B streamed, held after the picture', sub: '16 GB plan: the two blocks read ahead for a further pass dropped after the last step; read per picture 65.3 → 64.1 GB', a: 9.6, b: 8.6, unit: 'GB' },
   { ref: '7x', what: 'Z-Image Turbo (MLX), a prompt used before', sub: '16 GB plan, 512 px, after another prompt: the model loaded again, then its encodings from the prompt cache', a: 98.7, b: 64.4, unit: 's' },
   { ref: '7y', what: 'Engines without a job', sub: 'Z-Image Turbo (MLX) loaded: memory held after the picture, then freed after the idle time', a: 7.5, b: 1.1, unit: 'GB' },
   { ref: '7r', what: 'Stop while SSD streaming is prepared', sub: 'Chroma1 Flash, stopped at 21 %: seconds until the job ended', a: 84.9, b: 0, unit: 's' },
@@ -80,6 +141,34 @@ const ATTENTION = [
   ['AuraFlow at 1024 px', '2 × 12 × 256, 4352', 283, 344, 'slower: head size 256'],
 ]
 
+// the same model on ComfyUI and on MLX, 1024 px on the M2 (MEASUREMENTS 7ag, 7ai, 7aj, 7ak, 7al, 7am, 7an): [label, s/step, engine GB]
+const RUNTIMES = [
+  ['MOSS-Image, ComfyUI (int8, float16)', 47.7, 9.9],
+  ['MOSS-Image, MLX (8 bit)', 53.5, 14.6],
+  ['MOSS-Image, MLX (4 bit)', 54.2, 8.2],
+  ['Fibo 2.0 edit, ComfyUI (int8, float16)', 74.9, 14.8],
+  ['Fibo 2.0 edit, MLX (8 bit)', 96.4, 11.1],
+  ['Fibo 2.0 edit of two pictures, ComfyUI', 125.7, 16.2],
+  ['Fibo 2.0 edit of two pictures, MLX', 166.2, 11.6],
+  ['Fibo 2.0 edit, 4 pictures, ComfyUI', 284.4, 19.2],
+  ['Fibo 2.0 edit, 4 pictures, MLX', 337.2, 13.0],
+  ['Fibo 2.0 Dev text to image, ComfyUI (guidance 5)', 72.0, 13.4],
+  ['Fibo 2.0 Dev edit, ComfyUI (guidance 5)', 147.3, 15.0],
+]
+
+// the denoiser quantized with Quanto or written once as GGUF, Mac mini M4 16 GB, 1024 px (MEASUREMENTS 7bk):
+// [label, s/step, peak GB, dB to 16 bit, load s]
+const QUANT = [
+  ['FLUX.2 [klein] 4B, Quanto 8 bit', 11.2, 13.9, 29.8, 26.1],
+  ['FLUX.2 [klein] 4B, GGUF Q8_0', 11.4, 13.5, 36.2, 7.4],
+  ['FLUX.2 [klein] 4B, Quanto 4 bit', 12.0, 10.4, 20.1, 24.9],
+  ['FLUX.2 [klein] 4B, GGUF Q4_0', 12.5, 9.6, 22.0, 3.7],
+  ['Z-Image Turbo, Quanto 8 bit', 19.3, 13.7, 31.8, 89.9],
+  ['Z-Image Turbo, GGUF Q8_0', 19.2, 12.5, 25.3, 13.2],
+  ['Z-Image Turbo, Quanto 4 bit', 20.3, 11.4, 22.9, 91.4],
+  ['Z-Image Turbo, GGUF Q4_0', 21.0, 10.2, 21.5, 6.7],
+]
+
 // the fused kernel by head size, 2 × 8 heads, 4096 tokens (MEASUREMENTS 7n): [label, ms, extra GB]
 const HEADS = [
   ['head size 64 (fused)', 31, 0],
@@ -93,6 +182,28 @@ const SEAMS = [
   ['256 px, 64 px overlap', 'before', 4.4, 1.19, 1.1, 20],
   ['256 px, 128 px overlap, new blend', '16 GB plans', 2.0, 0.79, 1.15, 40],
   ['512 px, 128 px overlap, new blend', 'where the plan has room', 0.96, 0.42, 3.3, 18],
+]
+
+// a checkpoint loaded cold from the USB SSD and from the internal SSD (MEASUREMENTS 7ao): [label, order of reading, USB s, internal s]
+const LOADS = [
+  ['JuggernautXL, 6.46 GB', 'file order', 17.6, 9.9],
+  ['RedCraft Krea 2, 12.24 GB', 'file order', 32.1, 22.0],
+  ['mopMix, 6.46 GB', 'random order', 12.9, 9.7],
+]
+
+// Wan 2.2 I2V 14B, ComfyUI LOW_VRAM, 832 × 480, 4 steps, one clip per length (MEASUREMENTS 7ay): [seconds, frames, s/step, whole s, GB at most, GB read]
+const VIDEO = [
+  [1, 13, 140.3, 486, 7.3, 27],
+  [2, 29, 293.9, 959, 8.3, 32],
+  [3, 45, 1071.2, 3134, 8.9, 49],
+  [5, 77, 2155.0, 6601, 10.0, 58],
+]
+
+// the memory note: NetaYume v4 on ComfyUI, 1024 px, 3 steps, memory wired so that it is short (MEASUREMENTS 7az): [wired GB, short GB, s/step, whole s, swap read GB]
+const SHORT = [
+  [0, 5.7, 29.1, 135, 0.1],
+  [7.5, 9.6, 29.3, 137, 1.4],
+  [12, 11.1, 412.0, 1221, 244.9],
 ]
 
 // the site's Content-Security-Policy allows no inline styles: every position becomes a class in charts.css
@@ -289,6 +400,40 @@ function headsChart() {
     </section>`
 }
 
+function runtimesChart() {
+  const ax = axis(Math.max(...RUNTIMES.map((r) => r[1])), 4)
+  const rows = RUNTIMES.map(([label, step, gb]) => `
+        <div class="bx-row" data-tip="${esc(`${label}: ${fmt(step)} s per step, ${fmt(gb)} GB at most. MEASUREMENTS 7ak`)}" tabindex="0">
+          <span class="dot-label">${esc(label)}</span>
+          <span class="bx-track">${grid(ax)}<span class="hbar ${at(`width:${pct(step, ax.top)}%`)}"></span></span>
+          <span class="bx-value">${fmt(step)} s · ${fmt(gb)} GB</span>
+        </div>`).join('')
+  return `
+    <section class="chart" id="runtimes">
+      <h2>One model, two runtimes</h2>
+      <p class="sub">MOSS-Image and Fibo 2.0 on ComfyUI and on MLX (mflux 0.24), 1024 px on an M2 with 24 GB. ComfyUI is quicker per step on the M2; MLX holds less where its text encoder is dropped first, so Fibo 2.0 runs on 16 GB Macs with it. Fibo 2.0 Dev (ComfyUI only) computes two passes per step for its guidance.</p>
+      <div class="bx">${ticksRow(ax, ' s')}${rows}
+      </div>${table(['Model and runtime', 's/step', 'Engine GB'], RUNTIMES.map(([l, step, gb]) => [esc(l), fmt(step), fmt(gb)]))}
+    </section>`
+}
+
+function quantChart() {
+  const ax = axis(Math.max(...QUANT.map((r) => r[2])), 4)
+  const rows = QUANT.map(([label, step, gb, db, load]) => `
+        <div class="bx-row" data-tip="${esc(`${label}: ${fmt(gb)} GB at most, ${fmt(step)} s per step, ${fmt(db)} dB to 16 bit, loaded in ${fmt(load)} s. MEASUREMENTS 7bk`)}" tabindex="0">
+          <span class="dot-label">${esc(label)}</span>
+          <span class="bx-track">${grid(ax)}<span class="hbar ${at(`width:${pct(gb, ax.top)}%`)}"></span></span>
+          <span class="bx-value">${fmt(gb)} GB · ${fmt(step)} s · ${fmt(db)} dB</span>
+        </div>`).join('')
+  return `
+    <section class="chart" id="quant">
+      <h2>Quanto or GGUF for the denoiser</h2>
+      <p class="sub">Diffusers will drop its Quanto backend with version 1.0; GGUF, written once, is the candidate without a new package. Mac mini M4 with 16 GB, 1024 px, everything held on the GPU (the peaks compare only with each other). The bar is the memory at most; dB is how close the picture is to 16 bit (Z-Image's 16 bit picture from the M2: on 16 GB it swapped). GGUF takes 0.4–1.3 GB less and loads in seconds, is as fast at 8 bit and 3–4 % slower at 4 bit; its pictures are closer for klein, further for Z-Image.</p>
+      <div class="bx">${ticksRow(ax, ' GB')}${rows}
+      </div>${table(['Model and quantization', 's/step', 'GB at most', 'dB to 16 bit', 'load s'], QUANT.map(([l, step, gb, db, load]) => [esc(l), fmt(step), fmt(gb), fmt(db), fmt(load)]))}
+    </section>`
+}
+
 function seamsChart() {
   const ax = axis(Math.max(...SEAMS.map((r) => r[2])), 4)
   const rows = SEAMS.map(([tiles, when, col, mean, gb, sec]) => `
@@ -306,13 +451,70 @@ function seamsChart() {
     </section>`
 }
 
+function loadsChart() {
+  const ax = axis(Math.max(...LOADS.map((r) => r[2])), 4)
+  const rows = LOADS.map(([label, order, usb, inside]) => dumbbell({
+    label, sub: order, a: usb, b: inside, ax, value: `${fmt(usb)} → ${fmt(inside)} s`,
+    tip: `${label}, ${order}: ${fmt(usb)} s from the USB SSD, ${fmt(inside)} s from the internal SSD. MEASUREMENTS 7ao`,
+  })).join('')
+  return `
+    <section class="chart" id="loads">
+      <h2>Loading from a USB SSD or the internal SSD</h2>
+      <p class="sub">A checkpoint read cold through its mapped file, one run each on an M2 with 24 GB. Plain reading is 0.81 GB/s over USB and 2.74 GB/s internally, yet mapped reading stays near 0.6 GB/s even internally. A copy on the internal SSD saves 3 to 10 s per cold load.</p>
+      ${legend('USB SSD', 'internal SSD')}
+      <div class="bx">${ticksRow(ax, ' s')}${rows}
+      </div>${table(['Checkpoint', 'Order', 'USB s', 'Internal s'], LOADS.map(([l, o, u, i]) => [esc(l), esc(o), fmt(u), fmt(i)]))}
+    </section>`
+}
+
+function videoChart() {
+  const max = Math.max(...VIDEO.map((r) => r[3]))
+  const rows = VIDEO.map(([sec, frames, step, whole, gb, read]) => `
+          <tr data-tip="${esc(`${sec} s (${frames} frames): ${fmt(step)} s per step, ${whole} s for the clip, ${fmt(gb)} GB at most, ${read} GB read. MEASUREMENTS 7ay`)}" tabindex="0">
+            <td>${sec} s<small>${frames} frames, ${fmt(whole / 60)} min</small></td>
+            <td class="bars"><span class="mbar b ${at(`width:${pct(whole, max)}%`)}"></span></td>
+            <td class="num">${fmt(step)}</td><td class="num">${whole}</td><td class="num">${fmt(gb)}</td><td class="num">${read}</td>
+          </tr>`).join('')
+  return `
+    <section class="chart" id="video">
+      <h2>Video: clips of one to five seconds</h2>
+      <p class="sub">Wan 2.2 I2V 14B (Q4_K GGUF, both experts read from the SSD per step, the text encoder dropped after the prompt), 832 × 480, 4 steps, one clip per length on the M2 with 24 GB. The bars are the whole time of the clip. Memory grows little with the length; the time per step grows faster than the frames, as the attention over the frames grows with the square of the tokens. On the 16 GB simulation (12 GB kept free, 8 GB wired) the one-second clip took 205.6 s per step and 11.6 min at 6.0 GB, reading 65 GB; the five-second clip drove the swap to 21 GB and the app's GPU process ended after 7 minutes, so Wan 2.2 14B stays a 24 GB model.</p>
+      <table class="micro">
+        <thead><tr><th>Clip</th><th>whole time</th><th class="num">s/step</th><th class="num">whole s</th><th class="num">GB at most</th><th class="num">GB read</th></tr></thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+    </section>`
+}
+
+function shortTable() {
+  const max = Math.max(...SHORT.map((r) => r[2]))
+  const rows = SHORT.map(([wired, short, step, whole, swap]) => `
+          <tr data-tip="${esc(`${short} GB short (${wired} GB wired): ${fmt(step)} s per step, ${whole} s for the picture, ${fmt(swap)} GB read back from the swap. MEASUREMENTS 7az`)}" tabindex="0">
+            <td>${fmt(short)} GB short<small>${wired} GB wired</small></td>
+            <td class="bars"><span class="mbar b ${at(`width:${pct(step, max)}%`)}"></span></td>
+            <td class="num">${fmt(step)}</td><td class="num">${whole}</td><td class="num">${fmt(swap)}</td>
+          </tr>`).join('')
+  return `
+    <section class="chart" id="short">
+      <h2>When less memory is free than the plan needs</h2>
+      <p class="sub">NetaYume v4 (Lumina 2) on ComfyUI, 1024 px, 3 steps, planned 14.1 GB, on the M2 with 24 GB. Memory wired with mlock so that other programs could not give it up; "short" is the plan less what was free when the picture started. Up to 9.6 GB short the picture stays as fast (macOS moves idle programs to the swap); at 11.1 GB short it took 14 times as long and read 245 GB back from the swap. The bars are the seconds per step.</p>
+      <table class="micro">
+        <thead><tr><th>Shortage</th><th>per step</th><th class="num">s/step</th><th class="num">whole s</th><th class="num">GB from the swap</th></tr></thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+    </section>`
+}
+
 /** The page and its charts.css (the positions of the marks). */
 export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }) {
   RULES = []
   const body = [speedChart(), memoryChart(),
     planChart('plan', 'The memory plan against the measurement', 'Before every picture VulKara plans the memory a model needs and picks bit size, staging or streaming from it. Here the plan against what the engine used, 1024 px; the right column is the difference. Before the fixes of the same day (decoding in tiles, padded attention).', PLAN, '7m'),
-    planChart('plan-after', 'Plans brought to the measurements', 'SD 1.5 planned at its own size with fused attention, ComfyUI models with the plan of a model held whole (shown in the benchmark since 0.7.5). The ComfyUI figures are the middle of two runs. Qwen-Image 2.1 streamed: the blocks kept in memory were not counted while denoising (planned 9.1 GB before).', PLAN_AFTER, '7p'),
-    onceTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
+    planChart('plan-after', 'Plans brought to the measurements', 'SD 1.5 planned at its own size with fused attention, ComfyUI models with the plan of a model held whole (shown in the benchmark since 0.7.5). The ComfyUI figures are the middle of two runs. Qwen-Image 2.1 streamed: the blocks kept in memory were not counted while denoising (planned 9.1 GB before). ComfyUI on 16 GB: the text encoder and the model planned apart, as ComfyUI loads them (MOSS-Image 14 GB before, NetaYume 11.6). Fibo 2.0: the activations of an edit counted (12.1 GB planned before).', PLAN_AFTER, '7p'),
+    planChart('plan-m4', 'On a 16 GB Mac: Mac mini M4', 'VulKara 0.7.11 on an Apple M4 with 16 GB (the other charts: the M2, 16 GB simulated there); from MOSS-Image on, test builds after it (MEASUREMENTS 7ah, 7ba–7bj). The plan against what the engine used, 1024 px (Fibo 768 px), with the seconds per step or per picture. Fibo 2.0 on MLX started 6.3 GB short and read 18.9 GB back from the swap: slower than on the M2 (7ba). Above their plan and open: FLUX.1 [schnell] 8 bit streamed (3.9 GB), NetaYume v4 (1.8 GB), FLUX.1 Fill (0.9 GB) (7bf, 7bj).', PLAN_M4, '7af'),
+    onceTable(), runtimesChart(), quantChart(), loadsChart(), videoChart(), shortTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
   const tileHtml = tiles()
   const css = RULES.map((r, i) => `.bench-page .p${i}{${r}}`).join('\n') + '\n'
   const cssV = createHash('sha256').update(css).digest('hex').slice(0, 10)
@@ -339,6 +541,7 @@ export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }
       <a class="brand" href="../"><img src="../assets/icon.svg" width="26" height="26" alt="">VulKara<span class="ver">v${VERSION}</span></a>
       <span class="path">~/vulkara <b>$</b> benchmark --report</span>
       <span class="spacer"></span>
+      <a class="gh" href="../results/">results</a>
       <a class="gh" href="../changes/">changes</a>
       <a class="gh" href="${BLOB}/docs/MEASUREMENTS.md" rel="noopener">MEASUREMENTS.md ↗</a>
     </div>
