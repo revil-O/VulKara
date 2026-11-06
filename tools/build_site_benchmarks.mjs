@@ -133,6 +133,8 @@ const ONCE = [
   { ref: '7ap', what: 'FLUX.2 [klein] 9B streamed, held after the picture', sub: '16 GB plan: the two blocks read ahead for a further pass dropped after the last step; read per picture 65.3 → 64.1 GB', a: 9.6, b: 8.6, unit: 'GB' },
   { ref: '7x', what: 'Z-Image Turbo (MLX), a prompt used before', sub: '16 GB plan, 512 px, after another prompt: the model loaded again, then its encodings from the prompt cache', a: 98.7, b: 64.4, unit: 's' },
   { ref: '7y', what: 'Engines without a job', sub: 'Z-Image Turbo (MLX) loaded: memory held after the picture, then freed after the idle time', a: 7.5, b: 1.1, unit: 'GB' },
+  { ref: '7bm', what: 'FLUX.1 [schnell] 8 bit GGUF, whole picture', sub: 'Mac mini M4 16 GB, 1024 px, 4 steps: 16 bit streamed from the SSD (the app today, 7bj) against a 4 bit copy written once and held in memory (probe)', a: 248, b: 112, unit: 's' },
+  { ref: '7bm', what: 'FLUX.1 [schnell] 8 bit GGUF, read per picture', sub: 'the same two routes', a: 98, b: 6.7, unit: 'GB' },
   { ref: '7r', what: 'Stop while SSD streaming is prepared', sub: 'Chroma1 Flash, stopped at 21 %: seconds until the job ended', a: 84.9, b: 0, unit: 's' },
 ]
 
@@ -172,6 +174,13 @@ const QUANT = [
   ['Z-Image Turbo, GGUF Q8_0', 19.2, 12.5, 25.3, 13.2],
   ['Z-Image Turbo, Quanto 4 bit', 20.3, 11.4, 22.9, 91.4],
   ['Z-Image Turbo, GGUF Q4_0', 21.0, 10.2, 21.5, 6.7],
+]
+
+// picture to prompt, Mac mini M4 16 GB, 16 bit, three pictures (MEASUREMENTS 7bn): [model, s per picture, peak GB]
+const CAPTION = [
+  ['Florence-2 base (MIT, 0.46 GB)', 3.7, 2.2],
+  ['Florence-2 large (MIT, 1.55 GB)', 3.1, 4.2],
+  ['Qwen3-VL 2B (Apache-2.0, 4.26 GB)', 9.4, 7.7],
 ]
 
 // the fused kernel by head size, 2 × 8 heads, 4096 tokens (MEASUREMENTS 7n): [label, ms, extra GB]
@@ -439,6 +448,23 @@ function quantChart() {
     </section>`
 }
 
+function captionChart() {
+  const ax = axis(Math.max(...CAPTION.map((r) => r[2])), 4)
+  const rows = CAPTION.map(([label, sec, gb]) => `
+        <div class="bx-row" data-tip="${esc(`${label}: ${fmt(gb)} GB at most, up to ${fmt(sec)} s per picture. MEASUREMENTS 7bn`)}" tabindex="0">
+          <span class="dot-label">${esc(label)}</span>
+          <span class="bx-track">${grid(ax)}<span class="hbar ${at(`width:${pct(gb, ax.top)}%`)}"></span></span>
+          <span class="bx-value">${fmt(gb)} GB · ${fmt(sec)} s</span>
+        </div>`).join('')
+  return `
+    <section class="chart" id="caption">
+      <h2>Picture to prompt</h2>
+      <p class="sub">Candidates for a prompt from a picture, Mac mini M4 with 16 GB, 16 bit, the longest of three pictures. The bar is the memory at most. Both Florence-2 sizes saw a third woman between two and put a pattern on the wrong clothes; Qwen3-VL 2B got the people and clothes right and wrote prompt-like text with light, colours and camera.</p>
+      <div class="bx">${ticksRow(ax, ' GB')}${rows}
+      </div>${table(['Model', 's per picture', 'GB at most'], CAPTION.map(([l, sec, gb]) => [esc(l), fmt(sec), fmt(gb)]))}
+    </section>`
+}
+
 function seamsChart() {
   const ax = axis(Math.max(...SEAMS.map((r) => r[2])), 4)
   const rows = SEAMS.map(([tiles, when, col, mean, gb, sec]) => `
@@ -519,7 +545,7 @@ export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }
     planChart('plan', 'The memory plan against the measurement', 'Before every picture VulKara plans the memory a model needs and picks bit size, staging or streaming from it. Here the plan against what the engine used, 1024 px; the right column is the difference. Before the fixes of the same day (decoding in tiles, padded attention).', PLAN, '7m'),
     planChart('plan-after', 'Plans brought to the measurements', 'SD 1.5 planned at its own size with fused attention, ComfyUI models with the plan of a model held whole (shown in the benchmark since 0.7.5). The ComfyUI figures are the middle of two runs. Qwen-Image 2.1 streamed: the blocks kept in memory were not counted while denoising (planned 9.1 GB before). ComfyUI on 16 GB: the text encoder and the model planned apart, as ComfyUI loads them (MOSS-Image 14 GB before, NetaYume 11.6). Fibo 2.0: the activations of an edit counted (12.1 GB planned before).', PLAN_AFTER, '7p'),
     planChart('plan-m4', 'On a 16 GB Mac: Mac mini M4', 'VulKara 0.7.11 on an Apple M4 with 16 GB (the other charts: the M2, 16 GB simulated there); from MOSS-Image on, test builds after it (MEASUREMENTS 7ah, 7ba–7bl). The plan against what the engine used, 1024 px (Fibo 768 px), with the seconds per step or per picture. Fibo 2.0 on MLX started 6.3 GB short and read 18.9 GB back from the swap: slower than on the M2 (7ba). Above their plan and open: FLUX.1 [schnell] 8 bit streamed (3.9 GB), NetaYume v4 (1.8 GB), FLUX.1 Fill (0.9 GB) (7bf, 7bj).', PLAN_M4, '7af'),
-    onceTable(), runtimesChart(), quantChart(), loadsChart(), videoChart(), shortTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
+    onceTable(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
   const tileHtml = tiles()
   const css = RULES.map((r, i) => `.bench-page .p${i}{${r}}`).join('\n') + '\n'
   const cssV = createHash('sha256').update(css).digest('hex').slice(0, 10)
