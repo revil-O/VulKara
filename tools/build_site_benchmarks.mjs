@@ -109,6 +109,11 @@ const PLAN_M4 = [
   ['Anima Turbo, ComfyUI 0.44.0', 'ComfyUI · 103 s (7bj)', 8.8, 9.1],
   ['MOSS-Image 8-step DMD, ComfyUI 0.44.0', 'ComfyUI · 209 s (7bj)', 9.1, 9.2],
   ['NetaYume v4, ComfyUI 0.44.0, 20 steps', 'ComfyUI · 322 s; planned 11.6 in 0.7.11 (7bj)', 10.7, 8.9],
+  ['FLUX.2 [klein] 9B, 768 px, GGUF copy instead of Quanto', 'Diffusers, 4 bit · 17.6 s/step (7bl)', 9.0, 9.8],
+  ['FLUX.1 dev + Turbo-Alpha, GGUF copy instead of Quanto', 'Diffusers, 4 bit · 30.2 s/step (7bl)', 10.9, 10.9],
+  ['SD 3.5 Medium, GGUF copy', 'Diffusers, 8 bit · 8.0 s/step (7bl)', 4.8, 10.4],
+  ['Qwen-Image 2.1, GGUF copy instead of Quanto', 'Diffusers, 8 bit · 21.5 s/step, guidance 1 (7bl)', 12.3, 11.9],
+  ['Juggernaut XL + ControlNet Canny, ControlNet by optimum-quanto', 'Diffusers · 6.0 s/step (7bl)', 11.2, 11.5],
 ]
 
 // work done once and kept, and a stop that waited (MEASUREMENTS 7r, 7s, 7t, 7u, 7x, 7y, 7z): before, after, unit
@@ -513,7 +518,7 @@ export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }
   const body = [speedChart(), memoryChart(),
     planChart('plan', 'The memory plan against the measurement', 'Before every picture VulKara plans the memory a model needs and picks bit size, staging or streaming from it. Here the plan against what the engine used, 1024 px; the right column is the difference. Before the fixes of the same day (decoding in tiles, padded attention).', PLAN, '7m'),
     planChart('plan-after', 'Plans brought to the measurements', 'SD 1.5 planned at its own size with fused attention, ComfyUI models with the plan of a model held whole (shown in the benchmark since 0.7.5). The ComfyUI figures are the middle of two runs. Qwen-Image 2.1 streamed: the blocks kept in memory were not counted while denoising (planned 9.1 GB before). ComfyUI on 16 GB: the text encoder and the model planned apart, as ComfyUI loads them (MOSS-Image 14 GB before, NetaYume 11.6). Fibo 2.0: the activations of an edit counted (12.1 GB planned before).', PLAN_AFTER, '7p'),
-    planChart('plan-m4', 'On a 16 GB Mac: Mac mini M4', 'VulKara 0.7.11 on an Apple M4 with 16 GB (the other charts: the M2, 16 GB simulated there); from MOSS-Image on, test builds after it (MEASUREMENTS 7ah, 7ba–7bj). The plan against what the engine used, 1024 px (Fibo 768 px), with the seconds per step or per picture. Fibo 2.0 on MLX started 6.3 GB short and read 18.9 GB back from the swap: slower than on the M2 (7ba). Above their plan and open: FLUX.1 [schnell] 8 bit streamed (3.9 GB), NetaYume v4 (1.8 GB), FLUX.1 Fill (0.9 GB) (7bf, 7bj).', PLAN_M4, '7af'),
+    planChart('plan-m4', 'On a 16 GB Mac: Mac mini M4', 'VulKara 0.7.11 on an Apple M4 with 16 GB (the other charts: the M2, 16 GB simulated there); from MOSS-Image on, test builds after it (MEASUREMENTS 7ah, 7ba–7bl). The plan against what the engine used, 1024 px (Fibo 768 px), with the seconds per step or per picture. Fibo 2.0 on MLX started 6.3 GB short and read 18.9 GB back from the swap: slower than on the M2 (7ba). Above their plan and open: FLUX.1 [schnell] 8 bit streamed (3.9 GB), NetaYume v4 (1.8 GB), FLUX.1 Fill (0.9 GB) (7bf, 7bj).', PLAN_M4, '7af'),
     onceTable(), runtimesChart(), quantChart(), loadsChart(), videoChart(), shortTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
   const tileHtml = tiles()
   const css = RULES.map((r, i) => `.bench-page .p${i}{${r}}`).join('\n') + '\n'
