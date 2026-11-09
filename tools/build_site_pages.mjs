@@ -97,6 +97,7 @@ const T = {
     featEyebrow: 'Features',
     featTitle: 'One app, a whole studio',
     bench: ['Benchmark: measure your Mac', 'Pick a model and measure it on your own Mac: seconds per step, the whole picture, the most memory VulKara and the system used, swap, what was read from the SSD, and every phase from loading to generating. Copy the runs as a table and compare Macs, sizes and bit sizes. The same measurements made VulKara faster: SD 1.5 twice as fast with half the memory, large SDXL pictures four times as fast.', 'See the measurements'],
+    news: [['scan-text', "Prompt from picture", "Choose a picture in Image to image and press <b>Prompt from picture</b>: Qwen3-VL 2B describes subject, setting, light, colours, style and camera in one paragraph, on the Mac, in about 15 seconds on a Mac mini M4 with 16 GB. Change it, then generate."], ['activity', "Menu bar and Monitor", "Close the window and VulKara keeps running with its icon in the menu bar: the running job, its progress, what waits. <b>Monitor</b> shows the job against its memory plan and, on the measured Mac, against the measurements of its model."]],
     featLead: 'Pictures, edits, video and your own LoRAs – for creators, students, comic and anime fans and digital artists.',
     feats: [
       ['type', 'Text to image', 'Describe it, pick a style, press ⌘↩. Twenty styles from photo to illustration and 3D, and up to three LoRAs, each with its own weight.'],
@@ -207,6 +208,7 @@ const T = {
     featEyebrow: 'Funktionen',
     featTitle: 'Eine App, ein ganzes Studio',
     bench: ['Benchmark: miss deinen Mac', 'Wähle ein Modell und miss es auf deinem eigenen Mac: Sekunden pro Schritt, das ganze Bild, den meisten Speicher von VulKara und vom System, Swap, was von der SSD gelesen wurde, und jede Phase vom Laden bis zum Erzeugen. Kopiere die Läufe als Tabelle und vergleiche Macs, Größen und Bit-Größen. Dieselben Messungen haben VulKara schneller gemacht: SD 1.5 doppelt so schnell mit halbem Speicher, große SDXL-Bilder viermal so schnell.', 'Zu den Messungen'],
+    news: [['scan-text', "Prompt aus Bild", "Wähle in „Bild zu Bild“ ein Bild und drücke <b>Prompt aus Bild</b>: Qwen3-VL 2B beschreibt Motiv, Umgebung, Licht, Farben, Stil und Kamera in einem Absatz, auf dem Mac, in etwa 15 Sekunden auf einem Mac mini M4 mit 16 GB. Ändere ihn, dann erstelle."], ['activity', "Menüleiste und Monitor", "Schließ das Fenster, und VulKara läuft mit seinem Symbol in der Menüleiste weiter: der laufende Auftrag, sein Fortschritt, was wartet. <b>Monitor</b> zeigt den Auftrag gegen seinen Speicherplan und auf dem gemessenen Mac gegen die Messwerte seines Modells."]],
     featLead: 'Bilder, Bearbeitung, Video und eigene LoRAs – für Creator, Studierende, Comic- und Anime-Fans und Digital Artists.',
     feats: [
       ['type', 'Text zu Bild', 'Beschreib es, wähl einen Stil, drück ⌘↩. Zwanzig Stile von Foto bis Illustration und 3D, dazu bis zu drei LoRAs, jede mit eigenem Gewicht.'],
@@ -317,6 +319,7 @@ const T = {
     featEyebrow: 'Funciones',
     featTitle: 'Una app, todo un estudio',
     bench: ['Benchmark: mide tu Mac', 'Elige un modelo y mídelo en tu propio Mac: segundos por paso, la imagen entera, la memoria máxima de VulKara y del sistema, el swap, lo que se leyó del SSD y cada fase, de la carga a la generación. Copia las mediciones como tabla y compara Macs, tamaños y bits. Las mismas mediciones hicieron VulKara más rápido: SD 1.5 el doble de rápido con la mitad de memoria, las imágenes SDXL grandes cuatro veces más rápidas.', 'Ver las mediciones'],
+    news: [['scan-text', "Prompt desde imagen", "Elige una imagen en Imagen a imagen y pulsa <b>Prompt desde imagen</b>: Qwen3-VL 2B describe motivo, entorno, luz, colores, estilo y cámara en un párrafo, en el Mac, en unos 15 segundos en un Mac mini M4 con 16 GB. Cámbialo y genera."], ['activity', "Barra de menús y Monitor", "Cierra la ventana y VulKara sigue en marcha con su icono en la barra de menús: la tarea en curso, su progreso, lo que espera. <b>Monitor</b> muestra la tarea frente a su plan de memoria y, en el Mac medido, frente a las mediciones de su modelo."]],
     featLead: 'Imágenes, edición, vídeo y tus propias LoRAs, para creadores, estudiantes, fans del cómic y del anime y artistas digitales.',
     feats: [
       ['type', 'Texto a imagen', 'Descríbelo, elige un estilo y pulsa ⌘↩. Veinte estilos, de foto a ilustración y 3D, y hasta tres LoRAs, cada una con su propio peso.'],
@@ -427,6 +430,7 @@ const T = {
     featEyebrow: 'Recursos',
     featTitle: 'Um app, um estúdio inteiro',
     bench: ['Benchmark: meça o seu Mac', 'Escolha um modelo e meça-o no seu próprio Mac: segundos por passo, a imagem inteira, a memória máxima do VulKara e do sistema, o swap, o que foi lido do SSD e cada fase, do carregamento à geração. Copie as medições como tabela e compare Macs, tamanhos e bits. As mesmas medições deixaram o VulKara mais rápido: SD 1.5 duas vezes mais rápido com metade da memória, imagens SDXL grandes quatro vezes mais rápidas.', 'Ver as medições'],
+    news: [['scan-text', "Prompt a partir da imagem", "Escolha uma imagem em Imagem para imagem e clique em <b>Prompt a partir da imagem</b>: o Qwen3-VL 2B descreve motivo, ambiente, luz, cores, estilo e câmera em um parágrafo, no Mac, em cerca de 15 segundos num Mac mini M4 com 16 GB. Mude-o e gere."], ['activity', "Barra de menus e Monitor", "Feche a janela e o VulKara continua rodando com seu ícone na barra de menus: a tarefa em andamento, o progresso, o que aguarda. O <b>Monitor</b> mostra a tarefa comparada com seu plano de memória e, no Mac medido, com as medições do seu modelo."]],
     featLead: 'Imagens, edição, vídeo e suas próprias LoRAs – para criadores, estudantes, fãs de HQ e anime e artistas digitais.',
     feats: [
       ['type', 'Texto para imagem', 'Descreva, escolha um estilo e pressione ⌘↩. Vinte estilos, de foto a ilustração e 3D, e até três LoRAs, cada uma com seu próprio peso.'],
@@ -537,6 +541,7 @@ const T = {
     featEyebrow: 'Funcionalidades',
     featTitle: 'Uma app, um estúdio completo',
     bench: ['Benchmark: mede o teu Mac', 'Escolhe um modelo e mede-o no teu próprio Mac: segundos por passo, a imagem inteira, a memória máxima do VulKara e do sistema, o swap, o que foi lido do SSD e cada fase, do carregamento à geração. Copia as medições como tabela e compara Macs, tamanhos e bits. As mesmas medições tornaram o VulKara mais rápido: SD 1.5 duas vezes mais rápido com metade da memória, imagens SDXL grandes quatro vezes mais rápidas.', 'Ver as medições'],
+    news: [['scan-text', "Prompt a partir da imagem", "Escolhe uma imagem em Imagem para imagem e carrega em <b>Prompt a partir da imagem</b>: o Qwen3-VL 2B descreve motivo, ambiente, luz, cores, estilo e câmara num parágrafo, no Mac, em cerca de 15 segundos num Mac mini M4 com 16 GB. Altera-o e gera."], ['activity', "Barra de menus e Monitor", "Fecha a janela e o VulKara continua a correr com o seu ícone na barra de menus: a tarefa em curso, o progresso, o que espera. O <b>Monitor</b> mostra a tarefa comparada com o seu plano de memória e, no Mac medido, com as medições do seu modelo."]],
     featLead: 'Imagens, edição, vídeo e LoRAs próprias – para criadores, estudantes, fãs de BD e anime e artistas digitais.',
     feats: [
       ['type', 'Texto para imagem', 'Descreva a imagem, escolha um estilo e prima ⌘↩. Vinte estilos, da fotografia à ilustração e ao 3D, e até três LoRAs, cada uma com o seu peso.'],
@@ -830,6 +835,11 @@ ${GALLERY.map(([file, w, h]) => `          <figure class="${w > h ? 'wide' : ''}
 ${t.feats.map(([ic, h, p], i) => `          <article class="card${i >= 8 ? ' wide' : ''}">
             <div class="tile">${icon(up, ic)}</div>
             <h3>${h}</h3>
+            <p>${p}</p>
+          </article>`).join('\n')}
+${t.news.map(([ic, h, p]) => `          <article class="card">
+            <div class="tile">${icon(up, ic)}</div>
+            <h3>${h} <span class="new">${t.models.new}</span></h3>
             <p>${p}</p>
           </article>`).join('\n')}
           <article class="card full">

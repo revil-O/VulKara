@@ -20,6 +20,8 @@ export const DOC_ICONS = {
   'sun-moon': 'website: appearance like the system',
   'copy': 'website: copy a command',
   'gauge': 'website: the benchmark',
+  'scan-text': 'website: prompt from picture',
+  'activity': 'website: the monitor window',
   'monitor': 'everything on the Mac',
   'tablet-smartphone': 'website: remote access from a phone or tablet',
   'boxes': 'Models',
