@@ -4,7 +4,7 @@
 // the right for the settings of the page.
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowUpCircle, MessagesSquare, Tag } from 'lucide-vue-next'
+import { ArrowUpCircle, MessagesSquare, Tag } from '@lucide/vue'
 import { DISCORD_URL } from '@shared/links'
 import { isRemote } from '../remote_vk'
 import { openLink } from '../util/links'

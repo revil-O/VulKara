@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
+  <!-- the menu bar icon (a template: black with alpha, macOS colours it): the app icon's pixels and spark -->
+  <g fill="#000">
+    <rect x="3" y="15" width="5" height="5" rx="1" opacity="0.55"/>
+    <rect x="10" y="15" width="5" height="5" rx="1"/>
+    <rect x="3" y="22" width="5" height="5" rx="1" opacity="0.55"/>
+    <rect x="10" y="22" width="5" height="5" rx="1" opacity="0.8"/>
+    <rect x="17" y="22" width="5" height="5" rx="1"/>
+    <rect x="3" y="29" width="5" height="5" rx="1" opacity="0.4"/>
+    <rect x="10" y="29" width="5" height="5" rx="1" opacity="0.55"/>
+    <rect x="17" y="29" width="5" height="5" rx="1" opacity="0.8"/>
+    <path d="M25 2 C25.6 8.5 27.5 10.4 34 11 C27.5 11.6 25.6 13.5 25 20 C24.4 13.5 22.5 11.6 16 11 C22.5 10.4 24.4 8.5 25 2 Z"/>
+  </g>
+</svg>

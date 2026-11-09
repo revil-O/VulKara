@@ -82,7 +82,7 @@ it over your own network, as a web UI in the browser.
 
 ### <img src="docs/icons/boxes.svg" width="20" height="20" alt=""> Many models, one app
 SD 1.5 / 2.x, SDXL (also Pony, Illustrious, NoobAI), SD 3.5, FLUX.1, FLUX.2, FLUX 3 Image Klein, Chroma, Qwen-Image,
-Z-Image, Krea 2, Ideogram 4, ERNIE-Image, Anima, Lumina 2, Pony V7 (AuraFlow) and Wan 2.2 video. Choose from a tested list, or import any model from Hugging Face, Civitai or a file.
+Z-Image, Krea 2, Ideogram 4, ERNIE-Image, Anima, Lumina 2, Pony V7 (AuraFlow), MOSS-Image, Fibo 2.0 and Wan 2.2 video. Choose from a tested list, or import any model from Hugging Face, Civitai or a file.
 The app speaks English, German, Spanish and Portuguese (Brazil and Portugal); a new language is a folder of JSON files.
 
 </td>
@@ -436,6 +436,8 @@ Mac is never used or changed.
 | Lumina 2 (NetaYume, Neta Lumina) | ComfyUI | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | | | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | | yes (Apache 2.0) |
 | ERNIE-Image (Turbo 8 steps, text in pictures) | MLX | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | | | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | | yes (Apache 2.0) |
 | AuraFlow, Pony V7 (GGUF; the repositories on Diffusers) | ComfyUI, Diffusers | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | | | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | | with conditions (Pony License) |
+| MOSS-Image (text in pictures; 50 steps or the 8-step DMD version, about 4½ min per picture on an M2) | ComfyUI | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | | | | | yes (Apache 2.0) |
+| Fibo 2.0 Edit Turbo (edits a picture by instruction, also inside a mask or up to four together; 4 steps, about 6 min per edit on an M2; ComfyUI from 20 GB, MLX on 16 GB) | ComfyUI, MLX | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | | | | no (CC BY-NC 4.0) |
 | Wan 2.2 5B / 14B (video) | ComfyUI | video | | | | | yes (Apache 2.0) |
 
 Models are never part of the app. They are downloaded on demand from Hugging Face or Civitai, and their licences are
@@ -467,4 +469,4 @@ licences are listed in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt). Model
 app; they keep the licences of their publishers, listed in the app under **Licenses**.
 
 VulKara costs nothing. If it is useful to you, you can support its development on
-[Buy Me a Coffee](https://buymeacoffee.com/revil.0). 
+[Buy Me a Coffee](https://buymeacoffee.com/revil.0). The source code is on [GitHub](https://github.com/revil-O/VulKara).

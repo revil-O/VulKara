@@ -331,6 +331,56 @@ def inspect_flux3(source, ref, token=None):
     return info
 
 
+# ------------------------------------------------------------ folders mflux saved (Fibo 2.0)
+
+MFLUX_SKIP = re.compile(r"^(assets|gallery)/|\.(jpe?g|png|webp|gif|mp4)$|^README\.md$|^\.gitattributes$", re.I)
+# what mflux reads from a saved model: weights, configs, tokenizers, chat templates, the fonts Fibo 2.0 draws text with,
+# and the licence texts (nothing to run: no .py, no pickled .bin)
+MFLUX_KEEP = re.compile(r"\.(safetensors|json|txt|jinja|model|tiktoken|ttf|otf|md)$|(^|/)(LICENSE|NOTICE)[^/]*$", re.I)
+
+
+def mflux_files(names):
+    """The files of an mflux repository that are downloaded."""
+    return sorted(f for f in names if MFLUX_KEEP.search(f) and not MFLUX_SKIP.search(f))
+
+
+def _mflux_components(sizes):
+    """{component: billions of 16 bit parameters as large as its files}: mflux holds its saved weights as they are."""
+    def gb(part):
+        return sum(n for f, n in sizes.items() if f.startswith(part + "/") and f.endswith(".safetensors")) / 1e9 / 2
+    return {"transformer": gb("transformer") or 4.3, "text_encoder": gb("text_encoder") or 2.3, "vae": gb("vae") or 0.08}
+
+
+def inspect_mflux(source, ref, token=None):
+    """inspect() for a repo or folder mflux saved (mflux_model.json) of a model it runs for VulKara, else None."""
+    if source == "hf":
+        try:
+            meta = _hf_json(ref, "mflux_model.json", token)
+        except Exception:
+            return None
+    else:
+        path = os.path.join(ref, "mflux_model.json")
+        if not os.path.isfile(path):
+            return None
+        meta = _load_json(path)
+    found = registry.detect_mflux(meta)
+    if not found:
+        return None
+    arch, overrides = found
+    info = {"source": source, "ref": ref, "file": None, "arch": arch, "overrides": overrides, "denoiser": "transformer",
+            "variant": None}
+    if source == "hf":
+        sizes = _hf_repo_info(ref, token)[1]
+        files = mflux_files(sizes)
+        info.update(layout="repo", files=files, file_sizes={f: sizes[f] for f in files}, file_sha256=_hashes(ref, files),
+                    download_bytes=sum(sizes[f] for f in files), components=_mflux_components(sizes))
+    else:
+        sizes = {str(p.relative_to(ref)): p.stat().st_size for p in Path(ref).rglob("*")
+                 if p.is_file() and not p.name.startswith("._")}
+        info.update(layout="folder", download_bytes=0, components=_mflux_components(sizes))
+    return info
+
+
 # ------------------------------------------------------------ inspection
 
 def _scheduler_config(model_index, read):
@@ -353,9 +403,9 @@ def inspect(source, ref, file=None, token=None, name_hint=""):
         try:
             model_index = _hf_json(ref, "model_index.json", token)
         except EntryNotFoundError:
-            flux3 = inspect_flux3(source, ref, token)
-            if flux3:
-                return flux3
+            found = inspect_flux3(source, ref, token) or inspect_mflux(source, ref, token)
+            if found:
+                return found
             raise registry.UnsupportedModel(_no_layout_message(ref, token))
         den = _denoiser_name(model_index)
         try:
@@ -375,9 +425,9 @@ def inspect(source, ref, file=None, token=None, name_hint=""):
 
     if source == "dir":
         if not os.path.isfile(os.path.join(ref, "model_index.json")):
-            flux3 = inspect_flux3(source, ref)
-            if flux3:
-                return flux3
+            found = inspect_flux3(source, ref) or inspect_mflux(source, ref)
+            if found:
+                return found
         model_index = _load_json(os.path.join(ref, "model_index.json"))
         den = _denoiser_name(model_index)
         den_cfg_path = os.path.join(ref, den, "config.json")
@@ -391,6 +441,7 @@ def inspect(source, ref, file=None, token=None, name_hint=""):
         return info
 
     # single file: local path, or a file inside an HF repo
+    dtypes = set()
     if source == "hf":
         from huggingface_hub import HfApi
         api = HfApi(token=token)
@@ -400,6 +451,7 @@ def inspect(source, ref, file=None, token=None, name_hint=""):
         if file.endswith(".safetensors"):
             meta = api.parse_safetensors_file_metadata(ref, file)
             shapes = {k: t.shape for k, t in meta.tensors.items()}
+            dtypes = {getattr(t, "dtype", "") for t in meta.tensors.values()}
         else:
             # the GGUF header from the file's first megabytes; from the file name when that fails (the
             # header is checked again after the download)
@@ -407,6 +459,8 @@ def inspect(source, ref, file=None, token=None, name_hint=""):
         file_bytes = size
     else:
         shapes = registry.read_single_file_header(ref)
+        if any(k.endswith(".comfy_quant") for k in (shapes or {})):
+            dtypes = {v["dtype"] for k, v in registry.read_safetensors_json(ref).items() if k != "__metadata__"}
         file_bytes = os.path.getsize(ref)
 
     names = ref + "/" + (file or "") + (" " + name_hint if name_hint else "")
@@ -432,8 +486,11 @@ def inspect(source, ref, file=None, token=None, name_hint=""):
         params = dict(spec["fallback_params"])
         if den_params and not spec.get("fixed_params"):
             params[spec["denoiser"]] = den_params
-        if (file or ref).lower().endswith(".gguf") and file_bytes:
-            # a GGUF file stays as it is in memory: counted by its size, in 16 bit equivalents
+        # a GGUF file, or one ComfyUI quantized itself to integers (int8, MOSS-Image), stays as it is in memory: counted
+        # by its size, in 16 bit equivalents (an FP8 one is computed in 16 bit on the Mac, vulkara_memory)
+        comfy_quant = any(k.endswith(".comfy_quant") for k in (shapes or {})) and not any(
+            str(d).startswith("F8") for d in dtypes)
+        if ((file or ref).lower().endswith(".gguf") or comfy_quant) and file_bytes:
             params[spec["denoiser"]] = file_bytes / 2e9
         info.update(layout=layout, arch=arch, overrides=overrides, components=params, denoiser=spec["denoiser"],
                     base_repo=spec["base_repo"], variant=None, base_files=base_files, base_sizes=base_sizes,
@@ -559,7 +616,8 @@ def _guess_from_name(name):
     if "flux" in n and "2" in n.split("flux")[-1][:3]:
         return ("flux2_dev" if "dev" in n else "flux2_klein"), "single_denoiser", {}, None
     if "flux" in n:
-        return ("flux1_schnell" if "schnell" in n else "flux1_dev"), "single_denoiser", registry.name_overrides(n), None
+        arch = "flux1_fill" if "fill" in n else "flux1_schnell" if "schnell" in n else "flux1_dev"
+        return arch, "single_denoiser", registry.name_overrides(n), None
     if "sd3" in n or "3.5" in n or "3_5" in n:
         return ("sd35_large" if "large" in n else "sd35_medium"), "single_denoiser", registry.name_overrides(n), None
     if "wan" in n and "i2v" in n and "14b" in n and ("2.2" in n or "2_2" in n):
@@ -588,10 +646,12 @@ def _base_repo(arch, den_params, ref=""):
 def make_plan(info, quant="auto", ram_gb=None):
     spec = registry.ARCHS[info["arch"]]
     if spec.get("runtime") == "comfyui":
-        # ComfyUI keeps the weights as they are and frees the text encoder when the denoiser needs room
+        # ComfyUI keeps the weights as they are; short of memory it encodes before it loads the denoiser and drops
+        # the text encoder first (engines/comfy/main.py shared_plan; video keeps both counted)
         ram = ram_gb if ram_gb is not None else memory.total_ram_gb()
+        image = spec.get("kind") != "video"
         plan = memory.plan(info["components"], info["denoiser"], spec["family"], ram, quant="none", allow_staging=True,
-                           denoiser_fixed_gb=info.get("denoiser_fixed_gb"))
+                           denoiser_fixed_gb=info.get("denoiser_fixed_gb"), staging_frees_denoiser=image)
         if plan["fits"] or not _comfy_streamable(info):
             return plan
         # too large: ComfyUI's LOW_VRAM mode copies the layers in from the mapped GGUF file (engines/comfy/main.py)
@@ -599,16 +659,18 @@ def make_plan(info, quant="auto", ram_gb=None):
         comps[info["denoiser"]] *= STREAM_RESIDENT_SHARE
         fixed = info.get("denoiser_fixed_gb")
         streamed = memory.plan(comps, info["denoiser"], spec["family"], ram, quant="none", allow_staging=True,
-                               denoiser_fixed_gb=fixed * STREAM_RESIDENT_SHARE if fixed else None)
+                               denoiser_fixed_gb=fixed * STREAM_RESIDENT_SHARE if fixed else None,
+                               staging_frees_denoiser=image)
         if streamed["fits"]:
             streamed["streamed"] = True
             return streamed
         return plan
     if spec.get("plan_on_disk"):
-        # FLUX 3 (flux3-mlx): the weights in memory as on disk, the text encoder only for encoding when both do not fit
+        # FLUX 3 (flux3-mlx), Fibo 2.0 (mflux's saved files): the weights in memory as on disk, the text encoder only
+        # for encoding when both do not fit
         return memory.plan(info["components"], info["denoiser"], spec["family"],
                            ram_gb if ram_gb is not None else memory.total_ram_gb(), quant="none", allow_staging=True,
-                           staging_frees_denoiser=True)
+                           staging_frees_denoiser=True, activations_gb=spec.get("activations_gb"))
     if spec.get("runtime") == "mlx":
         # MLX-only models: mflux quantizes all weights (4 bit on small Macs, text encoder included),
         # the checkpoint's own precision (FP8) does not matter
@@ -627,11 +689,11 @@ def make_plan(info, quant="auto", ram_gb=None):
     # (engine.py); the model fits if that does
     comps = dict(info["components"])
     comps[info["denoiser"]] *= memory.stream_resident_share(spec["family"])
-    streamed = memory.plan(comps, info["denoiser"], spec["family"], ram, quant=quant)
+    streamed = memory.plan(comps, info["denoiser"], spec["family"], ram, quant=quant, full_precision_margin_gb=0)
     if not streamed["fits"] and quant == "auto":
         # as the engine: a big text encoder in 4 bit as the last resort
         streamed = memory.plan(comps, info["denoiser"], spec["family"], ram, quant=quant,
-                               text_quant_opts=memory.QUANT_ORDER)
+                               text_quant_opts=memory.QUANT_ORDER, full_precision_margin_gb=0)
     if streamed["fits"]:
         streamed["quant"][info["denoiser"]] = "none"
         streamed["streamed"] = True
@@ -930,6 +992,12 @@ def _check_base_access(repo, token):
     try:
         auth_check(repo, token=token)
     except GatedRepoError:
+        if not token:
+            # the licence may well be accepted already: without a token Hugging Face can not tell
+            raise PermissionError("This model needs the base components of %s, which is gated on Hugging Face and "
+                                  "needs an access token: enter your Hugging Face token in Settings → Access tokens "
+                                  "(its account must have accepted the licence at https://huggingface.co/%s) and "
+                                  "import again." % (repo, repo))
         raise PermissionError("This model needs the base components of %s, which is gated on Hugging Face. "
                               "Accept its licence at https://huggingface.co/%s (with the account of your "
                               "Hugging Face token) and import again." % (repo, repo))
@@ -998,6 +1066,17 @@ def import_civitai(ref, name, quant="auto", dry_run=False, force=False, token=No
     return result
 
 
+def _made_elsewhere(manifest):
+    """True when a model.json was written on another Mac, as the app tells it (src/main/foreign_mac.ts): by the app's id
+    of the Mac where both are known, else by the memory in whole GB."""
+    on = manifest.get("imported_on") if isinstance(manifest.get("imported_on"), dict) else None
+    here = imported_on()
+    if on and on.get("machine") and here.get("machine"):
+        return on["machine"] != here["machine"]
+    ram = (on or {}).get("ram_gb", (manifest.get("plan") or {}).get("ram_gb"))
+    return isinstance(ram, (int, float)) and int(ram + 0.5) != here["ram_gb"]
+
+
 def register_in_place(model_dir, dry_run=False):
     """A folder that already is an imported model (it has a model.json, e.g. imported on another
     disk or by another copy of the app) is used where it is: nothing is copied or downloaded."""
@@ -1006,6 +1085,13 @@ def register_in_place(model_dir, dry_run=False):
     if manifest.get("engine") != "diffusers" or manifest.get("arch") not in registry.ARCHS:
         raise registry.UnsupportedModel("This folder's model.json is not a model this app can use")
     spec = registry.ARCHS[manifest["arch"]]
+    if _made_elsewhere(manifest):
+        # its plan and caches are for another Mac: the app refuses such a model (src/main/foreign_mac.ts), so a
+        # "done" here left a model that could not run (2026-11-03, a folder copied from a 24 GB Mac to a 16 GB one)
+        raise registry.UnsupportedModel(
+            "This folder was imported on another Mac (%s GB): its memory plan does not fit this one. Import the model "
+            "again from its source, or import its weights folder (with model_index.json) instead of the model folder"
+            % ((manifest.get("imported_on") or {}).get("ram_gb") or (manifest.get("plan") or {}).get("ram_gb") or "?"))
     if dry_run:
         summary = {"arch": manifest["arch"], "label": spec["label"], "layout": "in place",
                    "plan": manifest.get("plan"), "download_gb": 0, "gated": False,
@@ -1143,7 +1229,7 @@ def run_import(source, ref, name, file=None, quant="auto", dry_run=False, force=
             "resolutions": spec["resolutions"], "negative_prompt": spec["negative_prompt"],
             "img2img": bool(spec.get("img2img_pipeline")) or spec["family"] == "flux2" or bool(spec.get("img2img")),
             "runtime": spec.get("runtime") or "diffusers",
-            "inpaint": bool(spec.get("inpaint_pipeline")), "inpaint_only": bool(spec.get("inpaint_only")),
+            "inpaint": bool(spec.get("inpaint_pipeline") or spec.get("inpaint")), "inpaint_only": bool(spec.get("inpaint_only")),
             "content_filtered": bool(spec.get("content_filtered")),
             "kind": spec.get("kind") or "image",
             "source": {"type": source, "ref": ref, "file": file},

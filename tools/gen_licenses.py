@@ -55,6 +55,13 @@ LICENSES = {
     "circlestone-labs-non-commercial-license": dict(
         name="CircleStone Labs Non-Commercial License", url="https://huggingface.co/circlestone-labs/Anima/blob/main/LICENSE.md",
         model="no", outputs="yes", note="The model only for non-commercial purposes; generated pictures may be used for any purpose."),
+    "cc-by-nc-4.0": dict(
+        name="Creative Commons Attribution-NonCommercial 4.0", url="https://creativecommons.org/licenses/by-nc/4.0/",
+        model="no", outputs="no", note="Model and pictures for non-commercial use only; commercial use needs an agreement with the maker."),
+    # Bria's Fibo 2.0 licence as mflux-community's repos name it: CC BY-NC 4.0
+    "fibo-2.0-edit-turbo-license": dict(
+        name="Creative Commons Attribution-NonCommercial 4.0", url="https://creativecommons.org/licenses/by-nc/4.0/",
+        model="no", outputs="no", note="Model and pictures for non-commercial use only; commercial use needs an agreement with the maker."),
     "ideogram-4-non-commercial": dict(
         name="Ideogram Non-Commercial Model Agreement", url="https://huggingface.co/ideogram-ai/ideogram-4-fp8/blob/main/LICENSE.md",
         model="no", outputs="no",
@@ -198,10 +205,24 @@ GITHUB_HELPERS = [
 ]
 
 
+# curated models downloaded from a repackaging: the maker's page as the source, and what the entry adds
+OVERRIDES = {
+    "MOSS-Image": dict(source="https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT"),
+    "MOSS-Image-8step-DMD": dict(note="lodestones' 8-step DMD LoRA (Apache 2.0) merged into MOSS-Image SFT."),
+    "Fibo-2.0-Edit-Turbo": dict(source="https://huggingface.co/briaai/Fibo-2.0-edit-turbo",
+                                note="Model and pictures for non-commercial use only; commercial use needs an agreement "
+                                     "with Bria AI. ComfyUI files repackaged by Comfy-Org."),
+    "Fibo-2.0-Edit-Turbo-MLX": dict(source="https://huggingface.co/briaai/Fibo-2.0-edit-turbo",
+                                    note="Model and pictures for non-commercial use only; commercial use needs an "
+                                         "agreement with Bria AI. Saved in 8 bit for mflux by mflux-community."),
+}
+
+
 def models():
     with open(os.path.join(DATA, "curated_models.json")) as f:
         curated = json.load(f)
-    out = [(hf_entry if m["source"] == "hf" else civitai_entry)("Recommended: " + m["family"], m["ref"], m["title"], m["id"])
+    out = [dict((hf_entry if m["source"] == "hf" else civitai_entry)("Recommended: " + m["family"], m["ref"], m["title"],
+                                                                      m["id"]), **OVERRIDES.get(m["id"], {}))
            for m in curated]
     return out + [hf_entry(group, repo, title) for group, repo, title in EXTRA] + photo_tools() + GITHUB_HELPERS
 

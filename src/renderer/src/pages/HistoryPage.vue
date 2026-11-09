@@ -6,13 +6,13 @@
 // marked with the heart, in the same way.
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Check, Copy, Download, FolderSearch, Heart, ImageOff, Play, Repeat, Search, Share, Trash2, X } from 'lucide-vue-next'
+import { Check, Copy, Download, FolderSearch, Heart, ImageOff, Play, Repeat, Search, Share, Trash2, X } from '@lucide/vue'
 import OpenHint from '../components/OpenHint.vue'
 import PageFrame from '../components/PageFrame.vue'
 import { useAssetsStore } from '../stores/assets'
 import { useHandoffStore } from '../stores/handoff'
 import { cleanError } from '../stores/runtimes'
-import { formatDuration, pageName, perStep } from '../util/format'
+import { durationText, pageName } from '../util/format'
 import { formPage } from '../util/job_form'
 import { dateLocale, t, type PlainKey } from '../i18n'
 import { canCopyImage, canShare, copyPicture, sharePicture } from '../share'
@@ -160,7 +160,7 @@ const facts = computed(() => {
   if (j.strength !== undefined) rows.push(['library.facts.strength', String(j.strength)])
   if (j.videoSeconds) rows.push(['library.facts.length', `${j.videoSeconds} s`])
   if (e.seconds !== undefined) {
-    rows.push(['library.facts.duration', formatDuration(e.seconds) + (e.secondsPerStep ? ' · ' + perStep(e.secondsPerStep) : '')])
+    rows.push(['library.facts.duration', durationText(e)])
   }
   if (j.loras?.length) rows.push(['library.facts.loras', j.loras.map((l) => `${l.path.split('/').pop()} (${l.scale})`).join(', ')])
   if (j.controlnet) rows.push(['library.facts.controlnet', `${j.controlnet.type} (${j.controlnet.weight})`])
@@ -587,5 +587,6 @@ dl {
 dd {
   margin: 0;
   word-break: break-word;
+  white-space: pre-line;  /* the run time's parts, one per line */
 }
 </style>

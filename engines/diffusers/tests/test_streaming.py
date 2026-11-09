@@ -27,11 +27,42 @@ def test_streamed_blocks_give_the_same_result_and_stay_off_memory(tmp_path):
     model, x = Toy(), torch.randn(2, 8)
     expected = model(x)
     n, kept = streaming.enable(model, torch.device("cpu"), torch.float32, str(tmp_path))
-    assert (n, kept) == (5, 0) and len(list(tmp_path.glob("*.safetensors"))) == 5
+    assert (n, kept) == (5, 0) and len(list(tmp_path.glob("*_blocks.*.safetensors"))) == 5
     assert model.transformer_blocks[0].weight.device.type == "meta"  # not resident
     for _ in range(2):  # the second pass reads the blocks again (prefetch wraps around)
         assert torch.allclose(model(x), expected, atol=1e-6)
     assert model.single_transformer_blocks[1].weight.device.type == "meta"
+
+
+def test_blocks_read_ahead_are_dropped_after_the_last_step_and_read_again(tmp_path):
+    torch.manual_seed(0)
+    model, x = Toy(), torch.randn(2, 8)
+    expected = model(x)
+    streaming.enable(model, torch.device("cpu"), torch.float32, str(tmp_path))
+    model(x)
+    assert model._stream_pending  # the first blocks of a further pass
+    streaming.drop_ahead(model)
+    assert not model._stream_pending
+    streaming.drop_ahead(None)  # a model that does not stream
+    assert torch.allclose(model(x), expected, atol=1e-6)
+
+
+def test_a_complete_cache_gives_the_model_without_its_file(tmp_path):
+    torch.manual_seed(0)
+    model, x = Toy(), torch.randn(2, 8)
+    expected = model(x)
+
+    def empty():
+        with torch.device("meta"):
+            return Toy()
+    assert streaming.from_cache(empty, str(tmp_path), torch.float32) is None  # no cache yet
+    streaming.enable(model, torch.device("cpu"), torch.float32, str(tmp_path))
+    assert (tmp_path / streaming.REST).is_file()  # the weights outside the blocks, written with the cache
+    again = streaming.from_cache(empty, str(tmp_path), torch.float32)
+    assert again.proj_in.weight.device.type == "cpu" and again.transformer_blocks[0].weight.device.type == "meta"
+    streaming.enable(again, torch.device("cpu"), torch.float32, str(tmp_path), resident_share=0.4)
+    assert torch.allclose(again(x), expected, atol=1e-6)
+    assert streaming.from_cache(empty, str(tmp_path), torch.float16) is None  # another compute dtype: another cache
 
 
 def test_on_mps_at_most_two_streamed_blocks_wait_on_the_gpu(tmp_path, monkeypatch):

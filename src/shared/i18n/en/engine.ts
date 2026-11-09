@@ -21,6 +21,7 @@ export default {
   preparingControl: 'Preparing {type} control image',
   encodingPrompt: 'Encoding prompt',
   generating: 'Generating',
+  describingPicture: 'Describing the picture',
   decoding: 'Decoding',
   workingOnPicture: 'Working on the picture',
   correcting: 'Correcting colours and contrast',

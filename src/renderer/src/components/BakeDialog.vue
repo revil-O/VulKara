@@ -4,7 +4,7 @@
 // strength, a name. The new model needs no LoRA any more and shows up under Models; the work runs in the import
 // queue, its progress shows here.
 import { computed, onMounted, ref, watch } from 'vue'
-import { Flame, Plus, X } from 'lucide-vue-next'
+import { Flame, Plus, X } from '@lucide/vue'
 import HintBadge from './HintBadge.vue'
 import { useAssetsStore } from '../stores/assets'
 import { useImportsStore } from '../stores/imports'

@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 · Copyright (C) 2026 Oliver Schmidt -->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Menu } from 'lucide-vue-next'
+import { Menu } from '@lucide/vue'
 import { useRoute, useRouter } from 'vue-router'
 import NavRail from './components/NavRail.vue'
 import JobBar from './components/JobBar.vue'
@@ -27,7 +27,7 @@ watch(() => route.path, () => { navOpen.value = false })
 // a viewer or splash window shows its page alone
 // the remote web UI does not update the Mac's app
 const remote = isRemote()
-const bare = computed(() => route.meta.bare === true || /^#\/(viewer|splash)/.test(location.hash))
+const bare = computed(() => route.meta.bare === true || /^#\/(viewer|splash|monitor)/.test(location.hash))
 
 onMounted(() => {
   if (bare.value) return
@@ -42,6 +42,8 @@ onMounted(() => {
   })
   // a viewer window hands a picture or the settings of a job back
   window.vk.viewer.onAction(routeViewerAction)
+  // the app menu and the menu bar open a page (Settings …)
+  if (!remote) window.vk.app.onNavigate((to) => { if (router.resolve(to).matched.length) void router.push(to) })
 })
 
 const handoff = useHandoffStore()

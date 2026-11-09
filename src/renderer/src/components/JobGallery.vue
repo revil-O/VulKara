@@ -3,7 +3,7 @@
 // The jobs of a page as tiles: a waiting or running job shows what it is and how far, a finished one its pictures.
 import { jobLabel } from '../util/labels'
 import { computed, ref } from 'vue'
-import { CircleAlert, FileX, Heart, Info, Square, X } from 'lucide-vue-next'
+import { CircleAlert, FileX, Heart, Info, Square, X } from '@lucide/vue'
 import OpenHint from './OpenHint.vue'
 import { useAssetsStore } from '../stores/assets'
 import { useFavoritesStore } from '../stores/favorites'

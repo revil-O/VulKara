@@ -6,6 +6,7 @@
     python main.py import_model …  import a model (spawned by native_functions.js)
     python main.py detect_pose <image>   pose (body, hands, face) of a photo for the pose editor
     python main.py find_faces <image>    the faces of a photo for Restore (5 landmarks and the restored square)
+    python main.py caption_image <image> a prompt that describes the picture (Image to image, Qwen3-VL 2B)
     python main.py export_single <model folder> <out.safetensors>   SD 1.x / SDXL in folder layout as one checkpoint
     python main.py train <job.json>      LoRA training for SDXL (FLUX.2 / Krea 2: mlx/train.py)
     python main.py hardware [--tiers]    this Mac and the mode per model family (Settings, docs)
@@ -52,7 +53,7 @@ def serve(stream=None):
             except Exception as e:
                 traceback.print_exc()
                 protocol.error(protocol.describe(e))
-            _free_memory()  # a stopped or failed job leaves its buffers in the Metal cache otherwise
+            _free_memory("image")  # a stopped or failed job leaves its buffers in the Metal cache otherwise
             footprint.report()
             protocol.state("idle")
         elif op == "preview":
@@ -101,6 +102,9 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "find_faces":
         import restore
         sys.exit(restore.faces_main(sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "caption_image":
+        import caption
+        sys.exit(caption.main(sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "recheck_loras":
         import recheck
         sys.exit(recheck.main(sys.argv[2:]))

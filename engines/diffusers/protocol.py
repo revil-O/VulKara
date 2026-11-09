@@ -8,6 +8,8 @@ Out: one event per line, "@vk " followed by JSON, {"event": "state" | "progress"
 
 A reader thread owns stdin, so a stop request is seen while a job runs and no other request is lost.
 """
+import contextlib
+import ctypes
 import json
 import os
 import queue
@@ -50,6 +52,8 @@ class CommandReader:
         self.commands = queue.Queue()
         self.stop_event = threading.Event()
         self.closed = threading.Event()
+        self.lock = threading.Lock()
+        self.interrupt = None  # (thread id, exception class) while that thread loads a model (interruptible())
         self.thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self):
@@ -63,6 +67,10 @@ class CommandReader:
                 continue
             if parsed[0] == "stop":
                 self.stop_event.set()
+                with self.lock:
+                    if self.interrupt is not None:
+                        _raise_in(*self.interrupt)
+                        self.interrupt = None
             else:
                 if parsed[0] in JOB_OPS:
                     # a stop is about the job read before it: cleared here, in the order of stdin, not when the
@@ -78,6 +86,28 @@ class CommandReader:
 
     def stop_requested(self):
         return self.stop_event.is_set()
+
+    @contextlib.contextmanager
+    def interruptible(self, exc):
+        """While the calling thread loads a model: a stop raises exc there at once (between two tensors) instead of
+        after the whole load. Only around code whose files are written whole or renamed into place: a cache file
+        written half would be read next time."""
+        if self.stop_event.is_set():
+            raise exc()
+        tid = threading.get_ident()
+        with self.lock:
+            self.interrupt = (tid, exc)
+        try:
+            yield
+        finally:
+            with self.lock:
+                self.interrupt = None
+                _raise_in(tid, None)  # a stop raised but not yet delivered is taken back
+
+
+def _raise_in(tid, exc):
+    """Raises exc in the thread tid at its next Python instruction (None takes a pending one back)."""
+    ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_ulong(tid), ctypes.py_object(exc) if exc else None)
 
 
 def event(name, **fields):
@@ -107,6 +137,8 @@ PLANNED = {"gb": None}
 
 def planned(gb):
     PLANNED["gb"] = round(gb, 2) if gb is not None else None
+    if gb is not None:
+        event("planned", gb=PLANNED["gb"])  # the monitor window shows the job's memory against it while it runs
 
 
 class Footprint:
@@ -156,9 +188,9 @@ class Footprint:
             event("footprint", peak_gb=round(peak / 1024 ** 3, 2), read_gb=round(read / 1024 ** 3, 2), plan_gb=PLANNED["gb"])
 
 
-def footprint_gb():
-    """What this process holds now (with the GPU's share), as macOS counts it."""
-    got = Footprint._usage(os.getpid())
+def footprint_gb(pid=None):
+    """What this process (or pid) holds now (with the GPU's share), as macOS counts it."""
+    got = Footprint._usage(pid or os.getpid())
     return got[1].phys_footprint / 1024 ** 3 if got else 0.0
 
 

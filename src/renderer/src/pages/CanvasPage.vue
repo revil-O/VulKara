@@ -4,7 +4,7 @@
 // frame gives a new picture; a frame over the edge of a picture extends it; a painted mask repaints a part;
 // a covered frame without a mask gives a variation. The jobs run through the queue like all others.
 import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, watch } from 'vue'
-import { Brush, Download, ImagePlus, Layers, Maximize, Move, Scaling, Sparkles, Square, Trash2, Undo2 } from 'lucide-vue-next'
+import { Brush, Download, ImagePlus, Layers, Maximize, Move, Scaling, Sparkles, Square, Trash2, Undo2 } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import JobGallery from '../components/JobGallery.vue'
 import HintBadge from '../components/HintBadge.vue'

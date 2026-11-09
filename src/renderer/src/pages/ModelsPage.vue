@@ -3,7 +3,7 @@
 // Models and LoRAs: what is installed, what is recommended, and adding more from Hugging Face, Civitai or disk.
 // Nothing is part of the app; every model is downloaded or imported here.
 import { computed, nextTick, onActivated, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { Boxes, Check, CircleAlert, Download, ExternalLink, FileDown, FolderOpen, FolderSearch, Layers, Pencil, Search, Square, Trash2, X } from 'lucide-vue-next'
+import { Boxes, Check, CircleAlert, Download, ExternalLink, FileDown, FolderOpen, FolderSearch, Layers, Pencil, Search, Square, Trash2, X } from '@lucide/vue'
 import LoraFinder from '../components/LoraFinder.vue'
 import HintBadge from '../components/HintBadge.vue'
 import PageFrame from '../components/PageFrame.vue'

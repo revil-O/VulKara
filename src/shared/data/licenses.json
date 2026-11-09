@@ -126,6 +126,17 @@
    "note": "Use-based restrictions (Attachment A) apply to the model and its outputs."
   },
   {
+   "group": "Recommended: SDXL",
+   "id": "SDXL-Inpainting",
+   "title": "Stable Diffusion XL Inpainting",
+   "source": "https://huggingface.co/diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
+   "license": "CreativeML Open RAIL++-M",
+   "license_url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md",
+   "model": "yes",
+   "outputs": "yes",
+   "note": "Use-based restrictions (Attachment A) apply to the model and its outputs."
+  },
+  {
    "group": "Recommended: FLUX.2",
    "id": "FLUX.2-klein-9B",
    "title": "FLUX.2 [klein] 9B",
@@ -214,6 +225,17 @@
    "note": "The model only for non-commercial purposes; generated pictures may be used commercially."
   },
   {
+   "group": "Recommended: FLUX.1",
+   "id": "FLUX.1-Fill-Q4",
+   "title": "FLUX.1 Fill [dev] (4 bit)",
+   "source": "https://huggingface.co/YarvixPA/FLUX.1-Fill-dev-GGUF",
+   "license": "FLUX.1 [dev] Non-Commercial License",
+   "license_url": "https://github.com/black-forest-labs/flux/blob/main/model_licenses/LICENSE-FLUX1-dev",
+   "model": "no",
+   "outputs": "yes",
+   "note": "The model only for non-commercial purposes; generated pictures may be used commercially."
+  },
+  {
    "group": "Recommended: Chroma",
    "id": "Chroma1-HD",
    "title": "Chroma1-HD",
@@ -256,6 +278,39 @@
    "model": "yes",
    "outputs": "yes",
    "note": ""
+  },
+  {
+   "group": "Recommended: MOSS-Image",
+   "id": "MOSS-Image",
+   "title": "MOSS-Image",
+   "source": "https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT",
+   "license": "Apache License 2.0",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "model": "yes",
+   "outputs": "yes",
+   "note": ""
+  },
+  {
+   "group": "Recommended: Fibo 2.0",
+   "id": "Fibo-2.0-Edit-Turbo",
+   "title": "Fibo 2.0 Edit Turbo",
+   "source": "https://huggingface.co/briaai/Fibo-2.0-edit-turbo",
+   "license": "Creative Commons Attribution-NonCommercial 4.0",
+   "license_url": "https://creativecommons.org/licenses/by-nc/4.0/",
+   "model": "no",
+   "outputs": "no",
+   "note": "Model and pictures for non-commercial use only; commercial use needs an agreement with Bria AI. ComfyUI files repackaged by Comfy-Org."
+  },
+  {
+   "group": "Recommended: Fibo 2.0",
+   "id": "Fibo-2.0-Edit-Turbo-MLX",
+   "title": "Fibo 2.0 Edit Turbo (MLX, 8 bit)",
+   "source": "https://huggingface.co/briaai/Fibo-2.0-edit-turbo",
+   "license": "Creative Commons Attribution-NonCommercial 4.0",
+   "license_url": "https://creativecommons.org/licenses/by-nc/4.0/",
+   "model": "no",
+   "outputs": "no",
+   "note": "Model and pictures for non-commercial use only; commercial use needs an agreement with Bria AI. Saved in 8 bit for mflux by mflux-community."
   },
   {
    "group": "Recommended: SD 3.5",
@@ -454,6 +509,17 @@
    "model": "yes",
    "outputs": "yes",
    "note": ""
+  },
+  {
+   "group": "Recommended: MOSS-Image",
+   "id": "MOSS-Image-8step-DMD",
+   "title": "MOSS-Image 8-step (DMD)",
+   "source": "https://huggingface.co/Spectrallic/MOSS-Image-SFT-8step-DMD-int8-convrot",
+   "license": "Apache License 2.0",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "model": "yes",
+   "outputs": "yes",
+   "note": "lodestones' 8-step DMD LoRA (Apache 2.0) merged into MOSS-Image SFT."
   },
   {
    "group": "Recommended: SD 1.x",

@@ -4,7 +4,7 @@
 // and a few numbers. The training itself runs in the main process; this page shows how far it is.
 import { computed, onActivated, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Flame, FolderOpen, ImagePlus, Play, Square, X } from 'lucide-vue-next'
+import { Flame, FolderOpen, ImagePlus, Play, Square, X } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import BakeDialog from '../components/BakeDialog.vue'
 import { useAssetsStore } from '../stores/assets'

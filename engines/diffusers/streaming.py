@@ -14,6 +14,7 @@ Reading is the slow part (a step reads every streamed block), so:
     delivers more with two reads at once, an external one is not slower for it).
 """
 import collections
+import contextlib
 import json
 import os
 import time
@@ -21,6 +22,7 @@ import time
 import torch
 
 FORMAT = 1
+REST = "rest.safetensors"  # the weights outside the blocks (embedders, norms, output layer)
 PREFETCH = 2  # blocks read ahead
 READERS = 2   # reads at a time
 # streamed blocks whose computing may still be queued on the GPU when the next one is loaded: MPS runs asynchronously,
@@ -135,13 +137,22 @@ def enable(model, device, dtype, cache_dir, report=None, resident_share=0.0):
             if report:
                 report(n, len(blocks))
             state = {k: v.detach().to(dtype).contiguous() for k, v in block.state_dict().items()}
-            save_file(state, path)
+            save_file(state, path + ".tmp")
+            os.replace(path + ".tmp", path)  # a write broken off leaves no half file under the real name
             del state
         paths.append(path)
+    rest_path = os.path.join(cache_dir, REST)
+    if (not valid or not os.path.isfile(rest_path)) and not any(p.device.type == "meta" for p in model.parameters(recurse=False)):
+        # the other weights too, so that later loads build the model empty and read only these (from_cache); written
+        # anew with the blocks, and whole or not at all (a half file failed every later load)
+        names = {name for name, _ in lists}
+        save_file({k: v.detach().to(dtype).contiguous() for k, v in model.state_dict().items() if k.split(".")[0] not in names}, rest_path + ".tmp")
+        os.replace(rest_path + ".tmp", rest_path)
     keep = resident_blocks([os.path.getsize(p) for p in paths], resident_share)
     model._stream_kept = [(blocks[n][1], paths[n]) for n in sorted(keep)]
     model._stream_device = device
     model._stream_read = read
+    model._stream_pending = pending
     for n, (key, block) in enumerate(blocks):
         path = paths[n]
         if n in keep:
@@ -215,6 +226,53 @@ def enable(model, device, dtype, cache_dir, report=None, resident_share=0.0):
     return len(order), len(keep)
 
 
+def from_cache(empty, cache_dir, dtype):
+    """The model for enable() from a complete stream cache, without loading its file: built empty (empty() gives it on
+    the meta device), the weights outside the blocks read from the cache. None when the cache is not complete: loading
+    a 16 bit model whole to find that out took 24.6 GB for FLUX.1 [dev] on a Mac that computes in float16
+    (MEASUREMENTS 7as). The first use of a model still loads it whole to write the cache."""
+    from safetensors.torch import load_file
+    model = empty()
+    rest_path = os.path.join(cache_dir, REST)
+    if _read_signature(os.path.join(cache_dir, "stream.json")) != _signature(model, dtype) or not os.path.isfile(rest_path):
+        return None
+    model.load_state_dict(load_file(rest_path), strict=False, assign=True)
+    return model
+
+
+@contextlib.contextmanager
+def _gguf_mapped():
+    """Diffusers reads a GGUF file with a copy of every tensor (`tensor.data.copy()`): the whole file in memory, 12.7 GB
+    for an 8 bit FLUX.1 next to the blocks being unpacked (14.2 GB on 16 GB, MEASUREMENTS 7bp). Inside this the tensors
+    stay views of the memory-mapped file: macOS reads them as the blocks are unpacked and may drop them again."""
+    import warnings
+    import gguf
+    from diffusers.models import model_loading_utils as mlu
+    from diffusers.quantizers.gguf.utils import SUPPORTED_GGUF_QUANT_TYPES, GGUFParameter
+
+    plain = (gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16)
+
+    def mapped(path, return_tensors=False):
+        out = {}
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)
+            # copy on write: still read only where used, and a tensor written in place gets a page of its own instead
+            # of the process ending on the read-only mapping
+            for t in gguf.GGUFReader(path, "c").tensors:
+                if t.tensor_type not in plain and t.tensor_type not in SUPPORTED_GGUF_QUANT_TYPES:
+                    raise ValueError("%s has the unsupported GGUF quantization type %s" % (t.name, t.tensor_type))
+                w = torch.from_numpy(t.data)
+                out[t.name] = w if t.tensor_type in plain else GGUFParameter(w, quant_type=t.tensor_type)
+        return out
+
+    original = mlu.load_gguf_checkpoint
+    mlu.load_gguf_checkpoint = mapped
+    try:
+        yield
+    finally:
+        mlu.load_gguf_checkpoint = original
+
+
 def unpack_gguf(load, empty, cache_dir, dtype, source_id, report=None):
     """A GGUF denoiser made streamable: its blocks unpacked once into the stream cache in the compute format (block by
     block, each freed right after), the other weights (embedders, norms, output layer) into rest.safetensors. Later
@@ -224,7 +282,7 @@ def unpack_gguf(load, empty, cache_dir, dtype, source_id, report=None):
     from safetensors.torch import load_file, save_file
     model = empty()
     marker = os.path.join(cache_dir, "unpacked.json")
-    rest_path = os.path.join(cache_dir, "rest.safetensors")
+    rest_path = os.path.join(cache_dir, REST)
     want = {"format": FORMAT, "source": source_id, "dtype": str(dtype)}
     if _read_signature(marker) != want or not os.path.isfile(rest_path):
         from diffusers.quantizers.gguf.utils import dequantize_gguf_tensor
@@ -233,7 +291,8 @@ def unpack_gguf(load, empty, cache_dir, dtype, source_id, report=None):
             return (dequantize_gguf_tensor(v) if hasattr(v, "quant_type") else v).detach().to(dtype).contiguous()
 
         os.makedirs(cache_dir, exist_ok=True)
-        packed = load()
+        with _gguf_mapped():
+            packed = load()
         lists = _block_lists(packed)
         blocks = [("%s.%d" % (name, i), block) for name, lst in lists for i, block in enumerate(lst)]
         for n, (key, block) in enumerate(blocks):
@@ -250,6 +309,16 @@ def unpack_gguf(load, empty, cache_dir, dtype, source_id, report=None):
             json.dump(want, f)
     model.load_state_dict(load_file(rest_path), strict=False, assign=True)
     return model
+
+
+def drop_ahead(model):
+    """Forgets the blocks read ahead for a further pass: after the last step they only hold memory (0.85 GB on
+    Qwen-Image 2.1, MEASUREMENTS 7w). A read still running is thrown away when it ends."""
+    pending = getattr(model, "_stream_pending", None)
+    if pending:
+        for future in pending.values():
+            future.cancel()
+        pending.clear()
 
 
 def kept_gb(model):

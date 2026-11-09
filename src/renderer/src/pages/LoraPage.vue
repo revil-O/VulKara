@@ -3,7 +3,7 @@
 // LoRAs: an overview of all of them (trigger words, category, what they were trained with, renaming) and a
 // comparison of strengths: the same prompt and seed, one picture per strength and LoRA.
 import { computed, nextTick, onActivated, reactive, ref, watch } from 'vue'
-import { ExternalLink, Flame, Pencil, RefreshCw, Scale, Search, Sparkles, X } from 'lucide-vue-next'
+import { ExternalLink, Flame, Pencil, RefreshCw, Scale, Search, Sparkles, X } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import JobGallery from '../components/JobGallery.vue'
 import BakeDialog from '../components/BakeDialog.vue'

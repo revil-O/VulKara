@@ -5,7 +5,7 @@
 // moves a zoomed picture; Space-drag or the middle button drags it. Painting and clicking keep working, because
 // they measure the picture as it is shown (getBoundingClientRect).
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { Maximize, Minus, Plus } from 'lucide-vue-next'
+import { Maximize, Minus, Plus } from '@lucide/vue'
 import { t } from '../i18n'
 
 const MAX = 8

@@ -112,6 +112,18 @@ def test_files_diffusers_reads_as_they_are_stay_as_they_are(name, pipeline):
     assert coverage(pipeline, sd)[0] == 1.0
 
 
+def test_a_file_mixing_both_factor_namings_gets_one():
+    """lrzjason's FLUX.2 [klein] consistency LoRAs name 32 of 144 layers ".lora.down/up", the rest ".lora_A/B":
+    diffusers' reader keeps both, peft then loads only the lora_A/B layers (112 of 144 in the app, refused)."""
+    sd = tensors("klein9_lcs_mixed_factor_names")
+    pipe = stand_in("Flux2KleinPipeline")
+    assert sum(k.endswith(".lora.down.weight") for k in sd) == 32
+    out = lora_convert.convert(pipe, sd)
+    assert not [k for k in out if ".lora.down." in k or ".lora.up." in k]
+    assert sum(k.endswith(".lora_A.weight") for k in out) == 144
+    assert coverage("Flux2KleinPipeline", out) == (1.0, 144)
+
+
 def test_qwen_image_21_gate_up_is_split_gate_rows_first():
     """ComfyUI fuses the SwiGLU gate and up projections, gate rows first; diffusers 0.41 names them
     img_mlp.gate_layer and img_mlp.proj (12288 x 4096 each)."""
@@ -230,3 +242,82 @@ def test_quantized_weights_get_plain_names_while_a_lora_loads():
     assert "state_dict" not in vars(t)
     with engine._plain_weight_names(None):
         pass
+
+
+def _fibo_diffusers(rank=4, dim=16, hidden=24, alpha=True):
+    """A Fibo 2.0 LoRA in diffusers' layout: one block's attention and feed-forward, random factors."""
+    torch.manual_seed(1)
+    sd = {}
+    for name, out_w, in_w in [("attention.to_q", dim, dim), ("attention.to_k", dim, dim), ("attention.to_v", dim, dim),
+                              ("attention.to_out.0", dim, dim), ("feed_forward.w1", hidden, dim), ("feed_forward.w3", hidden, dim),
+                              ("feed_forward.w2", dim, hidden), ("cross_attention.to_q", dim, dim), ("cross_attention.to_k", dim, 2 * dim),
+                              ("cross_attention.to_v", dim, 2 * dim), ("cross_attention.to_out.0", dim, dim)]:
+        sd["transformer.layers.0.%s.lora_A.weight" % name] = torch.randn(rank, in_w)
+        sd["transformer.layers.0.%s.lora_B.weight" % name] = torch.randn(out_w, rank)
+        if alpha:
+            sd["transformer.layers.0.%s.alpha" % name] = torch.tensor(float(rank))
+    return sd
+
+
+def _delta(sd, prefix, name):
+    A, B = sd["%s.%s.lora_A.weight" % (prefix, name)], sd["%s.%s.lora_B.weight" % (prefix, name)]
+    scale = sd.get("%s.%s.alpha" % (prefix, name))
+    scale = float(scale) / A.shape[0] if scale is not None else 1.0
+    return B @ A * scale
+
+
+def test_fibo2_diffusers_layout_is_fused_for_comfyui_and_split_back():
+    sd = _fibo_diffusers()
+    assert lora_convert.fibo2_needs_comfy(sd) and not lora_convert.fibo2_needs_diffusers(sd)
+    fused = lora_convert.fibo2_to_comfy(sd)
+    assert lora_convert.fibo2_needs_diffusers(fused) and not lora_convert.fibo2_needs_comfy(fused)
+    qkv, w13 = "diffusion_model.layers.0.attention.qkv", "diffusion_model.layers.0.feed_forward.w13"
+    assert fused[qkv + ".lora_A.weight"].shape == (12, 16) and fused[qkv + ".lora_B.weight"].shape == (48, 12)
+    assert fused[w13 + ".lora_B.weight"].shape == (512, 8)  # the hidden width padded to 256
+    assert fused["diffusion_model.layers.0.feed_forward.w2.lora_A.weight"].shape == (4, 256)
+    assert float(fused[qkv + ".alpha"]) == 12.0  # alpha / rank unchanged: 4 / 4 = 12 / 12
+    # the fused layer's change is the parts' changes one under the other
+    d = _delta(fused, "diffusion_model", "layers.0.attention.qkv")
+    for i, part in enumerate(("to_q", "to_k", "to_v")):
+        assert torch.allclose(d[i * 16:(i + 1) * 16], _delta(sd, "transformer", "layers.0.attention." + part), atol=1e-5)
+    d = _delta(fused, "diffusion_model", "layers.0.feed_forward.w13")
+    assert torch.allclose(d[:24], _delta(sd, "transformer", "layers.0.feed_forward.w1"), atol=1e-5)
+    assert torch.allclose(d[256:280], _delta(sd, "transformer", "layers.0.feed_forward.w3"), atol=1e-5)
+    assert torch.allclose(d[24:256], torch.zeros(232, 16))
+    assert torch.allclose(_delta(fused, "diffusion_model", "layers.0.attention.out"), _delta(sd, "transformer", "layers.0.attention.to_out.0"))
+    # the injection layers' cross attention: k and v fused, the output projection without diffusers' ".0"
+    d = _delta(fused, "diffusion_model", "layers.0.cross_attention.to_kv")
+    assert torch.allclose(d[16:32], _delta(sd, "transformer", "layers.0.cross_attention.to_v"), atol=1e-5)
+    assert torch.allclose(_delta(fused, "diffusion_model", "layers.0.cross_attention.to_out"), _delta(sd, "transformer", "layers.0.cross_attention.to_out.0"))
+    # split back for mflux: the same changes, diffusers' names, the padding gone
+    back = lora_convert.fibo2_to_diffusers(fused)
+    assert set(back) == set(sd)
+    for name in ("attention.to_q", "attention.to_v", "attention.to_out.0", "feed_forward.w1", "feed_forward.w3", "feed_forward.w2",
+                 "cross_attention.to_k", "cross_attention.to_out.0"):
+        assert torch.allclose(_delta(back, "transformer", "layers.0." + name), _delta(sd, "transformer", "layers.0." + name), atol=1e-5)
+    assert back["transformer.layers.0.feed_forward.w2.lora_A.weight"].shape == (4, 24)
+
+
+def test_fibo2_without_alpha_keeps_the_scale_of_one():
+    sd = _fibo_diffusers(alpha=False)
+    fused = lora_convert.fibo2_to_comfy(sd)
+    assert not any(k.endswith(".alpha") for k in fused)
+    d = _delta(fused, "diffusion_model", "layers.0.attention.qkv")
+    assert torch.allclose(d[16:32], _delta(sd, "transformer", "layers.0.attention.to_k"), atol=1e-5)
+
+
+class _Quanto4Like(_QuantoLike):
+    """quanto's 4 bit names: `x.weight._data._data`, `._scale`, `._shift`."""
+
+    def state_dict(self, *args, **kwargs):
+        sd = torch.nn.Module.state_dict(self, *args, **kwargs)
+        w = sd.pop("proj.weight")
+        sd["proj.weight._data._data"], sd["proj.weight._scale"], sd["proj.weight._shift"] = w, torch.ones(1), torch.zeros(1)
+        return sd
+
+
+def test_4_bit_quantized_weights_get_plain_names_too():
+    # FLUX.1 dev kept in 4 bit on 16 GB: the Turbo-Alpha LoRA failed with KeyError 'context_embedder.weight'
+    t = _Quanto4Like()
+    with engine._plain_weight_names(t):
+        assert tuple(t.state_dict()["proj.weight"].shape) == (4, 8)

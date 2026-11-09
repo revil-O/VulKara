@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
 import { describe, expect, it } from 'vitest'
-import { formatDuration, jobFacts, jobProgress } from './format'
+import { durationText, formatDuration, jobFacts, jobProgress } from './format'
 import type { QueuedJob } from '@shared/api'
 
 const job = (over: Partial<QueuedJob> = {}): QueuedJob => ({
@@ -26,5 +26,19 @@ describe('format', () => {
     expect(jobProgress(job({ progress: 42, eta: 70, secondsPerStep: 2.1 }))).toBe('42 % · 1:10 min left · 2.1 s/step')
     expect(jobProgress(job({ state: 'waiting' }))).toBe('Waiting')
     expect(jobProgress(job({ state: 'failed', error: 'boom' }))).toBe('boom')
+  })
+})
+
+describe('durationText', () => {
+  it('shows the run time with loading, steps and finishing, older entries with the pace only', () => {
+    const e = { seconds: 168, secondsPerStep: 4.93, loadSeconds: 118, job: { steps: 8 } }
+    const text = durationText(e)
+    expect(text.startsWith('2:48 min')).toBe(true)
+    expect(text).toContain('1:58 min')
+    expect(text).toContain('39 s')
+    expect(text).toContain('11 s')
+    expect(text.split('\n')).toHaveLength(4)
+    expect(durationText({ seconds: 168, secondsPerStep: 4.93, job: { steps: 8 } }).split(' · ')).toHaveLength(2)
+    expect(durationText({ job: {} })).toBe('')
   })
 })

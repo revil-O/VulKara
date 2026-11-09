@@ -3,7 +3,7 @@
 // The splash window at start: the forge picture with the name. The main window loads behind it; the splash closes by
 // itself once that is ready (a click or Return closes it earlier).
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { LoaderCircle } from 'lucide-vue-next'
+import { LoaderCircle } from '@lucide/vue'
 import picture from '../assets/splash/splash.jpg?url'
 import { t } from '../i18n'
 

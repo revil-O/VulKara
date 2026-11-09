@@ -2,7 +2,7 @@
 <script setup lang="ts">
 // Choosing a style: the current one as a button, the styles by group with a preview picture each when opened.
 import { computed, ref } from 'vue'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown } from '@lucide/vue'
 import { STYLES, STYLE_GROUPS, styleSlug } from '@shared/styles'
 import { t } from '../i18n'
 import { styleLabel } from '../util/labels'

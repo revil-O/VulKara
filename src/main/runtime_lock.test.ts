@@ -32,10 +32,13 @@ describe('the runtime packages', () => {
     })
   }
 
-  it('keeps Pillow below 13 in every runtime (13.0.0 broke mflux on Python 3.11)', () => {
-    for (const engine of ['diffusers', 'mlx', 'comfy']) {
-      const pillow = pins(`${ENGINES}${engine}/constraints.txt`).get('pillow')
-      expect(Number(pillow?.split('.')[0]), engine).toBeLessThan(13)
+  it('keeps the MLX runtime on Pillow 13 only with mflux 0.24 or newer', () => {
+    // Pillow 13.0.0 broke an import in mflux 0.23 on Python 3.11; mflux 0.24 needs Pillow 13 (MEASUREMENTS 7aj).
+    // Diffusers and ComfyUI moved to 13.0.0 for its security fixes after their tests and pictures (7bj).
+    const mlx = pins(`${ENGINES}mlx/constraints.txt`)
+    if (Number(mlx.get('pillow')?.split('.')[0]) >= 13) {
+      const [major, minor] = (mlx.get('mflux') ?? '0.0').split('.').map(Number)
+      expect(major > 0 || minor >= 24).toBe(true)
     }
   })
 })

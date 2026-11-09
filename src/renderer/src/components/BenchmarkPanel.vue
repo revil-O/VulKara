@@ -3,7 +3,7 @@
 // Benchmark of one model (Hardware page): a few pictures with the model's own settings through the queue, then the
 // time to the first step, seconds per step, the whole time and the memory and swap the Mac used meanwhile.
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { Check, Copy, Gauge, Square, Trash2 } from 'lucide-vue-next'
+import { Check, Copy, Gauge, Square, Trash2 } from '@lucide/vue'
 import type { BenchmarkRun, Waited } from '@shared/api'
 import HintBadge from './HintBadge.vue'
 import { useAssetsStore } from '../stores/assets'
@@ -19,6 +19,7 @@ const runs = ref<BenchmarkRun[]>([])
 const modelId = ref('')
 const size = ref(0)
 const count = ref(2)
+const freshPrompt = ref(false)
 const error = ref('')
 const copied = ref(false)
 
@@ -39,7 +40,7 @@ async function start(): Promise<void> {
   if (!m) return
   error.value = ''
   try {
-    await window.vk.benchmark.start(benchmarkJob(m, size.value), count.value, m.title)
+    await window.vk.benchmark.start(benchmarkJob(m, size.value), count.value, m.title, freshPrompt.value)
   } catch (err) {
     error.value = (err as Error).message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
   }
@@ -88,6 +89,10 @@ const STATES = { waiting: 'jobs.waiting', running: 'hardware.bench.running', don
           <select v-model.number="count">
             <option v-for="n in [1, 2, 3]" :key="n" :value="n">{{ n }}</option>
           </select>
+        </label>
+        <label class="check">
+          <input v-model="freshPrompt" type="checkbox" /> {{ t('hardware.bench.freshPrompt') }}
+          <HintBadge :text="t('hardware.bench.freshPromptHint')" />
         </label>
         <button v-if="busy" class="btn" @click="stop"><Square :size="13" /> {{ t('hardware.bench.stop') }}</button>
         <button v-else class="btn primary" :disabled="!model" @click="start"><Gauge :size="14" /> {{ t('hardware.bench.start') }}</button>
@@ -184,7 +189,7 @@ h2 {
 
 .controls {
   display: grid;
-  grid-template-columns: minmax(200px, 2fr) minmax(140px, 1fr) minmax(80px, 0.5fr) auto;
+  grid-template-columns: minmax(200px, 2fr) minmax(140px, 1fr) minmax(80px, 0.5fr) auto auto;
   gap: 12px;
   align-items: end;
 }
@@ -295,5 +300,14 @@ h2 {
 
 .row.end {
   justify-content: flex-end;
+}
+.check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.check input {
+  accent-color: var(--accent);
 }
 </style>

@@ -68,8 +68,13 @@ def test_the_memory_switch_takes_only_its_two_modes(monkeypatch):
     mm.get_torch_device = lambda: types.SimpleNamespace(type="mps")
     comfy = types.ModuleType("comfy")
     comfy.model_management = mm
+    sm = types.ModuleType("comfy.supported_models")
+    sm.MOSSImage = type("MOSSImage", (), {"supported_inference_dtypes": [torch.bfloat16, torch.float32]})
+    sm.Fibo2 = type("Fibo2", (), {"supported_inference_dtypes": [torch.bfloat16, torch.float32]})
+    comfy.supported_models = sm
     monkeypatch.setitem(sys.modules, "comfy", comfy)
     monkeypatch.setitem(sys.modules, "comfy.model_management", mm)
+    monkeypatch.setitem(sys.modules, "comfy.supported_models", sm)
     routes = web.RouteTableDef()
     server = types.ModuleType("server")
     pending = [{"free_memory": True}, {"free_memory": True}]
@@ -88,6 +93,9 @@ def test_the_memory_switch_takes_only_its_two_modes(monkeypatch):
     # MPS computes bfloat16 at half the speed: float16 where the model allows it (Anima), else bfloat16 stays (Lumina 2)
     anima, lumina = [torch.bfloat16, torch.float16, torch.float32], [torch.bfloat16, torch.float32]
     assert (mm.unet_dtype(supported_dtypes=anima), mm.unet_dtype(supported_dtypes=lumina)) == (torch.float16, torch.bfloat16)
+    # MOSS-Image: float16 first, also for the int8 layers it computes (MEASUREMENTS 7ag)
+    assert sm.MOSSImage.supported_inference_dtypes[0] == torch.float16
+    assert sm.Fibo2.supported_inference_dtypes[0] == torch.float16  # Fibo 2.0 likewise (7ah)
     if torch.backends.mps.is_available():
         q, k, v = (torch.randn(1, 8, 256, 40, device="mps") for _ in range(3))
         ref = torch.softmax(q @ k.transpose(-1, -2) * 40 ** -0.5, -1) @ v

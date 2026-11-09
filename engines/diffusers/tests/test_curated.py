@@ -6,7 +6,7 @@ import os
 import re
 
 PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..", "src", "shared", "data", "curated_models.json")
-FAMILIES = {"SD 1.x", "SD 2.x", "SDXL", "SD 3.5", "FLUX.1", "Chroma", "Z-Image", "FLUX.2", "FLUX 3", "Anima", "Wan", "Lumina 2", "ERNIE-Image"}
+FAMILIES = {"SD 1.x", "SD 2.x", "SDXL", "SD 3.5", "FLUX.1", "Chroma", "Z-Image", "FLUX.2", "FLUX 3", "Anima", "Wan", "Lumina 2", "ERNIE-Image", "MOSS-Image", "Fibo 2.0"}
 
 
 def load():

@@ -6,7 +6,9 @@ engine.py hands every LoRA through prepare() (loading, the coverage check and th
 converted dict). What is converted, per pipeline:
 
 - every pipeline: peft dumps (".lora_A.default.weight", with or without "base_model.model."), the component prefix
-  ("transformer." / "unet.") added when a file has none
+  ("transformer." / "unet.") added when a file has none; a file naming some layers ".lora.down/up" and the others
+  ".lora_A/B" in one naming (diffusers' reader takes one per file and drops the rest: lrzjason's FLUX.2 [klein]
+  consistency LoRAs, 20 of 100 layers)
 - FLUX.1 / Chroma: the original (BFL) block names with peft factors (lora_A / lora_B), as ComfyUI and ai-toolkit
   write them, into kohya's names, which diffusers' FLUX reader maps (it splits the fused qkv layers); Chroma's
   distilled guidance layers are left out (diffusers maps none of them)
@@ -16,6 +18,11 @@ converted dict). What is converted, per pipeline:
   attention.qkv, kohya's, peft dumps) into diffusers' names (z_image_to_diffusers); the MLX engine uses the same
 - SD / SDXL: ai-toolkit's "lora_transformer_" names and stray "diffusion_model_" keys as kohya's "lora_unet_"
   (diffusers converts a kohya file only when every key is kohya's)
+
+- Fibo 2.0: diffusers' layout (to_q / to_k / to_v, w1 / w3, to_out.0) fused for ComfyUI's repacked files (attention.qkv,
+  feed_forward.w13 with the hidden width padded to a multiple of 256, attention.out, cross and perceiver attention
+  to_kv), the rank stacked (fibo2_to_comfy); and ComfyUI's fused layout split back into diffusers' for mflux
+  (fibo2_to_diffusers). Neither runtime reads the other's layout.
 
 LyCORIS LoKr / LoHa have no reader in diffusers: they are refused with a clear message (check_format).
 """
@@ -246,6 +253,18 @@ def _peft_dump(sd, component):
     return out
 
 
+_OLD_FACTORS = (".lora.down.weight", ".lora.up.weight")
+
+
+def _peft_factor(key):
+    """diffusers' older factor names (".lora.down/up") as peft's (".lora_A/B")."""
+    if key.endswith(".lora.down.weight"):
+        return key[:-len(".lora.down.weight")] + ".lora_A.weight"
+    if key.endswith(".lora.up.weight"):
+        return key[:-len(".lora.up.weight")] + ".lora_B.weight"
+    return key
+
+
 def _kohya_unet(sd):
     """SD / SDXL: every UNet key in kohya's "lora_unet_" names (diffusers converts kohya files only as a whole)."""
     out = {}
@@ -283,6 +302,8 @@ def _needs(kind, keys):
         return ["zimage"] if z_image_needs(keys) else []
     if kind == "auraflow" and auraflow_needs(keys):
         return ["auraflow"]
+    if any(k.endswith(_OLD_FACTORS) for k in keys) and any(".lora_A." in k for k in keys):
+        steps.append("one_naming")
     if any(".default." in k or k.startswith("base_model.model.") for k in keys):
         steps.append("peft")
     elif kind not in ("unet",) and keys and not any(k.startswith(_COMPONENT_PREFIXES) for k in keys):
@@ -305,6 +326,8 @@ def convert(pipe, sd):
         return z_image_to_diffusers(sd)
     if "auraflow" in steps:
         return auraflow_to_diffusers(sd)
+    if "one_naming" in steps:
+        sd = {_peft_factor(k): v for k, v in sd.items()}
     if "peft" in steps:
         sd = _peft_dump(sd, "unet" if kind == "unet" else "transformer")
     if "bfl" in steps:
@@ -331,3 +354,161 @@ def prepare(pipe, source, name="This LoRA"):
     else:
         check_format(source, name)
     return convert(pipe, source) if _needs(_kind(pipe), list(source)) else source
+
+
+# ------------------------------------------------------------------ Fibo 2.0: diffusers' layout <-> ComfyUI's fused files
+
+_FIBO_PREFIXES = ("base_model.model.", "transformer.", "diffusion_model.")
+_FIBO_FACTOR = re.compile(r"\.(lora_A|lora_B|lora_down|lora_up)(\.default)?\.weight$|\.alpha$")
+# diffusers' layer -> (ComfyUI's fused layer, its place in it, parts of the fusion); the feed-forward's hidden width is
+# padded to a multiple of 256 in the fused files
+_FIBO_FUSED = {"attention.to_q": ("attention.qkv", 0, 3), "attention.to_k": ("attention.qkv", 1, 3),
+               "attention.to_v": ("attention.qkv", 2, 3), "feed_forward.w1": ("feed_forward.w13", 0, 2),
+               "feed_forward.w3": ("feed_forward.w13", 1, 2), "ffn.w1": ("ffn.w13", 0, 2), "ffn.w3": ("ffn.w13", 1, 2),
+               "cross_attention.to_k": ("cross_attention.to_kv", 0, 2), "cross_attention.to_v": ("cross_attention.to_kv", 1, 2),
+               "self_attention.to_k": ("self_attention.to_kv", 0, 2), "self_attention.to_v": ("self_attention.to_kv", 1, 2)}
+# diffusers' output projections -> ComfyUI's (mflux names the cross and perceiver ones to_out.0 as diffusers does)
+_FIBO_RENAMED = {"attention.to_out.0": "attention.out", "cross_attention.to_out.0": "cross_attention.to_out",
+                 "self_attention.to_out.0": "self_attention.to_out"}
+_FIBO_PAD = 256
+
+
+def _fibo_layers(sd):
+    """{layer (without prefix): {"A": down, "B": up, "alpha": alpha or None}} of a Fibo 2.0 LoRA, and the prefix seen."""
+    layers, prefix = {}, ""
+    for k, v in sd.items():
+        m = _FIBO_FACTOR.search(k)
+        if not m:
+            continue
+        name = k[:m.start()]
+        for p in _FIBO_PREFIXES:
+            if name.startswith(p):
+                name, prefix = name[len(p):], p
+                break
+        d = layers.setdefault(name, {"A": None, "B": None, "alpha": None})
+        kind = m.group(1) or "alpha"
+        d["A" if kind in ("lora_A", "lora_down") else "B" if kind in ("lora_B", "lora_up") else "alpha"] = v
+    return layers, prefix
+
+
+def _match(name, table):
+    """The entry of table (layer tails) the layer name ends with, or None."""
+    return next((k for k in sorted(table, key=len, reverse=True) if name == k or name.endswith("." + k)), None)
+
+
+def _padded(width):
+    return -(-width // _FIBO_PAD) * _FIBO_PAD
+
+
+def fibo2_needs_comfy(keys):
+    """Whether a Fibo 2.0 LoRA is in diffusers' layout (separate q / k / v, w1 / w3), which ComfyUI's fused files skip."""
+    return any(any(k.endswith("." + d + s) for d in _FIBO_FUSED for s in (".lora_A.weight", ".lora_down.weight")) for k in keys)
+
+
+def fibo2_needs_diffusers(keys):
+    """Whether a Fibo 2.0 LoRA is in ComfyUI's fused layout, which mflux does not map."""
+    fused = {f for f, _, _ in _FIBO_FUSED.values()} | set(_FIBO_RENAMED.values())
+    return any(any(k.endswith("." + f + s) for f in fused for s in (".lora_A.weight", ".lora_down.weight")) for k in keys)
+
+
+def fibo2_to_comfy(sd):
+    """Diffusers' layout fused for ComfyUI's files: the parts of a fused layer stacked along the rank (their down
+    factors one under the other, the up factors block-diagonal, the feed-forward rows padded as in the files), the
+    alpha times the parts so the scale alpha / rank stays. Keys as ComfyUI reads them (diffusion_model.…)."""
+    import torch
+    layers, _ = _fibo_layers(sd)
+    out, groups = {}, {}
+    for name, d in layers.items():
+        tail = _match(name, _FIBO_FUSED)
+        renamed = _match(name, _FIBO_RENAMED)
+        if tail:
+            fused, place, parts = _FIBO_FUSED[tail]
+            groups.setdefault(name[:-len(tail)] + fused, [None] * parts)[place] = d
+        elif renamed:
+            out[name[:-len(renamed)] + _FIBO_RENAMED[renamed]] = d
+        else:
+            out[name] = d
+    for key, parts in groups.items():
+        if any(p is None for p in parts):
+            raise UnsupportedLoraFormat("The LoRA lacks a part of %s" % key)
+        pad = _padded(parts[0]["B"].shape[0]) if key.endswith(("w13",)) else parts[0]["B"].shape[0]
+        A = torch.cat([p["A"] for p in parts], 0)
+        rank = sum(p["A"].shape[0] for p in parts)
+        B = torch.zeros(pad * len(parts), rank, dtype=parts[0]["B"].dtype)
+        r0 = 0
+        for i, p in enumerate(parts):
+            B[i * pad:i * pad + p["B"].shape[0], r0:r0 + p["A"].shape[0]] = p["B"]
+            r0 += p["A"].shape[0]
+        alpha = parts[0]["alpha"]
+        out[key] = {"A": A, "B": B, "alpha": None if alpha is None else alpha * len(parts)}
+    for name, d in list(out.items()):
+        if name.endswith("feed_forward.w2") or name.endswith("ffn.w2"):  # its input is the padded hidden width
+            A = d["A"]
+            pad = _padded(A.shape[1])
+            if pad != A.shape[1]:
+                d["A"] = torch.cat([A, torch.zeros(A.shape[0], pad - A.shape[1], dtype=A.dtype)], 1)
+    result = {}
+    for name, d in out.items():
+        result["diffusion_model.%s.lora_A.weight" % name] = d["A"]
+        result["diffusion_model.%s.lora_B.weight" % name] = d["B"]
+        if d["alpha"] is not None:
+            result["diffusion_model.%s.alpha" % name] = d["alpha"]
+    return result
+
+
+def fibo2_to_diffusers(sd):
+    """ComfyUI's fused layout split into diffusers' (as mflux maps it): every part keeps the whole down factor and its
+    rows of the up factor, the feed-forward padding cut off. Keys with the transformer. prefix."""
+    layers, _ = _fibo_layers(sd)
+    split = {}
+    for tail, (fused, place, parts) in _FIBO_FUSED.items():
+        split.setdefault(fused, []).append((place, parts, tail))
+    out = {}
+    inv = {v: k for k, v in _FIBO_RENAMED.items()}
+    for name, d in layers.items():
+        tail = _match(name, split)
+        renamed = _match(name, inv)
+        if tail:
+            rows = d["B"].shape[0] // split[tail][0][1]
+            for place, parts, part in split[tail]:
+                B = d["B"][place * rows:(place + 1) * rows]
+                if tail.endswith("w13"):  # the padding rows carry nothing
+                    B = B[:_unpadded(B)]
+                out[name[:-len(tail)] + part] = {"A": d["A"], "B": B, "alpha": d["alpha"]}
+        elif renamed:
+            out[name[:-len(renamed)] + inv[renamed]] = d
+        elif name.endswith(("feed_forward.w2", "ffn.w2")) and d["A"].shape[1] % _FIBO_PAD == 0:
+            out[name] = {"A": d["A"][:, :_unpadded_cols(d["A"])], "B": d["B"], "alpha": d["alpha"]}
+        else:
+            out[name] = d
+    result = {}
+    for name, d in out.items():
+        result["transformer.%s.lora_A.weight" % name] = d["A"]
+        result["transformer.%s.lora_B.weight" % name] = d["B"]
+        if d["alpha"] is not None:
+            result["transformer.%s.alpha" % name] = d["alpha"]
+    return result
+
+
+def _unpadded(B):
+    """Rows of an up factor before the zero padding (the fused files pad the hidden width to a multiple of 256)."""
+    n = B.shape[0]
+    while n > 0 and not _any(B[n - 1]):
+        n -= 1
+    return n
+
+
+def _unpadded_cols(A):
+    n = A.shape[1]
+    while n > 0 and not _any(A[:, n - 1]):
+        n -= 1
+    return n
+
+
+def _any(t):
+    """Whether a row holds anything (torch and mlx tensors alike)."""
+    try:
+        return bool(t.abs().max() > 0)
+    except AttributeError:
+        import mlx.core as mx
+        return bool(mx.abs(t).max() > 0)

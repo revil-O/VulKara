@@ -128,6 +128,9 @@ def model_changes(folder, m, ram_gb=None):
         # a sub-base written into "variant" (the file variant diffusers loads) goes back to what was there before
         if m.get("variant") in registry.SUB_BASES:
             out["variant"] = (m["variant"], _original_file_variant(folder))
+        # an architecture that learned to repaint masks (FLUX.2 [klein] with its inpainting pipeline)
+        if registry.ARCHS[arch].get("inpaint_pipeline") and m.get("inpaint") is False:
+            out["inpaint"] = (False, True)
         if registry.ARCHS[arch].get("user_loras") is False and m.get("user_loras") is not False:
             out["user_loras"] = (m.get("user_loras"), False)
     return out

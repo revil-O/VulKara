@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
 import { describe, expect, it } from 'vitest'
-import { aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, emptyForm, formPage, formProblem, lorasFor, modelsFor } from './job_form'
+import { TURBO, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, emptyForm, keepsPicture, formPage, formProblem, lorasFor, modelsFor, takesTurbo, takesUpsampler, upsamplerHelper } from './job_form'
 import type { Asset, ModelMeta } from '@shared/types'
 
 const model = (id: string, meta: Partial<ModelMeta> = {}): Asset => ({
@@ -19,7 +19,38 @@ const VIDEO = model('wan', { kind: 'video' })
 const FLUX3 = model('flux3', { arch: 'flux3_klein', family: 'flux3', runtime: 'mlx', negativePrompt: false, inpaint: false, defaults: { num_steps: 16, guidance_scale: 1, width: 1024, height: 1024 } })
 const LORAS = [lora('a', 'sdxl'), lora('b', 'flux1')]
 
+describe('the fast option of FLUX.1 [dev]', () => {
+  const DEV = model('dev', { arch: 'flux1_dev', family: 'flux1', negativePrompt: false, defaults: { num_steps: 28, guidance_scale: 3.5, width: 1024, height: 1024 } })
+  const turbo: Asset = { ...lora('turbo', 'flux1'), source: { type: 'hf', ref: TURBO.ref, file: TURBO.file } }
+  it('says so instead of dropping one of three LoRAs of the user for Turbo-Alpha', () => {
+    const three = { ...emptyForm('text'), prompt: 'a cat', fast: true, loras: [{ id: 'a', scale: 1 }, { id: 'b', scale: 1 }, { id: 'c', scale: 1 }] }
+    expect(formProblem('text', three, DEV, false)).toMatch(/Turbo-Alpha/)
+    expect(formProblem('text', { ...three, loras: three.loras.slice(0, 2) }, DEV, false)).toBe('')
+    expect(formProblem('text', { ...three, fast: false }, DEV, false)).toBe('')
+  })
+
+  it('adds the Turbo-Alpha LoRA with its 8 steps and guidance 3.5, only for FLUX.1 [dev]', () => {
+    const form = { ...emptyForm('text'), prompt: 'x', steps: 28, guidance: 4, fast: true }
+    const job = buildJob('text', form, DEV, [turbo])
+    expect([job.steps, job.guidance, job.loras]).toEqual([8, 3.5, [{ path: '/loras/turbo', scale: 1 }]])
+    expect(buildJob('text', { ...form, fast: false }, DEV, [turbo]).steps).toBe(28)
+    expect(buildJob('text', form, DEV, []).steps).toBe(28)  // not downloaded: the page says so
+    expect(takesTurbo(DEV.meta) && !takesTurbo(FLUX.meta)).toBe(true)  // schnell is distilled already
+  })
+})
+
 describe('generate form', () => {
+  it('sends further pictures with the input picture only to a model that edits several together (Fibo 2.0)', () => {
+    const FIBO = model('fibo', { arch: 'fibo2', family: 'fibo2', runtime: 'comfyui', negativePrompt: false })
+    const form = { ...emptyForm('image'), inputImage: '/a.png', references: ['/b.png', '', '/c.png', '/d.png', '/e.png'] }
+    expect(buildJob('image', form, FIBO, []).referenceImages).toEqual(['/b.png', '/c.png', '/d.png'])
+    expect(buildJob('image', form, SDXL, []).referenceImages).toBeUndefined()
+    expect(buildJob('inpaint', { ...form, inputImage: '/a.png' }, FIBO, [], { maskImage: '/m.png' }).referenceImages).toBeUndefined()
+    const back = emptyForm('image')
+    applyJob(back, { ...buildJob('image', form, FIBO, []), id: 'j' }, [FIBO], [])
+    expect(back.references).toEqual(['/b.png', '/c.png', '/d.png'])
+  })
+
   it('labels a picture made from a prompt AI GENERATED and a changed picture of the user AI MODIFIED', () => {
     const form = { ...emptyForm('text'), aiLabel: true }
     expect(aiLabelOf(form, 'text')).toEqual({ size: 'medium', kind: 'generated', tone: 'auto', subtle: false })
@@ -133,7 +164,25 @@ describe('generate form', () => {
     expect(buildJob('text', form, FLUX3, []).upsample).toBe(true)
     expect(buildJob('text', { ...form, upsample: false }, FLUX3, []).upsample).toBeUndefined()
     expect(buildJob('image', { ...emptyForm('image'), prompt: 'x', inputImage: '/in.png' }, FLUX3, []).upsample).toBeUndefined()
+    const ERNIE = model('ernie', { arch: 'ernie_image', family: 'ernie', runtime: 'mlx', negativePrompt: true, inpaint: false, defaults: { num_steps: 8, guidance_scale: 1, width: 1024, height: 1024 } })
+    expect(takesUpsampler(ERNIE.meta) && upsamplerHelper(ERNIE.meta)).toBe('ernie_pe')
+    expect(upsamplerHelper(FLUX3.meta)).toBe('flux3_pup')
+    expect(buildJob('text', form, ERNIE, []).upsample).toBe(true)
     expect(buildJob('text', form, SDXL, []).upsample).toBeUndefined()
+  })
+
+  it('keeps the picture only on Image to image with FLUX.2 [klein], off at first', () => {
+    const KLEIN = model('klein', { arch: 'flux2_klein', family: 'flux2', negativePrompt: false, inpaint: true, defaults: { num_steps: 4, guidance_scale: 1, width: 1024, height: 1024 } })
+    const form = { ...emptyForm('image'), prompt: 'snow', inputImage: '/in.png' }
+    expect(form.keepPicture).toBe(false)
+    expect(keepsPicture(KLEIN.meta) && !keepsPicture(SDXL.meta)).toBe(true)
+    expect(buildJob('image', { ...form, keepPicture: true }, KLEIN, []).keepPicture).toBe(true)
+    expect(buildJob('image', form, KLEIN, []).keepPicture).toBeUndefined()
+    expect(buildJob('image', { ...form, keepPicture: true }, SDXL, []).keepPicture).toBeUndefined()
+    expect(buildJob('inpaint', { ...form, keepPicture: true }, KLEIN, [], { maskImage: '/m.png' }).keepPicture).toBeUndefined()
+    const back = emptyForm('image')
+    applyJob(back, { id: 'j', ...buildJob('image', { ...form, keepPicture: true }, KLEIN, []) }, [KLEIN], [])
+    expect(back.keepPicture).toBe(true)
   })
 
   it('describes jobs with an input picture', () => {

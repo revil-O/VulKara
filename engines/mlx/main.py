@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Copyright (C) 2026 Oliver Schmidt
-"""MLX engine: runs FLUX.1, FLUX.2 [klein] and Z-Image models (diffusers folder layout), Krea 2 and Ideogram 4
-with mflux, and FLUX 3 Image Klein with flux3-mlx (flux3.py).
+"""MLX engine: runs FLUX.1, FLUX.2 [klein] and Z-Image models (diffusers folder layout), Krea 2, Ideogram 4, ERNIE-Image
+and Fibo 2.0 (mflux's saved files) with mflux, and FLUX 3 Image Klein with flux3-mlx (flux3.py).
 
 Speaks the same stdin/stdout protocol as the diffusers engine (see ../diffusers/protocol.py)
 and reads the same model.json manifests, so the app can route a job to either engine.
@@ -69,7 +69,8 @@ def model_class_and_config(m):
 
 
 FAMILIES = {"flux1_schnell": "flux1", "flux1_dev": "flux1", "flux2_klein": "flux2", "krea2": "krea2",
-            "ideogram4": "ideogram4", "z_image": "z_image", "flux3_klein": "flux3", "ernie_image": "ernie"}
+            "ideogram4": "ideogram4", "z_image": "z_image", "flux3_klein": "flux3", "ernie_image": "ernie",
+            "fibo2_mlx": "fibo2"}
 
 
 def ernie_guided(m):
@@ -112,6 +113,34 @@ def lora_coverage(keys, mapping):
                 for t in mapping for p in t.possible_down_patterns]
     downs = [k for k in keys if _DOWN.search(k)]
     return sum(1 for k in downs if any(p.match(k) for p in patterns)), len(downs)
+
+
+def fibo2_lora(path, name):
+    """A Fibo 2.0 LoRA as mflux takes it: ComfyUI's fused layout split once into diffusers' (lora_convert
+    .fibo2_to_diffusers) into a cached copy; a LoRA whose layers mostly have no place is refused. Returns the file."""
+    import lora_convert
+    import registry
+    keys = list(registry.read_safetensors_header(path))
+    if lora_convert.fibo2_needs_diffusers(keys):
+        st = os.stat(path)
+        tag = hashlib.sha1(("%s|%d|%d" % (os.path.abspath(path), st.st_size, int(st.st_mtime))).encode()).hexdigest()[:16]
+        folder = os.path.join(tempfile.gettempdir(), "vulkara_mlx_loras")
+        out = os.path.join(folder, "fibo2_%s.safetensors" % tag)
+        if not os.path.isfile(out):
+            import mlx.core as mx
+            os.makedirs(folder, exist_ok=True)
+            converted = lora_convert.fibo2_to_diffusers(dict(mx.load(path)))
+            mx.save_safetensors(out + ".tmp.safetensors", converted)
+            os.replace(out + ".tmp.safetensors", out)
+            protocol.log("[mlx] LoRA %s split into diffusers' names" % name)
+        path = out
+        keys = list(registry.read_safetensors_header(path))
+    from mflux.models.fibo2.weights.fibo2_lora_mapping import Fibo2LoRAMapping
+    placed, total = lora_coverage(keys, Fibo2LoRAMapping.get_mapping())
+    if not total or placed < total * MIN_APPLIED:
+        raise ValueError("The LoRA %s does not fit this Fibo 2.0 model: only %d%% of its layers (%d of %d) found their "
+                         "place" % (name, int(100 * placed / max(1, total)), placed, total))
+    return path
 
 
 def z_image_lora(path, name):
@@ -157,8 +186,9 @@ DECODE_GB = {"z_image": 2.5, "flux2": 1.0, "krea2": 2.0, "ernie": 2.5, "flux1": 
 CACHE_LIMIT_BYTES = 1000 ** 3
 # quantized once and saved in mflux's format (<model>/mlx_q<bits>): later loads read it directly
 # instead of decoding and quantizing the FP8 checkpoints again (Ideogram 4: 27 GB FP8 -> 14 GB; Krea 2, whose text
-# encoder is freed after each prompt on a 16 GB Mac, then reloads quickly for a new prompt)
-CACHED_ARCHS = {"ideogram4", "krea2"}
+# encoder is freed after each prompt on a 16 GB Mac, then reloads quickly for a new prompt); Z-Image, ERNIE and
+# FLUX.2 [klein] read their 16 bit repository at every load otherwise (Z-Image Turbo 30 GB, 46 s, MEASUREMENTS 7bs)
+CACHED_ARCHS = {"ideogram4", "krea2", "z_image", "ernie_image", "flux2_klein"}
 CACHE_MIN_FREE_GB = 5.0
 # mflux samplers of Ideogram 4 by step count (steps + guidance schedule + noise schedule)
 IDEOGRAM_PRESETS = {12: "V4_TURBO_12", 20: "V4_DEFAULT_20", 48: "V4_QUALITY_48"}
@@ -361,6 +391,10 @@ class Progress:
         self.quiet = quiet  # preview pictures do not move the progress bar of a job
 
     def call_in_loop(self, t, seed, prompt, latents, config, time_steps):
+        # mflux calls this before it evaluates the step (MLX is lazy): evaluated here, the value is sent when the step
+        # is done, not one step early (the run time's loading part came out a step short, Krea 2 at 0 s)
+        import mlx.core as mx
+        mx.eval(latents)
         if not self.quiet:
             protocol.progress(round(100.0 * (t + 1) / self.steps, 1))
         if self.reader is not None and self.reader.stop_requested():
@@ -418,12 +452,38 @@ def free_buffers(after="image"):
     mx.reset_peak_memory()
 
 
-def low_ram(model):
+def materialize(model, text_encoders=True, denoiser=True):
+    """Reads and quantizes the weights part by part right after loading, the denoiser first. mflux leaves them lazy, and
+    the first step then loaded and quantized all parts at once: Z-Image Turbo on a 16 GB Mac mini peaked at 29.3 GB and
+    took 84 s per step, part by part 12.3 GB and 21 s (MEASUREMENTS 7bc). text_encoders=False leaves the text encoders
+    for the encoding (a plan that frees the denoiser while it encodes: both are never loaded together); denoiser=False
+    leaves the transformer until the text encoder is dropped (DropTextEncoder reads it then)."""
+    import mlx.core as mx
+    # an mlx Module is a dict: its parts are its items, not attributes
+    members = list(model.items()) if isinstance(model, dict) else list(vars(model).items())
+    parts = [(n, v) for n, v in members if callable(getattr(v, "parameters", None))]
+    parts.sort(key=lambda p: 0 if "transformer" in p[0] else 2 if p[0].startswith("text_encoder") else 1)
+    done = []
+    for name, part in parts:
+        if (name.startswith("text_encoder") and not text_encoders) or ("transformer" in name and not denoiser):
+            continue
+        mx.eval(part.parameters())
+        mx.clear_cache()  # the 16 bit originals of this part
+        done.append(name)
+    return done
+
+
+# Krea 2's Qwen VAE in mflux's 512 px tiles still added 6.6 GB to the 7.7 GB model on a 16 GB Mac mini (14.3 GB at
+# 768 and 1024 px); 256 px tiles 3.6 GB (11.3 GB), the picture 44.8 dB from the 512 px tiles, no seam (MEASUREMENTS 7bd)
+DECODE_TILE = {"krea2": 256}
+
+
+def low_ram(model, arch=None):
     """As mflux's own low-RAM mode (its MemorySaver) on small Macs: the VAE decodes in tiles where that costs nothing
     visually (the decode was the peak: Z-Image at 1024 px 13.8 GB against 7.5 GB for the steps)."""
     from mflux.models.common.vae.tiling_config import TilingConfig
     if getattr(model, "tiling_config", None) is None and TilingConfig.may_tile_implicitly(model):
-        model.tiling_config = TilingConfig()
+        model.tiling_config = TilingConfig(vae_decode_tile_size=DECODE_TILE[arch]) if arch in DECODE_TILE else TilingConfig()
 
 
 def cache_prompt_encodings(model, keep=8):
@@ -445,6 +505,23 @@ def cache_prompt_encodings(model, keep=8):
     model.prompt_cache = cache  # as mflux's other models: kept on disk by the engine
 
 
+def _eager_fibo2_pictures():
+    """mflux leaves an edit's encoded picture lazy: computed only at the first step, beside the transformer. Evaluated
+    at once it is done while the text encoder is still there and the transformer not yet (DropTextEncoder)."""
+    from mflux.models.fibo2.latent_creator.fibo2_latent_creator import Fibo2LatentCreator
+    encode = Fibo2LatentCreator.encode_image
+    if getattr(encode, "vk_eager", False):
+        return
+
+    def eager(*args, **kwargs):
+        import mlx.core as mx
+        out = encode(*args, **kwargs)
+        mx.eval(out)
+        return out
+    eager.vk_eager = True
+    Fibo2LatentCreator.encode_image = staticmethod(eager)
+
+
 class DropTextEncoder:
     """mflux callback for staged models: once the prompt is encoded (and in mflux's prompt cache),
     the text encoder is freed before denoising; a new prompt loads the model again."""
@@ -454,16 +531,19 @@ class DropTextEncoder:
 
     def call_before_loop(self, seed, prompt, latents, config, **kwargs):
         model = self.engine.model
-        if getattr(model, "text_encoder", None) is None:
-            return
-        self.engine.keep_encodings()
-        model.text_encoder = None
-        self.engine.encoded.add(self.engine.encode_key)
-        import gc
-        import mlx.core as mx
-        gc.collect()
-        mx.clear_cache()
-        protocol.log("[mlx] text encoder freed for denoising")
+        if getattr(model, "text_encoder", None) is not None:
+            self.engine.keep_encodings()
+            model.text_encoder = None
+            self.engine.encoded.add(self.engine.encode_key)
+            import gc
+            import mlx.core as mx
+            gc.collect()
+            mx.clear_cache()
+            protocol.log("[mlx] text encoder freed for denoising")
+        # a transformer left lazy (Fibo 2.0) is read only now, after the text encoder and the picture to edit
+        if self.engine.lazy_denoiser:
+            materialize(model)
+            self.engine.lazy_denoiser = False
 
 
 class MlxEngine:
@@ -474,6 +554,7 @@ class MlxEngine:
         self.staged = False
         self.encoded = set()  # prompts in mflux's prompt cache while the text encoder is dropped
         self.encode_key = None
+        self.lazy_denoiser = False  # Fibo 2.0 staged: the transformer is read in DropTextEncoder
         self.disk_parts = None  # what a loaded model's prompt encodings depend on (prompt cache on disk)
         self.cache_before = set()  # mflux's prompt cache before this job's prompt was encoded
         self.bit_sizes = []  # (part, "8 bit") of the loaded model, reported with each job
@@ -483,6 +564,7 @@ class MlxEngine:
 
     def unload(self):
         self.model = None
+        self.lazy_denoiser = False
         self.key = None
         self.disk_parts = None
         self.staged = False
@@ -520,6 +602,7 @@ class MlxEngine:
         weights = folder if os.path.isabs(folder) else os.path.join(model_dir, folder)
         cache = os.path.join(model_dir, "mlx_q%s" % bits) if m["arch"] in CACHED_ARCHS and bits else None
         cached = bool(cache) and os.path.isfile(os.path.join(cache, "complete"))
+        source = weights  # what the encodings on disk go by, also once the saved copy loads instead
         if cached:
             weights = cache  # the linked checkpoints are not needed any more
         else:
@@ -540,7 +623,24 @@ class MlxEngine:
                          lora_paths=[l["file"] for l in loras] or None,
                          lora_scales=[float(l["scale"]) for l in loras] or None,
                          bake_lora=not loras)
-        if cache and not cached and not loras:
+        self.staged = bool(plan.get("staged_text_encoder")) and m["arch"] in STAGED_ARCHS
+        if self.staged and m["arch"] == "z_image":
+            cache_prompt_encodings(self.model)
+        # the text encoder's files, its bit size and the LoRAs: what the encodings on disk depend on
+        te = os.path.join(source, "text_encoder")
+        self.disk_parts = {"engine": "mlx", "arch": m["arch"], "weights": quant_cache._source_signature(source, None),
+                           "text_encoder": quant_cache._source_signature(te, None) if os.path.isdir(te) else None,
+                           "bits": bits, "quantize_te": quantize_te,
+                           "loras": [(f, s, os.path.getmtime(f)) for f, s in key[1]]} if self.staged else None
+        self.encoded = set()
+        save = cache and not cached and not loras
+        # this prompt encoded before: its text encoder is never read (the weights stay lazy until materialize); loaded
+        # with it Z-Image Turbo held 11.0 GB and swapped 2.7 GB on a 16 GB Mac mini (MEASUREMENTS 7bt)
+        skip_te = not save and self._cached_encodings(prompt)
+        if skip_te:
+            self.model.text_encoder = None
+        materialize(self.model, text_encoders=not skip_te)  # before saving the cache, which would evaluate all at once
+        if save:
             self._save_cache(m, cache)
         free_buffers("loaded")
         # mflux quantizes every part alike, except text encoders it keeps in 16 bit
@@ -548,21 +648,13 @@ class MlxEngine:
         self.bit_sizes = [(m["denoiser"], own), ("text_encoder", own if quantize_te or m["arch"] not in TEXT_ENCODER_16BIT
                                                    or not bits else "16 bit")]
         self.key = key
-        self.staged = bool(plan.get("staged_text_encoder")) and m["arch"] in STAGED_ARCHS
-        if self.staged and m["arch"] == "z_image":
-            cache_prompt_encodings(self.model)
         if memory.total_ram_gb() <= LOW_RAM_GB:
-            low_ram(self.model)
-        self.encoded = set()
-        # the text encoder's files, its bit size and the LoRAs: what the encodings on disk depend on
-        te = os.path.join(weights, "text_encoder")
-        self.disk_parts = {"engine": "mlx", "arch": m["arch"], "weights": quant_cache._source_signature(weights, None),
-                           "text_encoder": quant_cache._source_signature(te, None) if os.path.isdir(te) else None,
-                           "bits": bits, "quantize_te": quantize_te,
-                           "loras": [(f, s, os.path.getmtime(f)) for f, s in key[1]]} if self.staged else None
-        protocol.log("[mlx] loaded %s, quantize=%s%s" % (m["name"], bits, ", text encoder only for new prompts"
+            low_ram(self.model, m["arch"])
+        protocol.log("[mlx] loaded %s, quantize=%s%s" % (m["name"], bits, ", text encoder not read (prompt encoded before)"
+                                                          if skip_te else ", text encoder only for new prompts"
                                                           if self.staged else ""))
-        self._cached_encodings(prompt)
+        if not skip_te:
+            self._cached_encodings(prompt)
         return
 
     def _disk_key(self, prompt):
@@ -632,9 +724,42 @@ class MlxEngine:
                 raise ValueError("The LoRA %s names a file outside its folder" % lm.get("name", "?"))
             if m.get("arch") == "z_image":
                 file = z_image_lora(file, lm.get("name") or "?")
+            if m.get("arch") == "fibo2_mlx":
+                file = fibo2_lora(file, lm.get("name") or "?")
             out.append({"file": file, "scale": e.get("scale", 1.0), "name": lm.get("name") or os.path.basename(folder),
                         "trigger_words": lm.get("trigger_words", [])})
         return out
+
+    def _ernie_enhance(self, d, prompt, width, height):
+        """ERNIE-Image's prompt enhancer (ernie_pe.py) on request: the description it writes is the prompt of the
+        picture and goes to the job's note. Run before the model loads; a loaded model goes when memory is short."""
+        import ernie_pe
+        import helpers
+        import pinned
+        h = next(x for x in helpers.catalog() if x["id"] == "ernie_pe")
+        folder = helpers.folder_of(h)
+        if not pinned.ready(h["repo"], folder):
+            # the MLX engine never downloads (it runs without network): the page or Models does that
+            raise ValueError("The ERNIE prompt enhancer is not downloaded yet: download it next to the option on Text to "
+                             "image or on the Models page (Helper models), or switch the option off")
+        pe = os.path.join(folder, "pe")
+        if self.model is not None and memory.free_gb() < ernie_pe.enhancer_gb(pe) + 1.0:
+            self.unload()
+            protocol.log("[mlx] model unloaded for the prompt enhancer")
+        seed = d.get("seed")
+        seed = int(seed) if seed not in (None, "") and int(seed) >= 0 else random.randint(0, 2 ** 31 - 1)
+        d["seed"] = seed  # the picture takes the same seed: prompt and seed give the same description again
+        self._state("Writing the full caption (prompt upsampler)")
+        t0 = time.time()
+
+        def stop():
+            if self.reader is not None and self.reader.stop_requested():
+                raise StopRequested()
+        caption = ernie_pe.enhance(pe, prompt, width, height, seed, stop=stop)
+        # the description retells the prompt: it goes to the job's note, never into the log (a shared report)
+        protocol.log("[mlx] prompt enhanced in %.0fs (%d characters)" % (time.time() - t0, len(caption)))
+        protocol.note("Prompt written by the enhancer: " + caption)
+        return caption
 
     def generate(self, d):
         model_dir = d.get("model_dir")
@@ -652,8 +777,12 @@ class MlxEngine:
                     prompt = w + ", " + prompt
         width = int(d.get("width") or defaults.get("width", 1024)) // 16 * 16
         height = int(d.get("height") or defaults.get("height", 1024)) // 16 * 16
+        if m.get("arch") == "ernie_image" and d.get("upsample") and not d.get("input_image"):
+            prompt = self._ernie_enhance(d, prompt, width, height)
         if m.get("arch") == "flux3_klein":
             return self._generate_flux3(d, m, model_dir, loras, prompt, width, height)
+        if m.get("arch") == "fibo2_mlx":
+            return self._generate_fibo2(d, m, model_dir, prompt, width, height, loras)
         steps = int(d.get("num_steps") or defaults.get("num_steps", 4))
         guidance = float(d["guidance_scale"]) if d.get("guidance_scale") is not None else defaults.get("guidance_scale", 1.0)
         if m["arch"] == "flux2_klein" and steps <= 8:
@@ -722,7 +851,7 @@ class MlxEngine:
         decode = DECODE_GB.get(family, 0) * max(0.25, width * height / (1024 * 1024))
         if decode and getattr(self.model, "tiling_config", None) is None:
             if need + decode > memory.free_gb(held):
-                low_ram(self.model)
+                low_ram(self.model, family)
                 if getattr(self.model, "tiling_config", None) is not None:
                     protocol.note("Not enough memory free to decode the picture in one piece: decoded in tiles "
                                   "(no visible difference)")
@@ -815,6 +944,123 @@ class MlxEngine:
             if not quiet:
                 protocol.result(str(path))
             saved.append(str(path))
+        return saved
+
+    def _generate_fibo2(self, d, m, model_dir, prompt, width, height, loras=()):
+        """Fibo 2.0 from mflux's saved files: text to image, an edit of the input picture as the prompt says, or only
+        inside a mask (greyed out as in training, then blended back, the rest pixel for pixel). The weights load
+        lazily: staged, the text encoder is dropped before the transformer's come in, and a new prompt loads again."""
+        import registry
+        from mflux.models.common.config import ModelConfig
+        from mflux.models.fibo2.variants import Fibo2, Fibo2Edit
+        weights = m["weights_dir"] if os.path.isabs(m["weights_dir"]) else os.path.join(model_dir, m["weights_dir"])
+        defaults = m.get("defaults", {})
+        dev = float(defaults.get("guidance_scale") or 1.0) > 1.0
+        plan = memory.plan(m["components"], "transformer", "fibo2", memory.total_ram_gb(), quant="none",
+                           allow_staging=True, staging_frees_denoiser=True,
+                           activations_gb=registry.ARCHS["fibo2_mlx"]["activations_gb"])
+        if not plan["fits"]:
+            raise MemoryError("%s needs about %d GB RAM" % (m.get("label", "Fibo 2.0"), plan["min_ram_gb"]))
+        staged = plan["staged_text_encoder"]
+        key = ("fibo2", weights, tuple((l["file"], float(l["scale"])) for l in loras))
+        if key != self.key or getattr(self.model, "text_encoder", None) is None:
+            self.unload()
+            self._state("Loading model (MLX)")
+            self.model = Fibo2Edit(model_path=weights, model_config=ModelConfig.fibo2() if dev
+                                   else ModelConfig.fibo2_edit_turbo(),
+                                   lora_paths=[l["file"] for l in loras] or None,
+                                   lora_scales=[float(l["scale"]) for l in loras] or None, bake_lora=not loras)
+            if memory.total_ram_gb() <= LOW_RAM_GB:
+                low_ram(self.model)
+            # staged, the transformer is read after the prompt and the picture to edit: loaded with them it took
+            # 14.3-14.6 GB on a 16 GB Mac mini before the first step (MEASUREMENTS 7bq)
+            materialize(self.model, text_encoders=not staged, denoiser=not staged)
+            self.lazy_denoiser = staged
+            free_buffers("loaded")
+            bits = getattr(self.model, "bits", None)
+            self.bit_sizes = [("transformer", "%d bit" % bits if bits else "16 bit"),
+                              ("text_encoder", "%d bit" % bits if bits else "16 bit")]
+            self.key, self.plan, self.staged, self.encoded = key, plan, staged, set()
+            protocol.log("[mlx] loaded %s, %s%s" % (m["name"], self.bit_sizes[0][1],
+                                                    ", text encoder only for the prompt" if staged else ""))
+        protocol.precision(self.bit_sizes)
+        if staged:
+            _eager_fibo2_pictures()
+        # further pictures it edits with the input picture, each about 1 megapixel whatever its size
+        refs = len(d.get("reference_images") or []) if d.get("input_image") and not d.get("mask_image") else 0
+        spec = registry.ARCHS["fibo2_mlx"]
+        need = memory.peak_at(plan, width, height, refs * spec["reference_gb"] + (spec["edit_gb"] if d.get("input_image") else 0))
+        protocol.planned(need)
+        short = memory.short_of(need, protocol.footprint_gb())
+        if short:
+            protocol.note(short)
+
+        steps = int(d.get("num_steps") or defaults.get("num_steps", 4))
+        guidance = float(d["guidance_scale"]) if dev and d.get("guidance_scale") is not None else (5.0 if dev else 1.0)
+        seed = d.get("seed")
+        seed = int(seed) if seed not in (None, "") and int(seed) >= 0 else random.randint(0, 2 ** 31 - 1)
+        self.model.callbacks.in_loop = [cb for cb in self.model.callbacks.in_loop if not isinstance(cb, Progress)]
+        self.model.callbacks.register(Progress(self.reader, steps, quiet=d.get("_quiet", False)))
+        if staged and not any(isinstance(cb, DropTextEncoder) for cb in self.model.callbacks.before_loop):
+            self.model.callbacks.register(DropTextEncoder(self))
+        self.encode_key = (prompt,)
+
+        work = tempfile.mkdtemp(prefix="vk_fibo2_")
+        original = mask = None
+        args = {"num_inference_steps": steps, "guidance": guidance}
+        if d.get("input_image"):
+            import colour
+            import masks
+            from PIL import Image
+            original = colour.open_rgb(d["input_image"])  # in sRGB, whatever profile it carries
+            image_path = os.path.join(work, "image.png")
+            original.save(image_path)
+            args["image_paths"] = [image_path]
+            for i, ref in enumerate((d.get("reference_images") or []) if not d.get("mask_image") else []):
+                # further pictures it edits with the input picture (<image_2> ...); a mask is for one picture
+                args["image_paths"].append(os.path.join(work, "image%d.png" % (i + 2)))
+                colour.open_rgb(ref).save(args["image_paths"][-1])
+            if d.get("mask_image"):
+                # the model repaints what it sees grey, a strip along the mask's edge included, so old and new blend
+                painted_part = Image.open(d["mask_image"]).convert("L").resize(original.size)
+                mask = masks.grow_mask(painted_part, 48)
+                args["mask_path"] = os.path.join(work, "mask.png")
+                mask.save(args["mask_path"])
+            if not d.get("exact_size"):
+                # the picture's proportions at the model's pixel count: the edit lines up with the picture
+                pixels = defaults.get("width", 1024) * defaults.get("height", 1024)
+                k = (pixels / float(original.width * original.height)) ** 0.5
+                width, height = (max(16, round(v * k / 16) * 16) for v in original.size)
+        saved = []
+        try:
+            for i in range(int(d.get("count") or 1)):
+                self._state("Generating")
+                t0 = time.time()
+                try:
+                    if original is None:
+                        result = Fibo2.generate_image(self.model, seed=seed + i, prompt=prompt, width=width,
+                                                      height=height, **args)
+                    else:
+                        result = self.model.generate_image(seed=seed + i, prompt=prompt, width=width, height=height,
+                                                           **args)
+                except Exception as e:
+                    if type(e).__name__ == "StopImageGenerationException":
+                        raise StopRequested()
+                    raise
+                image = result.image
+                if mask is not None:
+                    image = masks.blend_into(original, image, mask, painted_part)  # outside the mask the picture stays as it was
+                stem = "".join(filter(str.isalnum, prompt[:30])) or "image"
+                path = IMAGES_DIR / ("%s_%s.png" % (stem, uuid.uuid4().hex[:12]))
+                image.save(path)
+                protocol.log("[mlx] image done in %.1fs" % (time.time() - t0))
+                free_buffers()
+                if not d.get("_quiet"):
+                    protocol.result(str(path))
+                saved.append(str(path))
+        finally:
+            import shutil
+            shutil.rmtree(work, ignore_errors=True)
         return saved
 
 

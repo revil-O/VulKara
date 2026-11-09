@@ -71,7 +71,7 @@ Die Seite „Start“ zeigt drei Schritte. Jeder Schritt bekommt ein Häkchen, s
 1. **Runtime installieren** (Einstellungen → Runtimes). Eine Runtime ist die Software, die die Modelle ausführt.
    Beginne mit **Diffusers (Apple GPU)**: Sie führt die meisten Modelle aus und außerdem den Import, die
    Pose-Erkennung und den Inhaltsfilter. **MLX** ist schneller für FLUX- und Z-Image-Modelle und die einzige Runtime
-   für Krea 2, Ideogram 4 und FLUX 3 Image Klein. **ComfyUI** ist optional und wird für Video, Vergrößern sowie Anima-, Lumina-2- und Pony-V7-Modelle gebraucht.
+   für Krea 2, Ideogram 4 und FLUX 3 Image Klein. **ComfyUI** ist optional und wird für Video, Vergrößern sowie Anima-, Lumina-2-, Pony-V7-, MOSS-Image- und Fibo-2.0-Modelle gebraucht.
 2. **Modell besorgen** (Modelle → Empfohlen). Für einen ersten Versuch nimm *SDXL 1.0* oder *DreamShaper XL v2 Turbo*
    auf einem Mac mit 16 GB Arbeitsspeicher, oder *Stable Diffusion 1.5* auf einem mit 8 GB.
 3. **Dein erstes Bild erstellen** (Text). Beschreibe das Bild und drücke **Erstellen** oder ⌘↩. Der Schritt wird
@@ -113,6 +113,10 @@ einen Neustart hinweg.
 - Wenn der letzte wartende Auftrag fertig ist, spielt der Mac einen kurzen Ton. Das lässt sich unter Einstellungen →
   Inhalte → *Signalton abspielen, wenn die Warteschlange abgearbeitet wurde* ausschalten.
 - Während ein LoRA trainiert wird, startet kein Auftrag.
+- Das Schließen des Fensters hält die Aufträge nicht an: VulKara läuft mit seinem Symbol in der Menüleiste weiter (der
+  laufende Auftrag, sein Fortschritt und wie viele warten; **VulKara öffnen**, **Monitor**, **Einstellungen**).
+  **VulKara beenden** (⌘Q oder im Menü des Symbols) beendet es samt Engines; ist der Fernzugriff an, bleibt die
+  Fern-Weboberfläche bis dahin erreichbar, und das Menü des Symbols sagt es. **Einstellungen …** im App-Menü hat ⌘, .
 
 ## 3. Text zu Bild
 
@@ -129,6 +133,11 @@ Klicke auf eine Kachel, um sie in der [großen Ansicht](#18-die-große-ansicht) 
   ganzen Fehler.
 - Ein **ⓘ** auf einem Bild öffnet dessen Hinweis auf dieselbe Weise, etwa wenn es mit Diffusers statt mit MLX erstellt
   wurde.
+- **Schnell (8 Schritte)** (FLUX.1 [dev] und seine Finetunes, unter „Schritte“): das Bild in 8 statt 20–50 Schritten,
+  mit alimamas Turbo-Alpha-LoRA und der Guidance 3,5 seiner Karte; Schritte und Guidance setzt die Option. Auf einem Mac
+  mini mit 16 GB dauerte ein Bild mit 1024 px 4:18 statt 11:04 min (28 Schritte); die Bildaufteilung ändert sich, die
+  Qualität bleibt. Der LoRA wird einmal mit dem Knopf neben der Option in deine LoRAs geladen (694 MB, die
+  nicht-kommerzielle Lizenz von FLUX.1 [dev]).
 - **Prompt-Upsampler** (FLUX 3 Image Klein, Text zu Bild, neben „Erstellen“): FLUX 3 ist auf ausführliche
   Szenenbeschreibungen trainiert; der Upsampler von Black Forest Labs (4 Bit, MLX) schreibt aus deinem Prompt zuerst
   eine solche – Motiv, Umgebung, Licht, Kamera, Farben. Ein Prompt, der schon alles beschreibt, geht unverändert,
@@ -137,6 +146,12 @@ Klicke auf eine Kachel, um sie in der [großen Ansicht](#18-die-große-ansicht) 
   freigegeben, und die Beschreibung, die er geschrieben hat, wird zur Notiz des Bildes.
 
   ![Text zu Bild mit FLUX 3: die Option Prompt-Upsampler neben „Erstellen“](../screenshots/de/generate_upsampler.jpg)
+
+- **Prompt-Enhancer** (ERNIE-Image, Text zu Bild, neben „Erstellen“): Dieselbe Option startet bei ERNIE-Image den
+  Enhancer von Baidu (Ministral 3 3B, 16 Bit, 7,7 GB einmal geladen), der einen kurzen Prompt zu einer ausführlichen
+  Beschreibung umschreibt; ausgeschaltet geht der Prompt, wie er geschrieben ist. Die Beschreibung wird zur Notiz des
+  Bildes; auf einem 16-GB-Mac wird das Bildmodell entladen, während der Enhancer schreibt. Er schreibt Englisch, egal in welcher Sprache der Prompt
+  ist; etwa eine Minute auf einem M2.
 
 - **EU-KI-Kennzeichnung** (neben „Erstellen“): setzt das Symbol der Europäischen Kommission für KI-Inhalte sichtbar in
   die rechte untere Ecke jedes Bildes. *AI GENERATED* für Bilder aus einem Prompt (Text, Illusion), *AI MODIFIED*, wo
@@ -221,6 +236,25 @@ anderen Modells die Einstellungen bei, damit sich Modelle mit denselben Werten v
 - **Gewichtung** (0–2) legt fest, wie streng das Ergebnis dem Steuerbild folgt.
 - Das Steuerungsmodell wird beim ersten Einsatz heruntergeladen.
 
+### Text und Layouts (MOSS-Image)
+
+MOSS-Image schreibt Text ins Bild (Englisch und Chinesisch): in Anführungszeichen, mit Zeilenumbrüchen, wo sie
+hingehören. Ein Layout legt fest, wo etwas steht: Der Prompt ist dann das JSON, das ComfyUIs Node *MOSS-Image Layout
+Prompt* schreibt, mit einer Beschreibung des ganzen Bildes und einem Eintrag je Kasten. Ein Kasten ist `[oben, links,
+unten, rechts]` in Pixeln von der Bildmitte aus (ein Poster mit 768 px reicht von −384 bis 384); ein Eintrag ist `text`
+(mit dem zu schreibenden Text), `object` oder `character`:
+
+```json
+{"summary":{"caption":"A poster for a bakery, warm morning light, clean typography"},
+ "items":[{"label":"text","caption":"headline in bold serif letters","text":"FRESH BREAD","bbox":[-340,-300,-220,300]},
+          {"label":"object","caption":"a round loaf of sourdough bread on a wooden board","bbox":[-150,-250,250,250]},
+          {"label":"text","caption":"small caption line","text":"baked every morning","bbox":[300,-200,360,200]}],
+ "bbox_coord_space":"abs_centralized","bbox_format":"yxyx"}
+```
+
+Als Prompt einfügen: Das Bild folgt den Kästen. Bild zu Bild und LoRAs gehen wie bei anderen Modellen (ComfyUI
+bildet die Schichten einer LoRA auf die zusammengelegten Modelldateien ab).
+
 ## 4. Stile
 
 ![Stile](../screenshots/de/styles.jpg)
@@ -269,7 +303,24 @@ wird.
   das Bild wieder ein. Malen und Klicken funktionieren auch im Zoom.
 - **Veränderung** (0,05–1): wie weit sich das Ergebnis vom Bild entfernt. Bei 0,3 ändern sich Farben und Details; bei
   0,6 ändert sich das Motiv, während der Bildaufbau bleibt; über 0,8 bleibt wenig vom Bild übrig. FLUX.2- und
-  Qwen-Image-2.1-Modelle nutzen diesen Regler nicht; sie nehmen das Bild als Referenz.
+  Qwen-Image-2.1-Modelle nutzen diesen Regler nicht; sie nehmen das Bild als Referenz. Fibo 2.0 auch nicht: Es ändert
+  das Bild so, wie der Prompt es sagt (*mach eine verschneite Nacht daraus*), alles andere bleibt. Unter **Weitere
+  Bilder** nimmt es bis zu drei weitere Bilder: Im Prompt ist das Bild oben <image_1>, diese sind <image_2> bis
+  <image_4> (*zieh der Person in <image_1> das Kleid aus <image_2> an*). Jedes weitere Bild macht die Schritte länger
+  und braucht mehr Speicher: Mit vier Bildern dauert ein Schritt 3,5- bis 4-mal so lange wie mit einem (20 bis 23
+  Minuten pro Bearbeitung bei 1024 px auf einem M2), auf ComfyUI mit etwa 5 GB mehr Speicher, auf MLX mit etwa 2 GB
+  mehr.
+- **Bild beibehalten (FLUX.2 [klein] 4B)**: ändert nur, was der Prompt verlangt, und behält den Rest: dieselbe Küste
+  in einer verschneiten Nacht, ein roter Mantel, sonst nichts geändert. Ohne die Option malt klein das Bild neu (eine
+  andere Küste, ein anderer Hintergrund). Ein starker Stilwechsel fällt schwächer aus (ein Aquarell aus einem Foto
+  bleibt nah am Foto). Dafür dient die Konsistenz-LoRA von lrzjason mit halber Stärke (Apache-2.0, 0,4 GB, beim
+  ersten Mal geladen); zuerst aus. Etwa 0,3 GB mehr Speicher; 9B bearbeitet ohne sie.
+- **Prompt aus Bild**: schreibt einen Prompt für das gewählte Bild: Motiv, Umgebung, Licht, Farben, Stil und Kamera in
+  einem englischen Absatz, den du vor dem Erstellen ändern kannst. Das macht Qwen3-VL 2B (Qwen, Apache-2.0) auf diesem
+  Mac, auf einem Mac mini M4 in etwa 15 s; es wird einmal geladen (4,1 GB), das geladene Bildmodell wird dafür
+  freigegeben, und der Knopf wartet, während ein Auftrag läuft. Ein Prompt, der schon im Feld steht, wird erst nach
+  einer Rückfrage ersetzt. Die Farben eines Schwarzweißfotos sind geraten (eine graue Hecke nannte es dunkelgrün).
+  Nicht in der Fern-Weboberfläche.
 - Das Ergebnis hat die Proportionen des Bildes. Für eine andere Größe aktiviere **Eigene Größe statt der Proportionen
   des Bildes**.
 - Alle anderen Einstellungen funktionieren wie bei [Text zu Bild](#3-text-zu-bild).
@@ -293,8 +344,12 @@ Malt einen Teil eines Bildes neu und behält den Rest.
 3. Beschreibe, was im bemalten Teil erscheinen soll, oder lass den Prompt leer, um nur etwas zu entfernen.
 4. **Veränderung** (Standard 100 %): Niedrigere Werte behalten mehr vom Vorhandenen.
 
-Inpainting können SD 1.x, SD 2.x, SDXL, SD 3.5, FLUX.1, Chroma, Qwen-Image und Z-Image. Spezielle Inpainting-Modelle
-wie *SD 1.5 Inpainting* ergeben die saubersten Ränder.
+Inpainting können SD 1.x, SD 2.x, SDXL, SD 3.5, FLUX.1, Chroma, Qwen-Image, Z-Image, FLUX.2 [klein] und Fibo 2.0.
+*SDXL Inpainting* (bei den empfohlenen Modellen) ist dafür trainiert und fügt Neues sauber ein, etwa 1½ Minuten pro
+Bild auf einem Mac mini mit 16 GB; FLUX.2 [klein] 4B braucht etwa 2 Minuten und malt die meisten Details; *FLUX.1 Fill [dev]* (ebenfalls empfohlen, braucht ein Hugging-Face-Token) fügt am saubersten ein, etwa 13–14 Minuten. Bei FLUX.1 [dev] oder [schnell] weist die Seite darauf hin, dass ein schwacher Umriss des bemalten Teils bleiben kann. Mit leerem
+Prompt wird der bemalte Teil entfernt: LaMa füllt ihn zuerst aus seiner Umgebung, das Modell überarbeitet das nur
+(**Veränderung** höchstens 40 %), so wird dort nichts Neues erfunden. Fibo 2.0 malt den bemalten Teil so neu, wie der Prompt es sagt
+(*eine kleine rote Hütte*), und nutzt **Veränderung** nicht; außerhalb der Maske bleibt das Bild Pixel für Pixel erhalten.
 
 ## 7. KI-Leinwand
 
@@ -350,8 +405,8 @@ Empfohlen).
 - **Länge**: 1–5 Sekunden.
 - **Auflösung**: 480p oder 720p.
 
-Video dauert viel länger als Bilder. Ein Clip von einer Sekunde in 480p brauchte auf einem M2 mit 24 GB etwa
-8 Minuten, und längere Clips brauchen deutlich mehr Arbeitsspeicher.
+Video dauert viel länger als Bilder. Auf einem M2 mit 24 GB brauchte ein Clip von einer Sekunde in 480p etwa
+8 Minuten, ein Clip von fünf Sekunden 110 Minuten (Wan 2.2 14B, 4 Schritte); die Engine hielt 7 bis 10 GB.
 
 ## 9. Vergrößern
 
@@ -434,7 +489,7 @@ jede Seite, die ein Bild annimmt.
 | Schritt | Wie |
 | --- | --- |
 | **Farbstich und Kontrast korrigieren** | Ohne Modell: Weißabgleich (ein roter oder gelber Stich wird neutralisiert; ein getöntes Schwarzweißfoto wird neutral grau), Tonwerte und lokaler Kontrast nur auf der Helligkeit. Helle Töne werden komprimiert statt abgeschnitten, so behält ein weißes Kleid seine Falten. **Stärke** 20–100 % (Standard 80 %). |
-| **Schäden reparieren (KI)** | Ein FLUX.2-Modell bearbeitet das Foto (Modelle → Empfohlen: FLUX.2 [klein]). **Schritte des Modells** 2–12. Ohne Bemalung malt es das ganze Foto neu: Weiche Kleidung, Blätter und Hintergründe bekommen echte Details, Gesichter können aber zu denen anderer Menschen werden; deshalb werden die Gesichter aus dem Foto vor der Reparatur übernommen, wenn *Gesichter restaurieren* eingeschaltet ist. |
+| **Schäden reparieren (KI)** | Ein FLUX.2-Modell bearbeitet das Foto (Modelle → Empfohlen: FLUX.2 [klein]). **Schritte des Modells** 2–12. Ohne Bemalung malt es das ganze Foto neu: Weiche Kleidung, Blätter und Hintergründe bekommen echte Details, Gesichter können aber zu denen anderer Menschen werden; deshalb werden die Gesichter aus dem Foto vor der Reparatur übernommen, wenn *Gesichter restaurieren* eingeschaltet ist. **Konsistenz-LoRA (FLUX.2 [klein] 4B)**, standardmäßig an: Die LoRA von lrzjason (Apache-2.0, 0,4 GB, einmalig heruntergeladen) hält die Reparatur näher am Foto, Kratzer verschwinden gründlicher; sie braucht etwa 1,7 GB mehr Speicher. Andere Modelle reparieren ohne sie. Bei FLUX.2 [klein] 9B und einem Schwarzweiß- oder Sepiafoto erscheint ein Hinweis: 9B färbt es bei der Reparatur ein, 4B mit der Konsistenz-LoRA behält seine Farbe. |
 | **Staub und Kratzer entfernen** | Ohne eigenes Modell: Kleine Flecken und dünne Kratzer, die sich von ruhiger Umgebung abheben, werden gefunden und aus ihrer Umgebung aufgefüllt (LaMa). Blätter und Stoff bleiben unberührt, ebenso Augen und Mund. **Empfindlichkeit** 0–100 % (Standard 50 %); ein höherer Wert findet schwächere Flecken, ab und zu aber auch ein kleines Detail des Fotos (die Vorschau zeigt es). |
 | **Weiche Details neu aufbauen (KI)** | Real-ESRGAN (das Hilfsmodell von Vergrößern, 64 MB) baut Kanten und Texturen des ganzen Fotos neu auf: Es wird um so viel verkleinert, wie es weich ist (**Weichheit des Fotos** × 1,25–3, Standard × 2), und wieder auf das Vierfache vergrößert. **Stärke** 20–100 %. Es schärft, was das Foto noch zeigt; ganz verlorene Textur (Stoff, Blätter) ergänzt nur *Schäden reparieren (KI)*. |
 | **Gesichter restaurieren (KI)** | CodeFormer (0,4 GB, einmalig heruntergeladen) restauriert unscharfe Gesichter, die aus dem Foto vor den KI-Schritten übernommen werden. **Originalgetreu** 50–100 % (Standard 90 %): Niedrigere Werte erfinden mehr Details. **Stärke** 20–100 % (Standard 60 %). Gesichter kleiner als etwa 14 Pixel bleiben unberührt. Die Lizenz von CodeFormer erlaubt nur nicht kommerzielle Nutzung. |
@@ -720,7 +775,7 @@ sein Arbeitsspeicher); ältere Importe werden am Arbeitsspeicher erkannt, für d
 | Familie | Runtime | Hinweise | Modell / Bilder kommerziell |
 | --- | --- | --- | --- |
 | Stable Diffusion 1.5, 2.x | Diffusers | auch Inpainting-Checkpoints | ja / ja (Open RAIL, Nutzungsbeschränkungen) |
-| SDXL, inkl. Turbo, Pony, Illustrious, NoobAI | Diffusers | LoRAs von Pony, Illustrious und NoobAI werden von reinen SDXL-LoRAs unterschieden | ja / ja (Open RAIL++) |
+| SDXL, inkl. Turbo, Pony, Illustrious, NoobAI | Diffusers | LoRAs von Pony, Illustrious und NoobAI werden von reinen SDXL-LoRAs unterschieden; auch Inpainting-Checkpoints (9 Kanäle) | ja / ja (Open RAIL++) |
 | Stable Diffusion 3.5 Medium / Large | Diffusers | | mit Auflagen (unter 1 Million USD Umsatz) |
 | FLUX.1 [schnell] / [dev] | Diffusers oder MLX | auch GGUF-Dateien | schnell ja / ja; dev nein / ja |
 | Chroma (Chroma1-HD, -Base, -Flash, Fine-Tunes) | Diffusers | echte Guidance mit Negativ-Prompt (zwei Durchgänge pro Schritt, daher langsamer als FLUX.1; Chroma1-Flash braucht 12 Schritte und keine Guidance – etwa 7 Minuten pro Bild bei 1024 px auf einem M2 mit 24 GB statt etwa 52); auf M1/M2 in float16 gerechnet, etwa 40 % schneller als bfloat16; safetensors und GGUF; Einzeldateien nehmen T5 und VAE von FLUX.1 | ja / ja (Apache 2.0) |
@@ -733,7 +788,9 @@ sein Arbeitsspeicher); ältere Importe werden am Arbeitsspeicher erkannt, für d
 | Ideogram 4 | MLX | lehnt Nacktheit von sich aus ab | nein / nein |
 | Anima | ComfyUI | | nein / ja |
 | Lumina 2 (NetaYume, Neta Lumina) | ComfyUI | der System-Prompt, den das Modell erwartet, kommt von selbst vor den Prompt (die Anime-Fine-Tunes nutzen ihren eigenen); etwa 30 s pro Schritt bei 1024 px auf einem M2 mit 24 GB | ja / ja (Apache 2.0) |
-| ERNIE-Image (Turbo, SFT) | MLX | stark bei Text im Bild, Postern und Comics; Turbo 8 Schritte ohne Guidance, etwa 6 Minuten pro Bild bei 1024 px (4 Bit) auf einem M2 mit 24 GB; der Prompt-Enhancer des Repositorys (7 GB) wird nicht geladen; Text zu Bild | ja / ja (Apache 2.0) |
+| ERNIE-Image (Turbo, SFT) | MLX | stark bei Text im Bild, Postern und Comics; Turbo 8 Schritte ohne Guidance, etwa 6 Minuten pro Bild bei 1024 px (4 Bit) auf einem M2 mit 24 GB; eigener Prompt-Enhancer auf Wunsch (Option Prompt-Enhancer neben „Erstellen“, 7,7 GB einmal geladen); Text zu Bild | ja / ja (Apache 2.0) |
+| Fibo 2.0 Edit Turbo (auch Dev) | ComfyUI; MLX (8 Bit) | Das 8B-Modell von Bria AI; Qwen3-VL 4B liest Prompt und Bild (8 Bit, auf der CPU), der Transformer in 8 Bit, gerechnet in float16; bearbeitet ein Bild nach Anweisung (Bild zu Bild), nur innerhalb einer Maske (Inpainting, AI Canvas) und malt neue Bilder, 4 Schritte ohne Guidance (Dev: 50 Schritte, Guidance 5, zwei Durchläufe pro Schritt: etwa eine Stunde pro neuem Bild, zwei pro Bearbeitung): etwa 6 Minuten pro Bearbeitung und 3 pro neuem Bild bei 1024 px auf einem M2 mit 24 GB; eine Bearbeitung braucht etwa 14,5 GB, also nicht für Macs mit 16 GB; dort läuft die MLX-Version (8-Bit-Dateien von mflux-community: etwa 11 GB, der Text-Encoder nur für den Prompt, etwa 7 Minuten pro Bearbeitung); bis zu vier Bilder zusammen (Weitere Bilder), LoRAs im Diffusers- oder ComfyUI-Layout (jede Runtime bekommt ihres, einmal umgewandelt) | nein / nein (CC BY-NC 4.0) |
+| MOSS-Image (auch die 8-Schritt-Version mit DMD) | ComfyUI | Text im Bild (Englisch und Chinesisch), Poster und Layouts; Qwen 3.5 9B liest den Prompt (4 Bit, auf der CPU), der Transformer in 8 Bit, gerechnet in float16 (Größen bis 2048 px); die Einstellungen des Herstellers: 50 Schritte, Guidance 3, Schicht 22 im negativen Zweig ausgelassen, etwa 48 s pro Schritt bei 1024 px auf einem M2 mit 24 GB (40 Minuten pro Bild); die 8-Schritt-Version ohne Guidance etwa 4½ Minuten; höchstens 8,4 GB auf 16 GB; Text zu Bild, Bild zu Bild und LoRAs; Layouts als JSON (Kapitel 3) | ja / ja (Apache 2.0) |
 | AuraFlow, Pony V7 | ComfyUI; das Repository Diffusers | auf ComfyUI der Transformer als GGUF (Ponys Q8_0 / Q4_0); Prompts werden wie in Ponys Workflow auf 768 Token aufgefüllt; etwa 50 s pro Schritt bei 1024 px auf einem M2 mit 24 GB; die Repositories (fal/AuraFlow-v0.3, purplesmartai/pony-v7-base) auf Diffusers, dort mit 16 GB in 8 Bit; LoRAs für ComfyUI laufen auf beiden | mit Bedingungen (Pony License) |
 | Wan 2.2 5B / 14B (Video) | ComfyUI | Bild zu Video | ja / ja (Apache 2.0) |
 
@@ -801,8 +858,8 @@ ihrer Downloadgröße. Ein Modell, das mehr Arbeitsspeicher braucht, als der Mac
 
 | Gruppe | Modelle |
 | --- | --- |
-| **Basismodelle** | Stable Diffusion 1.5 (+ Inpainting), SD 2.1, SDXL 1.0, SDXL Turbo, SD 3.5 Medium / Large, FLUX.1 schnell (4/8 Bit), FLUX.1 dev (16/4 Bit), Chroma1-HD, Chroma1-Flash (schnell), Z-Image-Turbo, ERNIE-Image-Turbo, FLUX.2 [klein] 4B / 9B, Wan 2.2 TI2V 5B / I2V 14B (Video) |
-| **Community-Modelle** | GonzaLomo Chroma, DreamShaper 8, Realistic Vision 5.1, Counterfeit, DreamShaper XL Turbo, Juggernaut XL v7, epiCRealism XL, JANKU Illustrious XL, Anima Turbo, NetaYume Lumina v4 … |
+| **Basismodelle** | Stable Diffusion 1.5 (+ Inpainting), SD 2.1, SDXL 1.0 (+ Inpainting), SDXL Turbo, SD 3.5 Medium / Large, FLUX.1 schnell (4/8 Bit), FLUX.1 dev (16/4 Bit), Chroma1-HD, Chroma1-Flash (schnell), Z-Image-Turbo, ERNIE-Image-Turbo, MOSS-Image, Fibo 2.0 Edit Turbo, FLUX.2 [klein] 4B / 9B, Wan 2.2 TI2V 5B / I2V 14B (Video) |
+| **Community-Modelle** | GonzaLomo Chroma, DreamShaper 8, Realistic Vision 5.1, Counterfeit, DreamShaper XL Turbo, Juggernaut XL v7, epiCRealism XL, JANKU Illustrious XL, Anima Turbo, NetaYume Lumina v4, MOSS-Image 8-step (DMD) … |
 | **Explizite Modelle** | nur gelistet, wenn Nacktheit in den Einstellungen erlaubt ist |
 
 Manche Modelle brauchen ein Zugriffstoken (Einstellungen → Zugriffstoken) oder eine auf ihrer Hugging-Face-Seite
@@ -849,6 +906,11 @@ Was beim Import passiert:
   Qwen-Image 2.1 auf einem Mac mit 16 GB: etwa so schnell wie gestreamt in 16 Bit (1 830 s statt 1 700–1 860 s bei
   1024 px und 40 Schritten), mit weniger Speicher und ohne pro Bild rund 380 GB von der SSD zu lesen. *Immer* unter
   Einstellungen → Engine → *Große Modelle Stück für Stück von der SSD laden* streamt stattdessen in 16 Bit.
+- **In 4 Bit**: Vor dem Streaming behält ein Modell, das weder in 16 noch in 8 Bit passt, seinen Denoiser in 4 Bit im
+  Arbeitsspeicher (einmal in einem eigenen Prozess komprimiert und gespeichert; das erste Bild dauert ein paar Minuten
+  länger). Auf dem Mac mini mit 16 GB lief FLUX.1 dev bei 768 px mit 18,9 s je Schritt statt 34,4 s gestreamt,
+  FLUX.2 [klein] 9B mit 17,0 statt 22,3 s, ohne von der SSD zu lesen; bei 1024 px beide so schnell wie gestreamt.
+  *Immer* streamt stattdessen in 16 Bit.
 - **SSD-Streaming**: Ein 16-Bit-Modell, das nicht in den Arbeitsspeicher passt, kann trotzdem laufen: Sein Denoiser wird
   einmal, Block für Block, in den *Cache für SSD-Streaming* geschrieben (etwa doppelt so groß wie das Modell, im Ordner
   des Modells oder in dem in den Einstellungen festgelegten Ordner), und während ein Bild entsteht, wird jeder Block
@@ -865,7 +927,9 @@ Was beim Import passiert:
   der Verlauf zeigen es als *Hinweis*. Krea 2, das nur MLX ausführt, gibt auf einem kleinen Mac seinen Text-Encoder
   nach dem Lesen des Prompts frei: So passt es in 16 GB, und ein neuer Prompt lädt das Modell erneut. Das dauert etwa
   12 Sekunden, da das 4-Bit-Modell beim ersten Start einmal daneben gespeichert wird (`mlx_q4` im Ordner des Modells,
-  etwa 9 GB), wenn die Festplatte Platz hat.
+  etwa 9 GB), wenn die Festplatte Platz hat. Z-Image, ERNIE-Image und FLUX.2 [klein] mit MLX werden beim ersten Start
+  genauso gespeichert (`mlx_q8` oder `mlx_q4`; Z-Image Turbo 8 Bit etwa 10 GB, klein 4B 4,3 GB); spätere Starts lesen
+  nur noch das (Z-Image Turbo auf einem Mac mini M4: 10 statt 30 GB, das erste Bild 188 statt 214 Sekunden).
 
   ![Hinweis im Verlauf: mit Diffusers statt MLX erstellt](../screenshots/de/history_note.jpg)
 ## 16. Verlauf
@@ -918,7 +982,7 @@ Die Markierungen werden mit dem Verlauf gespeichert, ein entfernter Eintrag nimm
 **Tipps** in der Navigation sammelt Hilfe zu Prompts und Richtlinien: wie ein Prompt aufgebaut ist, glaubwürdige
 Anatomie (Hände, Gesichter, Augen, Posen), Details und Materialien, Licht, Arbeiten mit LoRAs, verbreitete Helfer und
 was jeder Modelltyp will (Prompt-Stil, Schritte, Guidance, Negativ-Prompt ja oder nein, Größen), von SD 1.5 bis Wan 2.2
-Video.
+Video, ERNIE-Image, MOSS-Image, Fibo 2.0, FLUX 3, Anima, Lumina 2 und AuraFlow (Pony V7).
 
 - **Für dein Modell** steht ganz oben: die Tipps für das auf der Seite Text gewählte Modell.
 - **Suchen** findet Tipps, die alle eingegebenen Wörter enthalten.
@@ -926,7 +990,8 @@ Video.
   Prompt und Seed: ein kurzer gegen einen ausführlichen Prompt (Hände, Auge, Haare, eine Teekanne, eine Straße bei
   Nacht, Haut), eine LoRA mit den Gewichten 0, 0,5, 1 und 1,5 (von keiner Wirkung bis zu einem Bild, das zerfällt) und
   ein Posenbild mit dem Ergebnis ohne die Pose und mit ihr bei den Gewichten 0,5 und 1. Unter *Allgemein* ein Prompt auf
-  fünf Modelltypen sowie ein Modell bei fünf Guidance-Werten, vier Seeds und vier Schrittzahlen. Das **ⓘ** neben einem
+  fünf Modelltypen sowie ein Modell bei fünf Guidance-Werten, vier Seeds und vier Schrittzahlen. Jeder Modelltyp hat
+  ein eigenes Paar: ein schlichter Prompt gegen den Prompt des Tipps mit demselben Seed. Das **ⓘ** neben einem
   Bild zeigt seinen Prompt, die Taste daneben kopiert ihn.
 - Die Beispielbilder tragen klein in ihrer rechten unteren Ecke das EU-Symbol *AI GENERATED*.
 - Ein Klick auf ein Bild öffnet es groß; ← und → blättern durch die Bilder desselben Tipps, Esc oder ein Klick daneben
@@ -962,8 +1027,8 @@ einem eigenen Vollbild-Space ohne Titelleiste), so verdeckt sie die App nie uner
 | Runtime | Größe | Führt aus |
 | --- | --- | --- |
 | **Diffusers (Apple GPU)** | ~0,9 GB | SD 1.x/2.x, SDXL, SD 3.5, FLUX.1, Chroma, FLUX.2, Qwen-Image und Qwen-Image 2.1, Z-Image, GGUF- und FP8-Dateien, LoRAs, ControlNet; außerdem den Importer, die Posenerkennung, die Fotorestaurierung und den Inhaltsfilter. Qwen-Image 2.1 braucht diffusers 0.41: Eine vorher installierte Runtime sagt das und bekommt es mit **Aktualisieren** |
-| **MLX** | ~1 GB | FLUX-Modelle und Z-Image (als Repository, Text zu Bild), meist schneller und sparsamer; Krea 2, Ideogram 4 und FLUX 3 Image Klein |
-| **ComfyUI** | ~1,5 GB | optional: Anima, Lumina 2, Pony V7, Wan-Video, Vergrößern |
+| **MLX** | ~1 GB | FLUX-Modelle und Z-Image (als Repository, Text zu Bild), meist schneller und sparsamer; Krea 2, Ideogram 4, FLUX 3 Image Klein und Fibo 2.0 für Macs mit 16 GB |
+| **ComfyUI** | ~1,5 GB | optional: Anima, Lumina 2, Pony V7, MOSS-Image, Fibo 2.0, Wan-Video, Vergrößern |
 
 Jede Runtime ist eine eigene Python-Umgebung im Runtimes-Ordner. **Aktualisieren** installiert sie neu mit den
 Paketen, mit denen diese VulKara-Version getestet wurde – jedes Paket in einer festen Version, sodass ein neues
@@ -1121,6 +1186,12 @@ Wenn die URL auf dem Remote-Gerät nicht geöffnet werden kann, erlaube in macOS
 Prompts, Bilder und Pfade verlassen den Mac nie, und die Nutzungsberichte der Bibliotheken (Hugging Face, diffusers,
 transformers) sind abgeschaltet.
 
+Was VulKara aus dem Internet holt, und wann: **Hugging Face** und **Civitai**, wenn du ein Modell, eine LoRA oder ein
+Hilfsmodell suchst, installierst oder aktualisierst (Civitai auch für die Prüfsummen-Suche unten, wenn eingeschaltet);
+**GitHub** für die tägliche Update-Prüfung der App und ihrer Laufzeiten und für Downloads wie uv, ComfyUI und die
+Gesichtsmodelle von Restaurieren; **PyPI**, wenn eine Laufzeit installiert oder aktualisiert wird. Jeder dieser Dienste sieht
+die IP-Adresse des Macs und was geholt wird; kein Prompt, Bild oder Pfad wird gesendet, und VulKara hat keine Telemetrie.
+
 Die Seiten der App sehen nur Bilder in VulKaras eigenen Ordnern (Bilder, Modelle, LoRAs), die Bilder des Verlaufs und
 die, die du ihr selbst gegeben hast, in einem Dialog ausgewählt oder auf ein Feld gezogen. Andere Bilder auf dem Mac
 bleiben außer Reichweite, auch für Code, der vielleicht in eine Seite eingeschleust wird. Ein schon einmal verwendetes
@@ -1161,7 +1232,9 @@ Alle Einstellungen bleiben über Neustarts hinweg erhalten.
   alles in die Zwischenablage, für einen Fehlerbericht.
   **Benchmark** misst ein Modell auf diesem Mac: Modell, Größe (seine eigene, 512, 768 oder 1024 px) und ein bis drei
   Bilder wählen, dann **Messen**. Die Bilder laufen mit den Schritten, der Guidance und dem Sampler des Modells durch
-  die Warteschlange, für jedes Modell mit demselben Prompt und Seed; das erste lädt auch das Modell. Die Tabelle zeigt
+  die Warteschlange, für jedes Modell mit demselben Prompt und Seed; das erste lädt auch das Modell. **Neuer Prompt je Bild** hängt an den Prompt jedes Bildes eine Zahl an, damit
+  jedes seinen Prompt neu kodiert, wie ein geänderter Prompt; ohne das nehmen die Bilder nach dem ersten den kodierten
+  Prompt aus dem Cache. Die Tabelle zeigt
   die Sekunden pro Schritt, das ganze Bild (das erste mit Laden), den höchsten Speicher von VulKara mit seinen Engines
   (wie macOS ihn zählt, mit dem, was die GPU hält) und vom System und den Swap, den das Bild dazu brauchte (ab 0,5 GB hervorgehoben: der Speicher wurde knapp und jeder Schritt
   ist langsamer), und in einer eigenen Spalte die Abschnitte, die die Engine
@@ -1178,6 +1251,13 @@ Alle Einstellungen bleiben über Neustarts hinweg erhalten.
   Läufe als Markdown-Tabelle mit Chip und Arbeitsspeicher in die Zwischenablage. Jeder Lauf nennt die App-Version und
   den Code-Stand, aus dem sie gebaut ist (Commit, + bei nicht eingecheckten Änderungen, Bauzeit), so bleiben Läufe
   verschiedener Versionen auseinander. Die Bilder bleiben im Verlauf.
+  **Monitor** (App-Menü VulKara → Monitor oder das VulKara-Symbol in der Menüleiste) öffnet ein kleines Fenster mit
+  dem laufenden Auftrag: Modell, Größe, Schritte, Fortschritt, Sekunden pro Schritt, Restzeit und der Speicher von
+  VulKara mit seinen Engines (mit dem Anteil der GPU) gegen den Speicherplan des Auftrags, mit Spitze und Swap dazu. Auf
+  dem Mac, auf dem gemessen wurde (Mac mini M4, 16 GB), vergleicht er außerdem Zeit pro Bild und Spitze mit den
+  Messwerten des Modells (docs/MEASUREMENTS.md), nur bei dessen Standardeinstellungen. Grün liegt darunter, Orange mehr
+  als 10 % darüber, Rot mehr als 25 %; zwischen den Aufträgen wird nichts verglichen. Darunter CPU und GPU dieses Macs
+  mit den letzten Minuten, Speicher, Swap und SSD-Streaming-Cache.
 
 - **Protokolle**: was die Engines und Installationsprogramme melden, jede Zeile mit Datum und Uhrzeit. Fertige
   Downloads zeigen ihre Größe und Geschwindigkeit. **Alles kopieren** kopiert die Zeilen dieser Sitzung, wie sie sind.
@@ -1294,5 +1374,7 @@ PNG-Dateien und Videos MP4-Dateien, in ihren Metadaten als KI-generiert gekennze
 | *Could not tell which model this LoRA was trained for* | Ihre Datei nennt keinen bekannten Modelltyp. Importiere sie von ihrer Seite auf Civitai oder Hugging Face, wo die Quelle das Basismodell angibt. |
 | *… needs diffusers 0.41 or newer* (Qwen-Image 2.1) | Einstellungen → Runtimes → **Aktualisieren** für die Runtime Diffusers. |
 | *… does not fit into this Mac's memory; streaming it from the SSD needs … GB free disk space* | Schaffe Platz auf diesem Laufwerk oder wähle in den Einstellungen einen anderen Ordner für *Cache für SSD-Streaming*. |
+| *Only … GB of memory free for the planned … GB …: macOS moves other programs to the swap, the picture is usually as fast* | Andere Apps oder eine andere Engine belegen ein paar GB. Nichts zu tun: das Bild bleibt gleich schnell, ruhende Apps wandern in den Swap (gemessen bis 10 GB Fehlmenge auf einem 24-GB-Mac; auf 16 GB kommt der deutliche Hinweis ab 4 GB). |
+| *Only … GB of memory free for the planned … GB …: this picture may take many times longer* | Andere Apps oder eine andere Engine belegen den Arbeitsspeicher. Schließe sie oder warte, bis ihr Auftrag fertig ist, und starte das Bild dann neu. |
 | Der KI-Schritt beim Restaurieren wird abgelehnt | Eine Leitplanke hat ihn gestoppt (der Auftrag sagt, welche): Male den Schaden genauer, erhöhe *Erlaubte Veränderung* ein wenig oder schalte die Gesichtsprüfung bei einem Foto ohne Gesichter aus. |
 | macOS öffnet die App beim ersten Mal nicht | Systemeinstellungen → Datenschutz & Sicherheit → **Dennoch öffnen** (nur bei Builds, die nicht notarisiert wurden). |

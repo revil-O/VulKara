@@ -4,7 +4,7 @@
 // the result is the control picture "Pose" of Text to image. A pose can also be read from a photo.
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Check, Download, FlipHorizontal2, ImageUp, Minus, Plus, RotateCcw, RotateCw, Trash2, Type } from 'lucide-vue-next'
+import { Check, Download, FlipHorizontal2, ImageUp, Minus, Plus, RotateCcw, RotateCw, Trash2, Type } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import { useHandoffStore } from '../stores/handoff'
 import { cleanError } from '../stores/runtimes'

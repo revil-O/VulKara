@@ -57,7 +57,7 @@ export function makeApi(call: Call, on: On, extra: BridgeExtra): VulkaraApi {
       onChange: (fn) => on('assets:change', fn),
     },
     benchmark: {
-      start: (job, count, model) => call('benchmark:start', job, count, model),
+      start: (job, count, model, freshPrompt) => call('benchmark:start', job, count, model, freshPrompt),
       list: () => call('benchmark:list'),
       clear: () => call('benchmark:clear'),
       onChange: (fn) => on('benchmark:change', fn),
@@ -132,6 +132,11 @@ export function makeApi(call: Call, on: On, extra: BridgeExtra): VulkaraApi {
       detect: (path) => call('pose:detect', path),
       onProgress: (fn) => on('pose:progress', fn),
     },
+    caption: {
+      image: (path) => call('caption:image', path),
+      stop: () => call('caption:stop'),
+      onProgress: (fn) => on('caption:progress', fn),
+    },
     dialog: {
       ask: (message, yes, no, detail) => call('dialog:ask', message, yes, no, detail),
     },
@@ -157,6 +162,8 @@ export function makeApi(call: Call, on: On, extra: BridgeExtra): VulkaraApi {
       clearPromptCache: () => call('app:clearPromptCache'),
       installUpdate: () => call('app:installUpdate'),
       onUpdate: (fn) => on('app:updateChanged', fn),
+      onNavigate: (fn) => on('nav:go', fn),
+      onFootprint: (fn) => on('monitor:footprint', fn),
     },
     remote: {
       info: () => call('remote:info'),

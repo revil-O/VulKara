@@ -252,8 +252,9 @@ flowchart TD
   Tile for Large).
 - The helper models (DWPose, Depth Anything) are downloaded on first use into the helper folder. The pose editor's
   **From a photo** runs the same DWPose detection through the Diffusers runtime.
-- A ControlNet needs memory next to the model: if it does not fit in 16 bit, the engine first stages the text encoder,
-  then tries 8 bit (compressed once and cached).
+- A ControlNet needs memory next to the model (its weights and about half the model's activations, counted in the
+  job's planned peak): if it does not fit in 16 bit, the engine first stages the text encoder, then tries 8 bit
+  (compressed once and cached).
 
 ### <img src="icons/sparkles.svg" width="20" height="20" alt=""> Illusion
 
@@ -297,7 +298,8 @@ flowchart TD
     MP --> CC["Content check on six frames, then History"]
 ```
 
-- Video takes far longer than pictures: a one-second clip at 480p took about 8 minutes on an M2 with 24 GB.
+- Video takes far longer than pictures: on an M2 with 24 GB a one-second clip at 480p took about 8 minutes, a
+  five-second clip 110 minutes, the engine at 7 to 10 GB (MEASUREMENTS 7ay).
 - Styles and LoRAs are not used for video; one job makes one clip.
 
 ### <img src="icons/maximize-2.svg" width="20" height="20" alt=""> Upscale

@@ -8,9 +8,13 @@ FLUX1 = {"arch": "flux1_dev", "layout": "repo", "denoiser": "transformer",
          "components": {"transformer": 11.9, "text_encoder": 0.12, "text_encoder_2": 4.76, "vae": 0.08}}
 
 
-def test_a_16_bit_model_too_large_for_16_gb_fits_streamed(monkeypatch):
+def test_a_16_bit_model_too_large_for_16_gb_is_kept_in_4_bit_and_streamed_below(monkeypatch):
+    # 16 GB: a 4 bit transformer in memory before streaming 16 bit (streamed, it took the SSD's time: MEASUREMENTS 7be)
     monkeypatch.delenv("VK_SSD_STREAMING", raising=False)
     plan = importer.make_plan(FLUX1, ram_gb=16)
+    assert plan["fits"] and not plan.get("streamed") and plan["quant"]["transformer"] == "q4"
+    # where not even that fits, it streams
+    plan = importer.make_plan(FLUX1, ram_gb=14)
     assert plan["fits"] and plan["streamed"] and plan["quant"]["transformer"] == "none"
 
 
@@ -20,7 +24,7 @@ def test_a_gguf_file_too_large_for_16_gb_fits_streamed_and_nothing_streams_when_
     plan = importer.make_plan(gguf, ram_gb=16)
     assert plan["fits"] and plan["streamed"] and plan["quant"]["transformer"] == "none"
     monkeypatch.setenv("VK_SSD_STREAMING", "off")
-    assert not importer.make_plan(FLUX1, ram_gb=16)["fits"]
+    assert not importer.make_plan(FLUX1, ram_gb=14)["fits"]
     assert not importer.make_plan(gguf, ram_gb=16)["fits"]
 
 
@@ -38,9 +42,10 @@ def test_a_civitai_16_bit_file_that_does_not_fit_is_streamed(monkeypatch):
     spec = registry.ARCHS["flux1_dev"]
     info = {"arch": "flux1_dev", "components": spec["fallback_params"], "denoiser": spec["denoiser"],
             "layout": "single_denoiser", "denoiser_fixed_gb": None}
-    plan = importer.make_plan(info, ram_gb=16)
+    plan = importer.make_plan(info, ram_gb=14)
     assert plan["fits"] and plan.get("streamed")
-    assert importer.make_plan(dict(info, denoiser_fixed_gb=11.8), ram_gb=16).get("streamed")  # its GGUF file too
+    assert importer.make_plan(info, ram_gb=16)["quant"]["transformer"] == "q4"  # 16 GB: kept in 4 bit instead
+    assert importer.make_plan(dict(info, denoiser_fixed_gb=11.8), ram_gb=16).get("streamed")  # its GGUF file streams
 
 
 
@@ -52,7 +57,7 @@ def test_a_streamed_model_keeps_what_the_memory_plan_allows():
     resident = memory.stream_resident_share("flux")
     for ram, low, high in ((16, 0.05, 0.35), (24, 0.3, 0.8)):
         streamed = dict(comps, transformer=comps["transformer"] * resident)
-        plan = memory.plan(streamed, "transformer", "flux", ram)
+        plan = memory.plan(streamed, "transformer", "flux", ram, full_precision_margin_gb=0)  # as the engine
         keep, kept_plan, release = engine.keep_plan(comps, "transformer", "flux", ram, plan)
         assert low <= keep <= high, (ram, keep)
         assert kept_plan["fits"] and kept_plan["quant"]["transformer"] == "none"

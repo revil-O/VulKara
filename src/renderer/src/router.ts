@@ -8,7 +8,7 @@ import type { PlainKey } from './i18n'
 import {
   Aperture, Boxes, Clapperboard, Cpu, Eraser, FileClock, Lightbulb, Frame, GraduationCap, Heart, History, House, Images, Info, Layers, Maximize2,
   PersonStanding, Scale, ScrollText, Settings, Sparkles, Type, WandSparkles,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 
 export interface PageEntry {
   path: string
@@ -73,6 +73,7 @@ const routes: RouteRecordRaw[] = [
   ...pages,
   { path: '/viewer', component: () => import('./pages/ViewerPage.vue'), meta: { bare: true } },
   { path: '/splash', component: () => import('./pages/SplashPage.vue'), meta: { bare: true } },
+  { path: '/monitor', component: () => import('./pages/MonitorPage.vue'), meta: { bare: true } },
 ]
 
 export const router = createRouter({ history: createWebHashHistory(), routes })
@@ -80,6 +81,6 @@ export const router = createRouter({ history: createWebHashHistory(), routes })
 // a browser (the remote web UI) may not open a page that stays on the Mac: send it to the start page
 const remotePaths = new Set(SHOWN.filter((p) => p.remote).map((p) => p.path))
 router.beforeEach((to) => {
-  if (isRemote() && to.meta.title !== undefined && !remotePaths.has(to.path)) return '/'
+  if (isRemote() && ((to.meta.title !== undefined && !remotePaths.has(to.path)) || to.path === '/monitor')) return '/'
   return true
 })

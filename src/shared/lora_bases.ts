@@ -68,8 +68,8 @@ export const BASE_GROUPS: { label: string; bases: LoraBase[] }[] = [...new Set(L
 
 // the app's architectures (engines/diffusers/registry.py) and the base their LoRAs are made for
 const BY_ARCH: Record<string, string> = {
-  sd15: 'sd15', sd15_inpaint: 'sd15', sd21: 'sd2', sd21_base: 'sd2', sdxl: 'sdxl', sd35_medium: 'sd35_medium',
-  sd35_large: 'sd35_large', flux1_dev: 'flux1_dev', flux1_schnell: 'flux1_schnell', chroma: 'chroma', flux2_dev: 'flux2_dev',
+  sd15: 'sd15', sd15_inpaint: 'sd15', sd21: 'sd2', sd21_base: 'sd2', sdxl: 'sdxl', sdxl_inpaint: 'sdxl', sd35_medium: 'sd35_medium',
+  sd35_large: 'sd35_large', flux1_dev: 'flux1_dev', flux1_fill: 'flux1_dev', flux1_schnell: 'flux1_schnell', chroma: 'chroma', flux2_dev: 'flux2_dev',
   flux2_klein: 'flux2_klein4', flux3_klein: 'flux3_klein', qwen_image: 'qwen_image', qwen_image21: 'qwen_image21', krea2: 'krea2', anima: 'anima', lumina2: 'lumina2', ernie_image: 'ernie_image', auraflow: 'auraflow', auraflow_diffusers: 'auraflow',
   ideogram4: 'ideogram4', wan22_ti2v: 'wan22_5b', wan22_i2v_14b: 'wan22_14b', z_image: 'z_image_turbo',
 }

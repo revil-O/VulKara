@@ -31,7 +31,7 @@ import { cachedLicence, fetchLicence, setOrigin } from './licence_info'
 import { cachedInfo, fetchInfo } from './lora_info'
 import { loraDetails, setCategory, setTriggerWords } from './loras'
 import { previewPicture, searchLoras, type FetchLike } from './lora_search'
-import { detectPose, findFaces } from './pose'
+import { captionImage, detectPose, findFaces } from './pose'
 import { Trainer, folderImages } from './training'
 import { JobQueue } from './queue'
 import { runTool } from './tool_process'
@@ -40,8 +40,10 @@ import { AUTO_INTERVAL, UpdateChecker } from './runtime_updates'
 import { AppUpdater } from './app_update'
 import { getToken, hasToken, setToken, type TokenService } from './secrets'
 import { closeViewers, isViewer, openViewer, viewerPayload } from './viewer'
+import { isMonitor, monitorContents } from './monitor_window'
 import { confirmSplash, isSplash, splashState } from './splash'
 import { engineLine, mainLanguage, t } from './i18n'
+import { MAX_REFERENCES } from '@shared/engine_job'
 import { engineEnv, getSettings, helpersDir, historyDir, imagesDir, isValidSetting, modelsDir, settableByPage, lorasDir, onSettingChanged, setSetting } from './settings'
 import type { LoraSearchRequest } from '@shared/lora_bases'
 import type { ImportJob, ImportRequest, QueueSnapshot, TrainingRequest, ViewerAction, ViewerItem } from '@shared/api'
@@ -53,8 +55,12 @@ let win: BrowserWindow | undefined
 /** where the pose editor's skeletons go (files:writePose): pictures that show no person */
 const posesDir = (): string => join(dataDir(), 'inputs', 'poses')
 
+// what the monitor window hears besides the language
+const MONITOR_EVENTS = new Set(['system:stats', 'queue:change'])
+
 function send(channel: string, ...args: unknown[]): void {
   if (win && !win.isDestroyed()) win.webContents.send(channel, ...args)
+  if (MONITOR_EVENTS.has(channel)) monitorContents()?.send(channel, ...args)
   if (REMOTE_EVENTS.has(channel)) for (const fn of remoteListeners) fn(channel, args)
 }
 
@@ -172,12 +178,22 @@ export const fileAccess = new FileAccess(
 )
 
 // CPU, memory and the streaming caches for the status bar and the Hardware page
+let measuring = false
 const monitor = new SystemMonitor({
   modelsDir, streamCacheDir: () => getSettings().streamCacheDir,
   send: (stats) => {
     send('system:stats', stats)
-    if (benchmarks.running) void treeFootprintGb(process.pid).then((gb) => benchmarks.sample(stats, gb || undefined))
-    else benchmarks.sample(stats)
+    // the footprint with what the GPU holds (appGb, the resident size, leaves an MLX engine's weights out); `top` costs
+    // about half a second of CPU: only while a benchmark runs or the monitor window watches a running job
+    const watched = !!monitorContents() && queue.snapshot().some((j) => j.state === 'running')
+    if (!benchmarks.running) benchmarks.sample(stats)
+    if ((benchmarks.running || watched) && !measuring) {
+      measuring = true  // a busy Mac can take longer than the 2 s for `top`: one at a time
+      void treeFootprintGb(process.pid).then((gb) => {
+        if (benchmarks.running) benchmarks.sample(stats, gb || undefined)
+        if (watched && gb) monitorContents()?.send('monitor:footprint', gb)
+      }).finally(() => { measuring = false })
+    }
   },
 })
 onSettingChanged((key) => { if (key === 'modelsDir' || key === 'streamCacheDir') monitor.refreshStorage() })
@@ -345,6 +361,8 @@ function scheduleUpdateChecks(): void {
 // every window asks for the app's language (i18n:lang) before it shows its page
 const VIEWER_CHANNELS = new Set(['viewer:payload', 'viewer:act', 'files:saveAs', 'files:reveal', 'files:share', 'files:copyImage', 'i18n:lang'])
 const SPLASH_CHANNELS = new Set(['splash:state', 'splash:confirm', 'app:info', 'i18n:lang'])
+// the monitor window only reads: the stats, the Mac, the queue
+const MONITOR_CHANNELS = new Set(['system:stats', 'system:hardware', 'queue:snapshot', 'i18n:lang'])
 
 type Handler = (...args: never[]) => unknown
 /** A handler that wants to know which window asked. */
@@ -356,7 +374,8 @@ function handleFrom(channel: string, fn: SenderHandler): void {
     const fromMain = !!win && event.sender === win.webContents
     const fromViewer = VIEWER_CHANNELS.has(channel) && isViewer(event.sender)
     const fromSplash = SPLASH_CHANNELS.has(channel) && isSplash(event.sender)
-    if (!(fromMain || fromViewer || fromSplash) || event.senderFrame !== event.sender.mainFrame) throw new Error('not allowed')
+    const fromMonitor = MONITOR_CHANNELS.has(channel) && isMonitor(event.sender)
+    if (!(fromMain || fromViewer || fromSplash || fromMonitor) || event.senderFrame !== event.sender.mainFrame) throw new Error('not allowed')
     return (fn as (e: IpcMainInvokeEvent, ...a: unknown[]) => unknown)(event, ...args)
   })
 }
@@ -446,10 +465,13 @@ export function registerIpc(): void {
   })
   scheduleUpdateChecks()
 
+  let captioning: { proc?: ChildProcess; stopped: boolean } | undefined
   const addJob = (job: Omit<Job, 'id'>, count?: number): string[] => {
     if (trainer.running) throw new Error(t('main.queue.training'))
     if (installing.size) throw new Error(t('main.queue.installing'))
     if (exporting) throw new Error(t('main.queue.exporting'))
+    // the picture model would load beside Qwen3-VL (5.3 GB): a 16 GB Mac swaps
+    if (captioning) throw new Error(t('main.queue.captioning'))
     if (!job || typeof job !== 'object' || typeof job.modelDir !== 'string' || (job.prompt !== undefined && typeof job.prompt !== 'string'))
       throw new Error(t('main.queue.incomplete'))
     // without the content filter no result could be shown: the job does not start
@@ -463,6 +485,18 @@ export function registerIpc(): void {
     const clean = job.inputImage ? unlabelledOf(job.inputImage) : undefined
     if (clean && fileAccess.allows(clean)) job = { ...job, inputImage: clean }
     fileAccess.check(job.maskImage, 'mask')
+    if (job.referenceImages !== undefined) {
+      const refs: unknown = job.referenceImages
+      if (!Array.isArray(refs) || refs.length > MAX_REFERENCES || refs.some((f) => typeof f !== 'string' || !f))
+        throw new Error(t('main.queue.incomplete'))
+      for (const f of refs) fileAccess.check(f)
+      // labelled results used again: their pictures without the label, as the input picture above
+      const unlabelled = (f: string): string => {
+        const c = unlabelledOf(f)
+        return c && fileAccess.allows(c) ? c : f
+      }
+      job = { ...job, referenceImages: (refs as string[]).map(unlabelled) }
+    }
     fileAccess.check(job.controlnet?.image, 'control')
     fileAccess.check(job.photoTool?.mask, 'selection')
     return queue.add(job, count)
@@ -472,9 +506,15 @@ export function registerIpc(): void {
     if (appUpdater?.status().stage === 'restarting') throw new Error(t('main.appUpdate.restarting'))
     return addJob(job, count)
   })
-  handle('benchmark:start', (job: Omit<Job, 'id'>, count: number, model: string) => {
+  handle('benchmark:start', (job: Omit<Job, 'id'>, count: number, model: string, freshPrompt?: boolean) => {
     const run = { ...job, page: 'benchmark' }
-    const ids = addJob(run, count)
+    // the engines keep the encodings of the last prompt: a number unique to this picture makes each one encode its prompt
+    const n = Math.max(1, Math.min(100, Math.floor(Number(count) || 1)))
+    // a number put into the prompt and the seeds counted up here: both must be what they claim
+    if (freshPrompt === true && (typeof run.prompt !== 'string' || !Number.isInteger(run.seed))) throw new Error(t('main.queue.incomplete'))
+    const ids = freshPrompt === true
+      ? Array.from({ length: n }, (_, i) => addJob({ ...run, prompt: `${run.prompt}, ${Date.now() + i}`, seed: run.seed + i }, 1)[0])
+      : addJob(run, count)
     benchmarks.track(ids, run, String(model ?? '').slice(0, 200), Date.now())
     return ids
   })
@@ -872,6 +912,31 @@ export function registerIpc(): void {
     return detectPose(engineCommand('diffusers', ['detect_pose', path]), engineEnv(), (stage, percent) => send('pose:progress', stage, percent))
   })
 
+  handle('caption:image', async (path: string) => {
+    if (typeof path !== 'string' || !isAbsolute(path) || !/\.(png|jpe?g|webp|bmp|tiff?|heic)$/i.test(path) || !existsSync(path)) throw new Error(t('main.files.choosePicture'))
+    fileAccess.check(path)
+    if (busy() || captioning) throw new Error(t('main.caption.busy'))
+    // an install or an export holds the disk and the runtime the caption needs
+    if (installing.size) throw new Error(t('main.queue.installing'))
+    if (exporting) throw new Error(t('main.queue.exporting'))
+    const run: { proc?: ChildProcess; stopped: boolean } = { stopped: false }
+    captioning = run
+    unloadEngines()  // Qwen3-VL takes about 5 GB; next to a loaded picture model a 16 GB Mac would swap (MEASUREMENTS 7br)
+    try {
+      return await captionImage(engineCommand('diffusers', ['caption_image', path]), engineEnv(), (stage, percent) => send('caption:progress', stage, percent), (proc) => { run.proc = proc; if (run.stopped) proc.kill() })
+    } catch (e) {
+      if (run.stopped) return { text: '' }
+      throw e
+    } finally {
+      captioning = undefined
+    }
+  })
+  handle('caption:stop', () => {
+    if (!captioning) return
+    captioning.stopped = true
+    captioning.proc?.kill()
+  })
+
   handle('restore:faces', (path: string) => {
     if (typeof path !== 'string' || !isAbsolute(path) || !/\.(png|jpe?g|webp|bmp|tiff?|heic)$/i.test(path) || !existsSync(path)) throw new Error(t('main.files.choosePicture'))
     fileAccess.check(path)
@@ -920,10 +985,27 @@ export function registerIpc(): void {
   onLog((line) => send('app:log', line))
 }
 
+/** The main window on a page (app menu, menu bar): the page goes there itself (App.vue). */
+export function navigate(route: string): void {
+  if (win && !win.isDestroyed()) win.webContents.send('nav:go', route)
+}
+
+/** What runs now, for the menu bar menu: the running job's model and progress, and how many wait. */
+export function queueStatus(): { running?: { model: string; progress: number; eta?: number }; waiting: number } {
+  const jobs = queue.snapshot()
+  const run = jobs.find((j) => j.state === 'running')
+  const model = run ? (run.job.modelDir.replace(/\/+$/, '').split('/').pop() ?? '') : ''
+  return { ...(run ? { running: { model, progress: run.progress, eta: run.eta } } : {}), waiting: jobs.filter((j) => j.state === 'waiting').length }
+}
+
 export function bindWindow(w: BrowserWindow): void {
   win = w
   // the viewer windows belong to the main window: back in it, they close
-  w.on('closed', closeViewers)
+  w.on('closed', () => {
+    // a closed window throws at every touch ("Object has been destroyed"): VulKara runs on without one (menu bar)
+    if (win === w) win = undefined
+    closeViewers()
+  })
   w.on('focus', closeViewers)
 }
 

@@ -4,7 +4,7 @@
 // the settings that keep the Mac responsive (the guard rails), each with a way to Settings.
 import { computed, onActivated, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Check, Copy } from 'lucide-vue-next'
+import { Check, Copy } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import HintBadge from '../components/HintBadge.vue'
 import LevelMeter from '../components/LevelMeter.vue'

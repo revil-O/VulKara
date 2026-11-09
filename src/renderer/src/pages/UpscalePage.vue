@@ -4,7 +4,7 @@
 // the ComfyUI runtime does it with Real-ESRGAN, which is downloaded on first use.
 import { computed, onActivated, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Maximize2 } from 'lucide-vue-next'
+import { Maximize2 } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import ImageInput from '../components/ImageInput.vue'
 import FactorPicker from '../components/FactorPicker.vue'

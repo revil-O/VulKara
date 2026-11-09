@@ -4,7 +4,7 @@
 // favourites on request; one click takes a picture. "From disk" opens the file dialog instead.
 import { jobLabel } from '../util/labels'
 import { computed, nextTick, ref, watch } from 'vue'
-import { FolderOpen, Heart, Search, X } from 'lucide-vue-next'
+import { FolderOpen, Heart, Search, X } from '@lucide/vue'
 import { finishPick, picker } from '../util/pick_image'
 import type { HistoryEntry } from '@shared/types'
 import { t } from '../i18n'

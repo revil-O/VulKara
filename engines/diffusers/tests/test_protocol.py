@@ -2,6 +2,8 @@
 # Copyright (C) 2026 Oliver Schmidt
 import io
 import json
+import threading
+import time
 
 import protocol
 
@@ -31,6 +33,41 @@ def test_a_stop_sent_before_the_job_starts_is_kept():
     assert r.next_command() == ("generate", {"n": 1})
     assert r.next_command() is None  # everything read: the stop came in before the job "started"
     assert r.stop_requested()
+
+
+class Stopped(Exception):
+    pass
+
+
+def test_a_stop_breaks_off_a_load_at_once_and_only_there():
+    send = threading.Event()
+
+    def lines():  # stdin: a stop once the test asks for it
+        send.wait()
+        yield '{"op": "stop"}\n'
+    r = protocol.CommandReader(lines()).start()
+    t0 = time.time()
+    try:
+        with r.interruptible(Stopped):
+            send.set()
+            while time.time() - t0 < 5:  # "loading": the stop lands between two of these instructions
+                time.sleep(0.01)
+        assert False, "the stop did not break off the load"
+    except Stopped:
+        pass
+    assert r.interrupt is None and r.stop_requested()
+    r.stop_event.clear()
+    r.closed.wait(2)
+    time.sleep(0.05)  # a stop after the load only sets the event
+    r2 = protocol.CommandReader(io.StringIO('{"op": "stop"}\n')).start()
+    r2.closed.wait(2)
+    time.sleep(0.05)
+    assert r2.stop_requested()
+    try:
+        with r2.interruptible(Stopped):  # a stop already there ends the load before it starts
+            assert False
+    except Stopped:
+        pass
 
 
 def test_events_are_prefixed_json(capsys):

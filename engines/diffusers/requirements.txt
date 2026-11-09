@@ -11,7 +11,7 @@ optimum-quanto==0.2.7
 sentencepiece==0.2.2
 protobuf==7.36.2
 psutil==7.2.2
-pillow==12.3.0  # Pillow 13.0.0's PIL._typing breaks on Python 3.11 (from numbers import _IntegralLike)
+pillow==13.0.0  # 13.0.0 fixes the security advisories of 12.3 (none backported); the old _IntegralLike break was mflux 0.23
 numpy==2.4.6
 ninja==1.13.2  # optimum-quanto builds its kernels at first use
 peft==0.21.2  # LoRA adapters

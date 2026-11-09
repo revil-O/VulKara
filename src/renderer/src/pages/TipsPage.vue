@@ -3,7 +3,7 @@
 // Tips & tricks: prompt help and guidelines, by topic and by model family; the family of the model chosen on the Text
 // page comes first.
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
-import { Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Search, X } from 'lucide-vue-next'
+import { Check, ChevronLeft, ChevronRight, Copy, ExternalLink, Search, X } from '@lucide/vue'
 import HintBadge from '../components/HintBadge.vue'
 import PageFrame from '../components/PageFrame.vue'
 import { useAssetsStore } from '../stores/assets'

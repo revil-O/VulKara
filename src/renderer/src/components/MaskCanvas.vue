@@ -5,7 +5,7 @@
 // elsewhere (an object selected on the Enhance page) can be the start; the strokes add to it or erase from it.
 import { computed, ref, watch } from 'vue'
 import ZoomPan from './ZoomPan.vue'
-import { Brush, Eraser, RotateCcw, Trash2 } from 'lucide-vue-next'
+import { Brush, Eraser, RotateCcw, Trash2 } from '@lucide/vue'
 import { t } from '../i18n'
 
 interface Stroke {
@@ -190,7 +190,8 @@ defineExpose({ exportMask, clear, visible })
   <div class="mask">
     <ZoomPan ref="zoom">
       <div class="surface" @pointerleave="cursor = undefined">
-        <img :src="src" draggable="false" @load="onLoad" />
+        <!-- crossorigin: the pages read the picture's pixels (Restore tells a black-and-white photo); vk-file sends CORS -->
+        <img :src="src" crossorigin="anonymous" draggable="false" @load="onLoad" />
         <canvas ref="canvas" @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="up" />
         <i v-if="cursor" class="cursor" :style="{ left: cursor.x + 'px', top: cursor.y + 'px', width: cursor.d + 'px', height: cursor.d + 'px' }" />
         <!-- marks over the photo that zoom with it (Restore: the faces) -->

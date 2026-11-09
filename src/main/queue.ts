@@ -23,7 +23,7 @@ export interface QueueDeps<E = string> {
   now(): number
   changed(): void
   /** a job ended with results (after the content filter), with how long it ran */
-  finished?(job: Job, results: string[], timing: { seconds?: number; secondsPerStep?: number }): void
+  finished?(job: Job, results: string[], timing: { seconds?: number; secondsPerStep?: number; loadSeconds?: number }): void
   /** a result the content filter did not pass (or could not check) is removed from the disk */
   discard?(path: string): void
   /** whether an input picture is VulKara's own making with no real photo behind it (a pose editor skeleton): no
@@ -51,6 +51,17 @@ export class ConsentRequired extends Error {
   }
 }
 
+/**
+ * What a job spent before its first step (engine start, loading the model, encoding the prompt): the first progress
+ * value comes after some steps, so the steps it stands for are taken back at the measured pace. Undefined without a pace.
+ */
+export function loadTime(e: { startedAt?: number; progressStart?: [number, number]; secondsPerStep?: number; job: { steps?: number } }): number | undefined {
+  if (e.startedAt === undefined || !e.progressStart || !e.secondsPerStep || !e.job.steps) return undefined
+  const [t0, v0] = e.progressStart
+  const stepsStart = t0 - (v0 / 100) * e.job.steps * e.secondsPerStep * 1000
+  return Math.max(0, Math.round((stepsStart - e.startedAt) / 100) / 10)
+}
+
 export class JobQueue<E = string> {
   private entries: Entry<E>[] = []
   private running?: Entry<E>
@@ -65,7 +76,7 @@ export class JobQueue<E = string> {
     if (refused) throw new Error(refused)
     // a picture of a person reaches the model as input, as pose or depth guide, or to be restored; a skeleton of the
     // pose editor shows no person
-    const pictures = [job.inputImage, job.controlnet?.image].filter((f): f is string => typeof f === 'string' && !!f)
+    const pictures = [job.inputImage, ...(job.referenceImages ?? []), job.controlnet?.image].filter((f): f is string => typeof f === 'string' && !!f)
     const fromPicture = !!job.restore || pictures.some((f) => !this.deps.generated?.(f))
     if (fromPicture && isSexualPrompt(text) && job.consent !== true) throw new ConsentRequired()
     const n = Math.max(1, Math.min(100, Math.floor(Number(count) || 1)))
@@ -108,7 +119,7 @@ export class JobQueue<E = string> {
 
   snapshot(): QueuedJob[] {
     return this.entries.map((e) => ({
-      job: e.job, state: e.state, progress: e.progress, status: e.status, eta: e.eta, secondsPerStep: e.secondsPerStep, precision: e.precision, waited: e.waited, footprint: e.footprint,
+      job: e.job, state: e.state, progress: e.progress, status: e.status, eta: e.eta, secondsPerStep: e.secondsPerStep, precision: e.precision, waited: e.waited, footprint: e.footprint, planGb: e.planGb,
       results: [...e.results], error: e.error, addedAt: e.addedAt, startedAt: e.startedAt, finishedAt: e.finishedAt,
     }))
   }
@@ -146,6 +157,9 @@ export class JobQueue<E = string> {
         break
       case 'precision':
         entry.precision = event.message
+        break
+      case 'planned':
+        entry.planGb = event.gb
         break
       case 'footprint':
         entry.footprint = { peakGb: event.peak_gb, readGb: event.read_gb, ...(event.plan_gb ? { planGb: event.plan_gb } : {}) }
@@ -227,7 +241,8 @@ export class JobQueue<E = string> {
     }
     try {
       const seconds = entry.startedAt !== undefined ? Math.round((entry.finishedAt - entry.startedAt) / 100) / 10 : undefined
-      if (entry.results.length) this.deps.finished?.(entry.job, [...entry.results], { seconds, secondsPerStep: entry.secondsPerStep })
+      const loadSeconds = loadTime(entry)
+      if (entry.results.length) this.deps.finished?.(entry.job, [...entry.results], { seconds, secondsPerStep: entry.secondsPerStep, ...(loadSeconds !== undefined ? { loadSeconds } : {}) })
     } catch (err) {
       // the history could not be written (disk full, folder gone): the queue goes on
       this.deps.log?.(`[queue] the finished job could not be saved: ${(err as Error).message}`)

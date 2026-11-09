@@ -65,3 +65,30 @@ def test_an_anima_lora_in_kohya_names_is_not_taken_for_sdxl(tmp_path):
              "lora_unet_blocks_0_self_attn_q_proj.lora_down.weight", "lora_unet_blocks_0_self_attn_q_proj.lora_up.weight"]
     assert registry.inspect_lora(_lora(tmp_path, names))["family"] == "anima"
 
+
+
+def test_krea2_decodes_in_smaller_tiles_on_small_macs(monkeypatch):
+    # its Qwen VAE in 512 px tiles added 6.6 GB on a 16 GB Mac mini, in 256 px tiles 3.6 GB (MEASUREMENTS 7bd)
+    import importlib.util
+    import os
+    import sys
+    import types
+    seen = []
+
+    class TilingConfig:
+        def __init__(self, **k):
+            seen.append(k)
+
+        @staticmethod
+        def may_tile_implicitly(model):
+            return True
+
+    for name in ("mflux", "mflux.models", "mflux.models.common", "mflux.models.common.vae"):
+        monkeypatch.setitem(sys.modules, name, types.ModuleType(name))
+    monkeypatch.setitem(sys.modules, "mflux.models.common.vae.tiling_config", types.SimpleNamespace(TilingConfig=TilingConfig))
+    spec = importlib.util.spec_from_file_location("mlx_main", os.path.join(os.path.dirname(__file__), "..", "..", "mlx", "main.py"))
+    mlx_main = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mlx_main)
+    mlx_main.low_ram(types.SimpleNamespace(tiling_config=None), "krea2")
+    mlx_main.low_ram(types.SimpleNamespace(tiling_config=None), "z_image")
+    assert seen == [{"vae_decode_tile_size": 256}, {}]

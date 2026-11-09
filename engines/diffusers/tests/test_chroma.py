@@ -110,8 +110,8 @@ def test_a_single_file_is_completed_from_chroma1_hd(tmp_path, monkeypatch, hub):
     assert BASE_BYTES < info["download_bytes"] < BASE_BYTES + 1_000_000
     plan = importer.make_plan(info, ram_gb=24)
     assert plan["fits"] and plan["quant"] == {"transformer": "q8", "text_encoder": "q8"} and not plan.get("streamed")
-    # small Macs stream the 16 bit transformer from the SSD
-    assert importer.make_plan(info, ram_gb=16).get("streamed")
+    # 16 GB: the transformer in 4 bit in memory (before streaming 16 bit from the SSD, MEASUREMENTS 7be)
+    assert importer.make_plan(info, ram_gb=16)["quant"]["transformer"] == "q4" and not importer.make_plan(info, ram_gb=16).get("streamed")
     flash = tmp_path / "Chroma1-HD-Flash.safetensors"
     flash.write_bytes(b"x")
     assert importer.inspect("file", str(flash))["base_repo"] == "lodestones/Chroma1-Flash"
@@ -166,6 +166,20 @@ def test_staged_encoding_with_masks_and_real_guidance():
     lm.spec, lm.device = spec, "cpu"
     out = lm.encode("a lighthouse", "blurry", 4.0)
     assert out["prompt_attention_mask"].dtype == torch.float16 and out["negative_prompt_embeds"].dtype == torch.float16
+
+
+def test_the_pipelines_hand_the_transformer_a_boolean_mask():
+    """diffusers 0.41 makes a 0/1 float mask, which scaled_dot_product_attention adds instead of applying (issue
+    12116); the helper that extends it over the image tokens returns booleans once a Chroma model loads."""
+    import diffusers
+    engine._chroma_bool_masks()
+    engine._chroma_bool_masks()  # idempotent
+    for name in ("ChromaPipeline", "ChromaImg2ImgPipeline", "ChromaInpaintPipeline"):
+        cls = getattr(diffusers, name)
+        m = cls._prepare_attention_mask(object(), batch_size=1, sequence_length=2, dtype=torch.float16,
+                                        attention_mask=torch.tensor([[1.0, 1.0, 0.0]], dtype=torch.float16))
+        assert m.dtype == torch.bool and m.tolist() == [[True, True, False, True, True]]
+        assert cls._prepare_attention_mask(object(), 1, 2, torch.float16, None) is None
 
 
 # ------------------------------------------------------------ LoRAs

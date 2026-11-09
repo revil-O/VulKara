@@ -88,6 +88,7 @@ export default {
     training: 'A LoRA is being trained: generate when the training is finished or stopped.',
     installing: 'A runtime is being installed: generate when it is finished.',
     exporting: 'A model is being exported: generate when it is finished.',
+    captioning: 'A prompt is being written from a picture: generate when it is finished or stopped.',
     incomplete: 'This job is incomplete.',
     needsFilter: 'The content filter needs the Diffusers runtime: install it in Settings → Runtimes.',
     notPassed: 'The content filter did not pass the result.',
@@ -197,6 +198,10 @@ export default {
   pose: {
     needsDiffusers: 'Poses are detected with the Diffusers runtime: install it in Settings → Runtimes',
     facesNeedDiffusers: 'Faces are found with the Diffusers runtime: install it in Settings → Runtimes',
+  },
+  caption: {
+    needsDiffusers: 'A prompt is written from a picture with the Diffusers runtime: install it in Settings → Runtimes',
+    busy: 'A job is running: a prompt can be written from the picture when the queue is empty.',
   },
   logs: {
     noLogFile: 'There is no log file in this session.',

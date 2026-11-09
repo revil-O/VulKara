@@ -18,7 +18,7 @@ def test_24gb_mac_runs_flux2_klein_9b_without_streaming():
 
 def test_more_ram_means_less_quantization():
     assert row(16, "sdxl")["diffusers"]["mode"] == "model 16 bit"
-    assert row(16, "flux1")["diffusers"].get("streamed")  # only as the SSD emergency mode
+    assert row(16, "flux1")["diffusers"]["mode"].startswith("model 4 bit")  # kept in memory, not streamed (7be)
     assert row(32, "flux1")["mlx"]["mode"] == "model 8 bit"
     assert row(64, "flux1")["mlx"]["mode"] == "model 16 bit"
     assert row(24, "krea2")["mlx"]["mode"] == "model 4 bit"  # text encoder quantized too

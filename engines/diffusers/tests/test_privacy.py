@@ -119,8 +119,8 @@ def test_the_helper_catalog_matches_what_the_engines_download():
     with open(pinned.PINS_FILE) as f:
         all_pins = json.load(f)
     for h in cat:
-        assert h["kind"] in ("content", "lama", "ddcolor", "preprocess", "controlnet", "upscaler", "faces", "pup"), h["id"]
-        if h["kind"] in ("preprocess", "controlnet", "upscaler", "pup"):
+        assert h["kind"] in ("content", "lama", "ddcolor", "preprocess", "controlnet", "upscaler", "faces", "pup", "lora"), h["id"]
+        if h["kind"] in ("preprocess", "controlnet", "upscaler", "pup", "lora"):
             assert h["repo"] in all_pins, h["id"]
         if h["kind"] == "faces":  # GitHub releases: every file with an https URL and its SHA-256
             import restore

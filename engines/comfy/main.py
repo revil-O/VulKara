@@ -9,6 +9,7 @@ over its websocket. Model files stay where they are: they are linked into ComfyU
 under unique names.
 """
 import asyncio
+import hashlib
 import json
 import os
 import random
@@ -27,6 +28,7 @@ from pathlib import Path
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "diffusers"))
 
+import masks  # noqa: E402
 import memory  # noqa: E402
 import protocol  # noqa: E402
 import paths  # noqa: E402
@@ -57,6 +59,27 @@ def _free_port():
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
+
+
+def _fibo2_lora(file, name):
+    """A Fibo 2.0 LoRA in diffusers' layout fused once for ComfyUI's repacked files (lora_convert.fibo2_to_comfy), into
+    a cached copy; one in ComfyUI's layout as it is."""
+    import lora_convert
+    import registry
+    keys = list(registry.read_safetensors_header(file))
+    if not lora_convert.fibo2_needs_comfy(keys):
+        return file
+    st = os.stat(file)
+    tag = hashlib.sha1(("%s|%d|%d" % (os.path.abspath(file), st.st_size, int(st.st_mtime))).encode()).hexdigest()[:16]
+    folder = WORK / "models" / "loras" / "fused"
+    out = folder / ("fibo2_%s.safetensors" % tag)
+    if not out.is_file():
+        from safetensors.torch import load_file, save_file
+        folder.mkdir(parents=True, exist_ok=True)
+        save_file(lora_convert.fibo2_to_comfy(load_file(file)), str(out) + ".tmp")
+        os.replace(str(out) + ".tmp", out)
+        protocol.log("[comfyui] LoRA %s fused for ComfyUI's Fibo 2.0 files" % name)
+    return str(out)
 
 
 def _link(src, folder, name):
@@ -149,10 +172,13 @@ def memory_mode(m, files, ram_gb):
 
 def shared_plan(m, ram_gb):
     """The memory plan of a model held whole in memory (SHARED), its text encoder loaded only while encoding (not
-    measured for video: Wan 2.2 14B has two experts the plan counts as one, so it keeps the text encoder counted)."""
+    measured for video: Wan 2.2 14B has two experts the plan counts as one, so it keeps the text encoder counted).
+    Short of memory ComfyUI encodes before it loads the model and drops both after the picture (--cache-ram), so the
+    text encoder and the model are not in memory together (MEASUREMENTS 7ae, 7ag)."""
     spec = registry.ARCHS[m["arch"]]
+    image = spec.get("kind") != "video"
     return memory.plan(m.get("components") or spec["fallback_params"], spec["denoiser"], spec["family"], ram_gb,
-                       quant="none", allow_staging=spec.get("kind") != "video")
+                       quant="none", allow_staging=image, staging_frees_denoiser=image)
 
 
 class ComfyServer:
@@ -315,6 +341,8 @@ class ComfyEngine:
             file = os.path.normpath(os.path.join(folder, lm["file"]))
             if os.path.dirname(file) != folder:
                 raise ValueError("The LoRA %s names a file outside its folder" % lm.get("name", "?"))
+            if lm.get("family") == "fibo2":
+                file = _fibo2_lora(file, lm["name"])
             name = _link(file, "loras", _safe(lm["name"]) + ".safetensors")
             out.append((name, float(e.get("scale", 1.0))))
             words += lm.get("trigger_words") or []
@@ -414,11 +442,39 @@ class ComfyEngine:
                 else int(defaults.get("num_frames", 49))
         elif d.get("input_image"):
             job["strength"] = float(d.get("strength", 0.6))  # how much of the picture changes
-        # a video's start picture is used as it is, a picture to change is scaled to the size
-        input_name = _copy_input(d["input_image"]) if d.get("input_image") else None
+        original, mask = None, None
+        if d.get("mask_image"):
+            if not spec.get("inpaint") or not d.get("input_image"):
+                raise ValueError("%s can not paint into a mask" % spec["label"])
+            import colour
+            from PIL import Image
+            # Fibo 2.0 repaints what it sees grey, a strip along the mask's edge included, so old and new blend
+            original = colour.open_rgb(d["input_image"])
+            painted_part = Image.open(d["mask_image"]).convert("L").resize(original.size)
+            mask = masks.grow_mask(painted_part, 48)
+            input_name = "pf_input_%s.png" % uuid.uuid4().hex[:8]
+            masks.grey_out(original, mask).save(WORK / "input" / input_name)
+        else:
+            # a video's start picture is used as it is, a picture to change is scaled to the size
+            input_name = _copy_input(d["input_image"]) if d.get("input_image") else None
+        # further pictures Fibo 2.0 edits with the input picture (not with a mask: that is for one picture)
+        references = [_copy_input(r) for r in d.get("reference_images") or []] if input_name and mask is None else []
+        if comfy.get("encode") == "fibo2" and d.get("input_image") and not d.get("exact_size"):
+            # the picture's proportions at the model's pixel count: Fibo 2.0 lines its edit up with the picture
+            from PIL import Image
+            with Image.open(d["input_image"]) as im:
+                w, h = im.size
+            k = (defaults.get("width", 1024) * defaults.get("height", 1024) / float(w * h)) ** 0.5
+            job["width"], job["height"] = (max(multiple, round(v * k / multiple) * multiple) for v in (w, h))
         # what the benchmark shows beside the engine's peak; a streamed model or a video has no plan of its own
-        protocol.planned(memory.peak_at(shared_plan(m, memory.total_ram_gb()), job["width"], job["height"])
-                         if mode == "SHARED" and not video else None)
+        plan = shared_plan(m, memory.total_ram_gb()) if mode == "SHARED" and not video else None
+        need = memory.peak_at(plan, job["width"], job["height"],
+                              len(references) * registry.ARCHS[m["arch"]].get("reference_gb", 0)) if plan else None
+        protocol.planned(need)
+        # what ComfyUI holds already (the last job's model) is free for this one
+        short = need and memory.short_of(need, protocol.footprint_gb(self.server.proc.pid) if self.server.proc else 0)
+        if short:
+            protocol.note(short)
 
         saved = []
         try:
@@ -426,11 +482,22 @@ class ComfyEngine:
                 self._state("Generating")
                 t0 = time.time()
                 build = workflows.build_video if video else workflows.build
-                graph = build(dict(job, seed=seed + i), files, comfy, loras, input_image=input_name)
+                # the plan counts the text encoder freed before the model loads; ComfyUI alone keeps it while more
+                # than --cache-ram is free (NetaYume v4: 10.5 GB against 8.9 planned, MEASUREMENTS 7bs)
+                extra = {"references": references} if references else {}
+                if plan and plan["staged_text_encoder"]:
+                    extra["free_text_encoder"] = True
+                graph = build(dict(job, seed=seed + i), files, comfy, loras, input_image=input_name, **extra)
                 out = asyncio.run(self._run(graph, job["steps"], quiet=d.get("_quiet", False)))
                 stem = "".join(filter(str.isalnum, prompt[:30])) or ("video" if video else "image")
                 path = IMAGES_DIR / ("%s_%s%s" % (stem, uuid.uuid4().hex[:12], os.path.splitext(out)[1] or ".png"))
                 shutil.move(out, path)
+                if mask is not None:
+                    # outside the mask the picture stays as it was, pixel for pixel
+                    from PIL import Image
+                    with Image.open(path) as painted:
+                        blended = masks.blend_into(original, painted, mask, painted_part)
+                    blended.save(path)
                 if video:
                     mark_video(str(path), m.get("name", ""))
                 protocol.log("[comfy] %s done in %.1fs" % ("video" if video else "image", time.time() - t0))
@@ -438,8 +505,9 @@ class ComfyEngine:
                     protocol.result(str(path))
                 saved.append(str(path))
         finally:
-            if input_name:
-                (WORK / "input" / input_name).unlink(missing_ok=True)
+            for name in [input_name, *references]:
+                if name:
+                    (WORK / "input" / name).unlink(missing_ok=True)
         return saved
 
     async def _run(self, graph, steps, quiet=False):

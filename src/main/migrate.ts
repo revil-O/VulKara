@@ -13,7 +13,7 @@ import { processEnv } from './env'
  * now that Chroma runs, for the Chroma checkpoints the first check marked as not runnable; -3: once more, now that
  * Z-Image runs, for the labels of Z-Image LoRAs that said no model can use them.
  */
-export const RECHECK_FLAG = 'loras-rechecked-4'  // 4: sub-bases out of model.json "variant"
+export const RECHECK_FLAG = 'loras-rechecked-5'  // 4: sub-bases out of model.json "variant"; 5: FLUX.2 [klein] inpaints
 
 /**
  * Once: the installed LoRAs and models are checked again with the current detection (engines/diffusers/recheck.py,

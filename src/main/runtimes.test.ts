@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 const dir = mkdtempSync(`${tmpdir()}/vk-runtimes-`)
 vi.mock('electron', () => ({ app: { getPath: () => dir, isPackaged: false, getAppPath: () => resolve('.') }, net: {} }))
 
-const { checkDownload, packageInstallError, updateTargets, staleRuntimes, runtimeDir } = await import('./runtimes')
+const { checkDownload, packageInstallError, updateTargets, staleRuntimes, runtimeDir, venvPython } = await import('./runtimes')
 
 describe('the runtimes in the update check', () => {
   it('every runtime declares what identifies its version, with the range from its requirements', () => {
@@ -32,8 +32,20 @@ describe('pinned downloads', () => {
     writeFileSync(file, 'hi')
     checkDownload(file, '8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4', 'uv')
     expect(existsSync(file)).toBe(true)
-    expect(() => checkDownload(file, '0'.repeat(64), 'uv 0.12.23')).toThrow(/uv 0.12.23 does not match its checksum/)
+    expect(() => checkDownload(file, '0'.repeat(64), 'uv 0.13.7')).toThrow(/uv 0.13.7 does not match its checksum/)
     expect(existsSync(file)).toBe(false)
+  })
+})
+
+describe('the Python of a runtime', () => {
+  it('reads the patch version the venv runs, none without a venv', () => {
+    // an earlier version's venv on 3.11.17 is made again on 3.11.18 (eMudhra certificates rejected in ssl)
+    const venv = `${dir}/venv-old`
+    mkdirSync(`${venv}/bin`, { recursive: true })
+    writeFileSync(`${venv}/bin/python`, '#!/bin/sh\necho 3.11.17\n')
+    chmodSync(`${venv}/bin/python`, 0o755)
+    expect(venvPython(venv)).toBe('3.11.17')
+    expect(venvPython(`${dir}/no-venv`)).toBeUndefined()
   })
 })
 
@@ -59,8 +71,11 @@ describe('runtimes from an earlier version', () => {
     expect(staleRuntimes()).toEqual(['mlx'])
     writeFileSync(join(rt, 'runtime.json'), JSON.stringify({ id: 'mlx', version: '0.20.0', installedAt: 1, lock: 'older' }))
     expect(staleRuntimes()).toEqual(['mlx'])
-    const lock = createHash('sha256').update(readFileSync(resolve('engines/mlx/constraints.txt'))).update('').digest('hex')
-    writeFileSync(join(rt, 'runtime.json'), JSON.stringify({ id: 'mlx', version: '0.20.0', installedAt: 1, lock }))
+    const lockFor = (python: string) => createHash('sha256').update(readFileSync(resolve('engines/mlx/constraints.txt'))).update(`${python},`).digest('hex')
+    // the same packages on the Python of an earlier version: made again on 3.11.18
+    writeFileSync(join(rt, 'runtime.json'), JSON.stringify({ id: 'mlx', version: '0.20.0', installedAt: 1, lock: lockFor('3.11.17') }))
+    expect(staleRuntimes()).toEqual(['mlx'])
+    writeFileSync(join(rt, 'runtime.json'), JSON.stringify({ id: 'mlx', version: '0.20.0', installedAt: 1, lock: lockFor('3.11.18') }))
     expect(staleRuntimes()).toEqual([])
   })
 })

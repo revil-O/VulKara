@@ -77,11 +77,11 @@ def test_loras_are_baked_into_a_new_model_that_needs_no_lora(tmp_path, monkeypat
 
     # the baked UNet gives what the base gives with the LoRA at 0.8
     from diffusers import StableDiffusionPipeline, UNet2DConditionModel
-    ref = StableDiffusionPipeline.from_pretrained(str(base / "weights"), text_encoder=None, tokenizer=None, torch_dtype=torch.float16)
+    ref = StableDiffusionPipeline.from_pretrained(str(base / "weights"), text_encoder=None, tokenizer=None, dtype=torch.float16)
     ref.load_lora_weights(str(tmp_path / "loras" / "tiny"), adapter_name="t")
     ref.set_adapters(["t"], adapter_weights=[0.8])
-    baked = UNet2DConditionModel.from_pretrained(str(target / "weights"), subfolder="unet", torch_dtype=torch.float16)
-    plain = UNet2DConditionModel.from_pretrained(str(base / "weights"), subfolder="unet", torch_dtype=torch.float16)
+    baked = UNet2DConditionModel.from_pretrained(str(target / "weights"), subfolder="unet", dtype=torch.float16)
+    plain = UNet2DConditionModel.from_pretrained(str(base / "weights"), subfolder="unet", dtype=torch.float16)
     torch.manual_seed(2)
     x, t, c = torch.randn(1, 4, 8, 8), torch.tensor([10]), torch.randn(1, 4, 32)
     with torch.no_grad():

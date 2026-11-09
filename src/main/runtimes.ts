@@ -4,7 +4,7 @@
 // also downloads a matching Python). The app ships only the engine scripts; models are never part of the app.
 
 import { app, net } from 'electron'
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -44,22 +44,24 @@ interface Runtime {
 }
 
 // a new release or commit is a reviewed change of these lines, with the content hashes of tools/pin_runtimes.py
-const COMFY_RELEASE = '0.38.0'
-const COMFY_TREE = 'eab59f119b613382985b49f1eb8da4be1b69c131a87163fb910293d4fa24a1a7'
+const COMFY_RELEASE = '0.44.0'
+const COMFY_TREE = '9c1f736c84577505586d3805b0e7040117e79c3bed04acc82f0a91ccbb9e6fc6'
+// the exact Python of every runtime: 3.11.18 rejects the compromised eMudhra intermediate certificates in ssl
+const PYTHON = '3.11.18'
 
 const CATALOG: Runtime[] = [
   {
-    id: 'diffusers', name: 'Diffusers (Apple GPU)', engine: 'diffusers', versionPackage: 'diffusers', python: '3.11',
+    id: 'diffusers', name: 'Diffusers (Apple GPU)', engine: 'diffusers', versionPackage: 'diffusers', python: PYTHON,
     versions: [{ kind: 'pypi', package: 'diffusers' }, { kind: 'pypi', package: 'spandrel' }, { kind: 'pypi', package: 'spandrel_extra_arches' }],
     description: () => t('main.runtimes.diffusersDescription'),
   },
   {
-    id: 'mlx', name: 'MLX', engine: 'mlx', versionPackage: 'mflux', python: '3.11',
+    id: 'mlx', name: 'MLX', engine: 'mlx', versionPackage: 'mflux', python: PYTHON,
     versions: [{ kind: 'pypi', package: 'mflux' }],
     description: () => t('main.runtimes.mlxDescription'),
   },
   {
-    id: 'comfyui', name: 'ComfyUI', engine: 'comfy', python: '3.11', comfyRelease: COMFY_RELEASE,
+    id: 'comfyui', name: 'ComfyUI', engine: 'comfy', python: PYTHON, comfyRelease: COMFY_RELEASE,
     comfyTree: COMFY_TREE,
     versions: [{ kind: 'github', name: 'ComfyUI', repo: 'Comfy-Org/ComfyUI', pinned: COMFY_RELEASE, versionFile: 'ComfyUI/comfyui_version.py' }],
     extensions: [{
@@ -77,11 +79,11 @@ const CATALOG: Runtime[] = [
 ]
 
 // uv at a fixed version, checked against the SHA-256 published with that release
-export const UV_VERSION = '0.12.23'
+export const UV_VERSION = '0.13.7'
 const UV_ARCH = process.arch === 'arm64' ? 'aarch64' : 'x86_64'
 const UV_SHA256: Record<string, string> = {
-  aarch64: '50487ae565ccd96e499056b4674d438f4c53170202617b4c759defe0c6a1b544',
-  x86_64: '960da44cb4b73685206ddd250b19e0a117fa41095710c1038f081f5cb613efb4',
+  aarch64: '81b811b57e4624df7ed3aac148e0359100d9962f3d9dce00aec533dc2e086731',
+  x86_64: '20c47e4c1f630b8abaff8c291fa9b9aa300fef92c4fbff95adf198b55287cda7',
 }
 const UV_URL = `https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-${UV_ARCH}-apple-darwin.tar.gz`
 
@@ -103,10 +105,18 @@ export function runtimePython(id: RuntimeId): string | undefined {
 
 /** What a runtime of this app version is made of: its package lock and the pinned ComfyUI with its extensions.
  *  Kept in runtime.json at install; when the app brings another one, the runtime is brought to it at the next start. */
+/** The Python version a venv runs (pyvenv.cfg only says 3.11: uv links the minor version), undefined without one. */
+export function venvPython(venv: string): string | undefined {
+  const python = join(venv, 'bin', 'python')
+  if (!existsSync(python)) return undefined
+  const r = spawnSync(python, ['-c', 'import platform; print(platform.python_version())'], { encoding: 'utf8', timeout: 30000 })
+  return r.status === 0 ? r.stdout.trim() : undefined
+}
+
 function lockOf(rt: Runtime): string {
   const lock = join(enginesDir(), rt.engine, 'constraints.txt')
   if (!existsSync(lock)) return ''
-  const comfy = [rt.comfyRelease ?? '', ...(rt.extensions ?? []).map((e) => e.commit)].join(',')
+  const comfy = [rt.python, rt.comfyRelease ?? '', ...(rt.extensions ?? []).map((e) => e.commit)].join(',')
   return createHash('sha256').update(readFileSync(lock)).update(comfy).digest('hex')
 }
 
@@ -289,6 +299,12 @@ async function installNow(id: RuntimeId, progress: Progress): Promise<{ version:
   // a Python managed by uv inside the runtimes folder, independent of the system's (Homebrew updates)
   const uvEnv = { UV_PYTHON_INSTALL_DIR: join(runtimesDir(), 'python'), UV_CACHE_DIR: join(runtimesDir(), 'cache') }
   progress(t('main.runtimes.preparingPython', { version: rt.python }), -1)
+  // a venv on another Python (an earlier version's) is made again; its packages come back from the cache below. The
+  // new Python is fetched first, so without a network the old venv stays usable
+  if (existsSync(venv) && venvPython(venv) !== rt.python) {
+    await run(uv, ['python', 'install', rt.python], undefined, uvEnv)
+    rmSync(venv, { recursive: true, force: true })
+  }
   if (!existsSync(join(venv, 'bin', 'python')))
     await run(uv, ['venv', '--python', rt.python, '--python-preference', 'only-managed', venv], undefined, uvEnv)
 

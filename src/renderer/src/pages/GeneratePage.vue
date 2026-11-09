@@ -4,7 +4,7 @@
 // the results are in the work area, the settings of the job in the panel on the right.
 import { computed, onActivated, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Dices, Minus, Plus, Sparkles, X } from 'lucide-vue-next'
+import { Dices, Minus, Plus, ScanText, Sparkles, X } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import ImageInput from '../components/ImageInput.vue'
 import HintBadge from '../components/HintBadge.vue'
@@ -18,17 +18,20 @@ import { useQueueStore } from '../stores/queue'
 import { useImportsStore } from '../stores/imports'
 import { cleanError } from '../stores/runtimes'
 import { guidanceHint, stepsHint } from '../util/model_fit'
-import { MAX_LORAS, MODES, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, modelDefaults, emptyForm, formProblem, lorasFor, modelsFor, takesUpsampler, type GenerateForm, type Mode } from '../util/job_form'
+import { MAX_LORAS, MODES, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, modelDefaults, emptyForm, formProblem, lorasFor, modelsFor, keepsPicture, takesReferences, takesTurbo, takesUpsampler, turboLora, upsamplerHelper, TURBO, type GenerateForm, type Mode } from '../util/job_form'
+import { MAX_REFERENCES } from '@shared/engine_job'
 import { DEFAULT_SIZES, RATIOS, ratioOf, sizeForRatio } from '../util/sizes'
 import { CONSENT_QUESTION } from '@shared/content_policy'
 import { askConsent } from '../util/consent'
 import { controlTypesFor } from '@shared/controlnet'
+import { flux1Outline } from '@shared/hints'
 import { SIGMA_SCHEDULES, samplersFor } from '@shared/samplers'
 import type { QueuedJob } from '@shared/api'
 import type { Job } from '@shared/types'
 import { seedOf } from '@/util/seed'
 import { samplerLabel } from '../util/labels'
 import { dec, num, t, type PlainKey } from '../i18n'
+import { isRemote } from '../remote_vk'
 
 const props = defineProps<{ mode: Mode }>()
 const TEXTS: Record<Mode, { title: PlainKey; subtitle: PlainKey; prompt: PlainKey }> = {
@@ -82,14 +85,24 @@ const native = computed<[number, number]>(() => {
 const ratio = computed(() => ratioOf(form.width, form.height, native.value[0], native.value[1], sizes.value))
 const showSize = computed(() => does.size || (props.mode === 'image' && form.customSize))
 const controlNote = ref<PlainKey | ''>('')
-// FLUX.2 takes the input picture as a reference, there is no strength to set
-const showStrength = computed(() => (props.mode === 'inpaint' || props.mode === 'image') && !(props.mode === 'image' && ['flux2', 'flux3', 'qwen_image21'].includes(model.value?.meta.family ?? '')))
+// FLUX.2 takes the input picture as a reference, there is no strength to set; Fibo 2.0 repaints a mask's part whole
+const showStrength = computed(() => (props.mode === 'inpaint' || props.mode === 'image') && model.value?.meta.family !== 'fibo2'
+  && !(props.mode === 'image' && ['flux2', 'flux3', 'qwen_image21'].includes(model.value?.meta.family ?? '')))
+
+// Fibo 2.0: further pictures beside the input picture, one empty field after the chosen ones
+const showReferences = computed(() => props.mode === 'image' && takesReferences(model.value?.meta))
+const referenceSlots = computed(() => Math.min(MAX_REFERENCES, form.references.filter(Boolean).length + 1))
+function setReference(i: number, path: string): void {
+  const refs = [...form.references]
+  refs[i] = path
+  form.references = refs.filter(Boolean)
+}
 
 // the model's own suggestions, offered while the form differs from them
 const suggested = computed(() => (model.value ? modelDefaults(model.value) : undefined))
 const offDefaults = computed(() => {
   const s = suggested.value
-  if (!s) return false
+  if (!s || fastOn.value) return false  // the fast option sets steps and guidance itself
   return s.steps !== form.steps || s.guidance !== form.guidance || (showSize.value && (s.width !== form.width || s.height !== form.height))
     || (does.sampler && s.sampler !== 'Default' && (s.sampler !== form.sampler || s.sigmaSchedule !== form.sigmaSchedule))
 })
@@ -103,8 +116,12 @@ const suggestText = computed(() => {
 })
 
 // steps and guidance the chosen model is not made for (kept from another model)
-const stepsFit = computed(() => stepsHint(model.value?.meta, form.steps))
-const guidanceFit = computed(() => guidanceHint(model.value?.meta, form.guidance, form.steps))
+// the fast option (FLUX.1 [dev]): the Turbo-Alpha LoRA sets steps and guidance itself
+const fastOffered = computed(() => does.loras && takesTurbo(model.value?.meta))
+const fastOn = computed(() => fastOffered.value && form.fast)
+const turbo = computed(() => turboLora(assets.loras))
+const stepsFit = computed(() => (fastOn.value ? null : stepsHint(model.value?.meta, form.steps)))
+const guidanceFit = computed(() => (fastOn.value ? null : guidanceHint(model.value?.meta, form.guidance, form.steps)))
 
 function chooseModel(id: string): void {
   const next = models.value.find((m) => m.id === id)
@@ -152,30 +169,67 @@ const hasMask = ref(false)
 const inputSize = ref<[number, number]>()
 const error = ref('')
 const sending = ref(false)
+
+// Prompt from picture (Image to image): Qwen3-VL describes the picture on this Mac, not in the remote web UI
+const remote = isRemote()
+const describing = ref('')  // its stage while it describes
+async function promptFromPicture(): Promise<void> {
+  if (!form.inputImage || describing.value) return
+  if (form.prompt.trim() && !(await window.vk.dialog.ask(t('generate.caption.replace'), t('generate.caption.replaceYes'), t('common.cancel')))) return
+  error.value = ''
+  describing.value = t('generate.caption.starting')
+  const off = window.vk.caption.onProgress((stage) => { describing.value = stage })
+  try {
+    const { text } = await window.vk.caption.image(form.inputImage)
+    if (text) form.prompt = text
+  } catch (err) {
+    error.value = cleanError(err)
+  } finally {
+    off()
+    describing.value = ''
+  }
+}
+const stopDescribing = (): void => { void window.vk.caption.stop() }
 const problem = computed(() => formProblem(props.mode, form, model.value, hasMask.value))
 
-// FLUX 3's prompt upsampler is a helper model: downloaded here or on the Models page (the MLX engine never downloads)
-const PUP = 'flux3_pup'
+// FLUX 3's prompt upsampler and ERNIE-Image's prompt enhancer are helper models: downloaded here or on the Models page
+// (the MLX engine never downloads)
+const PUP = computed(() => upsamplerHelper(model.value?.meta))
+// the texts of the option: ERNIE's enhancer has its own
+const up = (key: string): string => t(`generate.upsample.${key}${model.value?.meta.arch === 'ernie_image' ? 'Ernie' : ''}` as PlainKey)
 const imports = useImportsStore()
 const pupInstalled = ref<boolean | null>(null)
 async function checkPup(): Promise<void> {
   try {
     pupInstalled.value = takesUpsampler(model.value?.meta)
-      ? (await window.vk.helpers.list()).find((h) => h.id === PUP)?.installed ?? false
+      ? (await window.vk.helpers.list()).find((h) => h.id === PUP.value)?.installed ?? false
       : null
   } catch {
     pupInstalled.value = null  // the remote web UI may not list helper models: the engine says when it is missing
   }
 }
 watch(() => model.value?.id, () => void checkPup(), { immediate: true })
-const pupDownload = computed(() => imports.of({ source: 'helper', ref: PUP }))
+const pupDownload = computed(() => imports.of({ source: 'helper', ref: PUP.value }))
 const pupDownloading = computed(() => pupDownload.value?.state === 'waiting' || pupDownload.value?.state === 'running')
 watch(() => pupDownload.value?.state, (state) => { if (state === 'done') void checkPup() })
 async function downloadPup(): Promise<void> {
   error.value = ''
   try {
     void imports.start()
-    await window.vk.helpers.install(PUP)
+    await window.vk.helpers.install(PUP.value)
+  } catch (err) {
+    error.value = cleanError(err)
+  }
+}
+
+const turboRequest = { source: 'hf' as const, ref: TURBO.ref, file: TURBO.file, name: TURBO.name }
+const turboDownload = computed(() => imports.of(turboRequest))
+const turboDownloading = computed(() => turboDownload.value?.state === 'waiting' || turboDownload.value?.state === 'running')
+async function downloadTurbo(): Promise<void> {
+  error.value = ''
+  try {
+    void imports.start()
+    await imports.add(turboRequest, TURBO.name)
   } catch (err) {
     error.value = cleanError(err)
   }
@@ -183,7 +237,8 @@ async function downloadPup(): Promise<void> {
 
 async function generate(): Promise<void> {
   error.value = problem.value
-  if (!error.value && props.mode === 'text' && form.upsample && pupInstalled.value === false) error.value = t('generate.upsample.missing')
+  if (!error.value && fastOn.value && !turbo.value) error.value = t('generate.fast.missing')
+  if (!error.value && props.mode === 'text' && form.upsample && pupInstalled.value === false) error.value = up('missing')
   if (error.value || !model.value || sending.value) return
   sending.value = true
   try {
@@ -260,15 +315,25 @@ const labelPreview = computed(() => {
           <span v-else class="dim">{{ t('generate.send.shortcut') }}</span>
           <span class="spacer" />
           <label v-if="mode === 'text' && takesUpsampler(model?.meta)" class="check">
-            <input v-model="form.upsample" type="checkbox" /> {{ t('generate.upsample.label') }}
-            <HintBadge above :text="t('generate.upsample.hint')" />
+            <input v-model="form.upsample" type="checkbox" /> {{ up('label') }}
+            <HintBadge above :text="up('hint')" />
           </label>
           <button
             v-if="mode === 'text' && form.upsample && pupInstalled === false" class="btn small" :disabled="pupDownloading"
             @click="downloadPup"
           >
-            {{ pupDownloading ? t('generate.upsample.downloading') : t('generate.upsample.download') }}
+            {{ pupDownloading ? t('generate.upsample.downloading') : up('download') }}
           </button>
+          <template v-if="mode === 'image' && !remote">
+            <button v-if="!describing" class="btn small" :disabled="!form.inputImage || queue.open.length > 0 || sending" @click="promptFromPicture">
+              <ScanText :size="14" /> {{ t('generate.caption.button') }}
+            </button>
+            <template v-else>
+              <span class="dim">{{ describing }}</span>
+              <button class="btn small" @click="stopDescribing">{{ t('common.cancel') }}</button>
+            </template>
+            <HintBadge above :text="t('generate.caption.hint')" />
+          </template>
           <!-- the EU's icon for AI content in the corner of the pictures -->
           <div v-if="mode !== 'video'" class="ai-label">
             <label class="check">
@@ -295,7 +360,7 @@ const labelPreview = computed(() => {
               <label class="check"><input v-model="form.aiLabelSubtle" type="checkbox" /> {{ t('generate.aiLabel.subtle') }}</label>
             </template>
           </div>
-          <button class="btn primary" :disabled="sending" @click="generate">
+          <button class="btn primary" :disabled="sending || !!describing" @click="generate">
             <Sparkles :size="14" /> {{ does.count && form.count > 1 ? t('generate.send.generateCount', { n: form.count }) : t('generate.send.generate') }}
           </button>
         </div>
@@ -316,6 +381,7 @@ const labelPreview = computed(() => {
             <option v-for="m in models" :key="m.id" :value="m.id">{{ m.title }}</option>
           </select>
           <small v-if="model" class="dim">{{ model.meta.label }}</small>
+          <small v-if="flux1Outline(mode, model?.meta)" class="dim">{{ t('generate.panel.flux1MaskHint') }}</small>
         </label>
 
         <div v-if="does.styles" class="field">
@@ -367,6 +433,18 @@ const labelPreview = computed(() => {
           <input v-model.number="form.strength" type="range" min="0.05" max="1" step="0.05" />
           <small class="dim">{{ mode === 'inpaint' ? t('generate.panel.changeInpaintHint') : t('generate.panel.changeHint') }}</small>
         </label>
+        <label v-if="mode === 'image' && keepsPicture(model?.meta)" class="check">
+          <input v-model="form.keepPicture" type="checkbox" /> {{ t('generate.keepPicture.label') }}
+          <HintBadge :text="t('generate.keepPicture.hint')" />
+        </label>
+
+        <div v-if="showReferences" class="field">
+          <span>{{ t('generate.panel.references') }} <HintBadge :text="t('generate.panel.referencesHint')" /></span>
+          <ImageInput
+            v-for="i in referenceSlots" :key="i" class="control" :model-value="form.references[i - 1] ?? ''"
+            @update:model-value="(p: string) => setReference(i - 1, p)"
+          />
+        </div>
 
         <div v-if="offDefaults && suggested" class="defaults">
           <button class="btn small" @click="model && applyDefaults(form, model)">{{ t('generate.panel.modelDefaults') }}</button>
@@ -380,10 +458,20 @@ const labelPreview = computed(() => {
                 <button class="btn small fix" @click.prevent="form.steps = stepsFit.fix.value">{{ stepsFit.fix.label }}</button>
               </template>
             </span>
-            <b>{{ form.steps }}</b>
+            <b>{{ fastOn ? TURBO.steps : form.steps }}</b>
           </span>
-          <input v-model.number="form.steps" type="range" min="1" max="80" />
+          <input v-if="fastOn" :value="TURBO.steps" type="range" min="1" max="80" disabled />
+          <input v-else v-model.number="form.steps" type="range" min="1" max="80" />
         </label>
+        <div v-if="fastOffered" class="field fast">
+          <label class="check">
+            <input v-model="form.fast" type="checkbox" /> {{ t('generate.fast.label') }}
+            <HintBadge :text="t('generate.fast.hint')" />
+          </label>
+          <button v-if="fastOn && !turbo" class="btn small" :disabled="turboDownloading" @click="downloadTurbo">
+            {{ turboDownloading ? t('generate.upsample.downloading') : t('generate.fast.download') }}
+          </button>
+        </div>
         <label class="field">
           <span>
             <span class="label-row">{{ t('generate.panel.guidance') }}
@@ -392,12 +480,13 @@ const labelPreview = computed(() => {
                 <button class="btn small fix" @click.prevent="form.guidance = guidanceFit.fix.value">{{ guidanceFit.fix.label }}</button>
               </template>
             </span>
-            <b>{{ num(form.guidance, 1) }}</b>
+            <b>{{ num(fastOn ? TURBO.guidance : form.guidance, 1) }}</b>
           </span>
           <div class="ruler" aria-hidden="true">
             <i v-for="n in 21" :key="n" :class="{ major: (n - 1) % 5 === 0 }"><em v-if="(n - 1) % 5 === 0">{{ n - 1 }}</em></i>
           </div>
-          <input v-model.number="form.guidance" type="range" min="0" max="20" step="0.1" />
+          <input v-if="fastOn" :value="TURBO.guidance" type="range" min="0" max="20" step="0.1" disabled />
+          <input v-else v-model.number="form.guidance" type="range" min="0" max="20" step="0.1" />
           <small class="dim">{{ t('generate.panel.guidanceHint') }}</small>
         </label>
 

@@ -1,7 +1,7 @@
 <!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 · Copyright (C) 2026 Oliver Schmidt -->
 <script setup lang="ts">
 import { computed, onActivated } from 'vue'
-import { Check, ChevronRight, Circle } from 'lucide-vue-next'
+import { Check, ChevronRight, Circle } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import LanguageSelect from '../components/LanguageSelect.vue'
 import { useAssetsStore } from '../stores/assets'

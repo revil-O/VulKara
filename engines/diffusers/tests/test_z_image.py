@@ -196,8 +196,11 @@ COMPONENTS = {"text_encoder": 4.022, "transformer": 6.155, "vae": 0.084}
 
 
 def test_memory_plans_with_diffusers():
-    # 24 GB: the transformer in 16 bit, the Qwen3 encoder in 8 bit and only loaded for a new prompt
+    # 24 GB: 16 bit would leave 1.8 GB under the budget (staged), less than the margin: the transformer in 8 bit
     plan = memory.plan(COMPONENTS, "transformer", "z_image", 24)
+    assert plan["fits"] and plan["quant"]["transformer"] == "q8"
+    # 26 GB: the transformer in 16 bit, the Qwen3 encoder in 8 bit and only loaded for a new prompt
+    plan = memory.plan(COMPONENTS, "transformer", "z_image", 26)
     assert plan["fits"] and plan["quant"] == {"transformer": "none", "text_encoder": "q8"} and plan["staged_text_encoder"]
     # 16 GB: both in 8 bit
     plan = memory.plan(COMPONENTS, "transformer", "z_image", 16)
@@ -271,7 +274,8 @@ def test_a_mac_short_of_free_memory_decodes_in_tiles_and_the_job_says_so(monkeyp
     # enough free: in one piece, the decode counted in the plan
     monkeypatch.setattr(memory, "free_gb", lambda held=0.0: 40.0)
     eng._plan_job("z_image", 1024, 1024)
-    assert eng.model.tiling_config is None and protocol.PLANNED["gb"] == round(peak + mlx_main.DECODE_GB["z_image"], 2) and sent == []
+    assert eng.model.tiling_config is None and protocol.PLANNED["gb"] == round(peak + mlx_main.DECODE_GB["z_image"], 2)
+    assert sent == [("planned", {"gb": protocol.PLANNED["gb"]})]
     # too little for the one-piece decode, enough without it: tiles, and a note
     sent.clear()
     monkeypatch.setattr(memory, "free_gb", lambda held=0.0: peak + 1.0)
@@ -484,3 +488,40 @@ def test_mlx_runs_z_image_on_its_own_fixed_shift(tmp_path):
     d = FlowMatchEulerDiscreteScheduler(shift=3.0, use_dynamic_shifting=False)
     d.set_timesteps(sigmas=s.tolist())
     assert torch.allclose(d.sigmas[:-1], torch.tensor(ref), atol=1e-6)
+
+
+def test_mlx_loads_the_parts_one_after_another_the_denoiser_first(monkeypatch):
+    # mflux leaves the weights lazy; all of them at once in the first step peaked at 29.3 GB on a 16 GB Mac mini
+    import sys
+    order = []
+    monkeypatch.setitem(sys.modules, "mlx", types.ModuleType("mlx"))
+    monkeypatch.setitem(sys.modules, "mlx.core", types.SimpleNamespace(eval=lambda p: order.append(p), clear_cache=lambda: None))
+    mlx_main = _mlx_main()
+
+    class Part:
+        def __init__(self, name):
+            self.name = name
+
+        def parameters(self):
+            return self.name
+
+    model = types.SimpleNamespace(text_encoder=Part("te"), vae=Part("vae"), transformer=Part("tr"), steps=9)
+    assert mlx_main.materialize(model) == ["transformer", "vae", "text_encoder"] and order == ["tr", "vae", "te"]
+    order.clear()
+    assert mlx_main.materialize(model, text_encoders=False) == ["transformer", "vae"] and order == ["tr", "vae"]
+    # an mlx Module (mflux's models) is a dict whose parts are its items
+    order.clear()
+    as_module = {"text_encoder": Part("te"), "transformer": Part("tr"), "config": "x"}
+    assert mlx_main.materialize(as_module) == ["transformer", "text_encoder"] and order == ["tr", "te"]
+
+
+def test_mlx_progress_is_sent_after_the_step_is_evaluated(monkeypatch):
+    # mflux calls the in-loop callback before it evaluates the step: the value of a step must wait for it
+    import sys
+    calls = []
+    monkeypatch.setitem(sys.modules, "mlx", types.ModuleType("mlx"))
+    monkeypatch.setitem(sys.modules, "mlx.core", types.SimpleNamespace(eval=lambda x: calls.append(("eval", x))))
+    mlx_main = _mlx_main()
+    monkeypatch.setattr(mlx_main.protocol, "progress", lambda v: calls.append(("progress", v)))
+    mlx_main.Progress(None, 8).call_in_loop(0, 1, "p", "latents", None, None)
+    assert calls == [("eval", "latents"), ("progress", 12.5)]

@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Copyright (C) 2026 Oliver Schmidt
-"""Keeps components quantized with optimum-quanto on disk, so they are quantized only once.
+"""Keeps components quantized with optimum-quanto on disk, so they are quantized only once: text encoders and
+ControlNets; denoisers are GGUF copies (gguf_cache.py).
 
 Quantizing runs on the CPU and is slow, and staged text encoders would pay for it on every new
 prompt. The cache holds the quantized weights (safetensors), quanto's quantization map and every
@@ -50,8 +51,43 @@ def cache_dir(model_dir, comp, level):
 
 
 def _key(folder, comp, level, dtype):
-    return {"format": FORMAT, "component": comp, "level": level, "dtype": str(dtype),
-            "source": _source_signature(folder, comp), "versions": _versions()}
+    key = {"format": FORMAT, "component": comp, "level": level, "dtype": str(dtype),
+           "source": _source_signature(folder, comp), "versions": _versions()}
+    if comp and _kept_in_fp32(folder, comp):
+        key["kept_fp32"] = "q8"  # caches made before left them 16 bit and are made again once
+    return key
+
+
+def _kept_in_fp32(folder, comp):
+    """The layers a transformers class keeps in float32 (T5's wo), [] when none or not a transformers class."""
+    try:
+        with open(os.path.join(folder, "model_index.json")) as f:
+            lib, name = json.load(f)[comp]
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+    if lib != "transformers":
+        return []
+    import transformers
+    return list(getattr(getattr(transformers, name, None), "_keep_in_fp32_modules", None) or [])
+
+
+def quantize_kept_fp32(model, dtype):
+    """The layers the model keeps in float32 in 8 bit: transformers' quanto quantizer leaves them out, so 1.0B of
+    T5-XXL's 4.76B parameters (its wo layers) stayed 16 bit, its "4 bit" took 5.2 GB next to the denoiser against 3.1
+    planned (FLUX.1 Fill on the Mac mini, MEASUREMENTS 7bf). In 4 bit one test prompt's embedding went off (cosine
+    0.91 against 0.97); float32 only guards against float16 overflow, so only when the text encoder computes in
+    bfloat16."""
+    import torch
+    from optimum.quanto import QModuleMixin, freeze, qint8, quantize
+    kept = set(getattr(model, "_keep_in_fp32_modules", None) or [])
+    if not kept or dtype != torch.bfloat16:
+        return model
+    names = [name for name, module in model.named_modules() if name.rpartition(".")[2] in kept
+             and isinstance(module, torch.nn.Linear) and not isinstance(module, QModuleMixin)]
+    if names:
+        quantize(model, weights=qint8, include=names)
+        freeze(model)
+    return model
 
 
 def load(model_dir, folder, comp, level, dtype, make_empty):
@@ -71,9 +107,17 @@ def load(model_dir, folder, comp, level, dtype, make_empty):
     try:
         return _restore(d, info, dtype, make_empty)
     except Exception as e:  # a broken cache must never block generation
+        if _stopped(e):
+            raise
         protocol.log("[diffusers] quantized cache of %s unusable (%s), rebuilding" % (comp, e))
         shutil.rmtree(d, ignore_errors=True)
         return None
+
+
+def _stopped(e):
+    """A Stop raised into the loading thread (protocol.interruptible, engine.StopRequested): the cache is fine and
+    stays; it went on as "unusable, rebuilding" and was deleted before."""
+    return type(e).__name__ == "StopRequested"
 
 
 def _restore(d, info, dtype, make_empty):
@@ -128,8 +172,10 @@ def save(model_dir, folder, comp, level, dtype, model):
             return
         _write(d, folder, comp, level, dtype, model)
     except Exception as e:
+        shutil.rmtree(d, ignore_errors=True)  # written half: gone (also when stopped)
+        if _stopped(e):
+            raise
         protocol.log("[diffusers] could not cache quantized %s: %s" % (comp, e))
-        shutil.rmtree(d, ignore_errors=True)
 
 
 def _write(d, folder, comp, level, dtype, model):

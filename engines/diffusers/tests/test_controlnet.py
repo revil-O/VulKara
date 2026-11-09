@@ -16,17 +16,24 @@ def test_types_per_model():
 
 
 def test_the_room_for_a_controlnet_follows_the_picture_size():
-    """FLUX.1 [schnell] Q8 on 24 GB (its plan): no room at 1024² (budget 19.2 − 15.5 − 2 × 2.5), but at 512 × 768
-    the activations are 3/8 of that and the ControlNet fits in 8 bit (2.15 GB)."""
+    """FLUX.1 [schnell] Q8 on 24 GB (its plan): at 1024² the ControlNet's activations (half the model's, MEASUREMENTS
+    7as) leave 2.45 GB, enough for the ControlNet in 8 bit (2.15 GB); at 512 × 768 the activations are 3/8 of that."""
     import types
     engine = pytest.importorskip("engine")
-    m = types.SimpleNamespace(plan={"budget_gb": 19.2, "denoise_peak_gb": 15.5, "activations_gb": 2.5})
+    m = types.SimpleNamespace(plan={"budget_gb": 19.2, "denoise_peak_gb": 15.5, "est_peak_gb": 15.5, "activations_gb": 2.5}, controlnet=None)
     room = engine.LoadedModel.controlnet_room
-    assert room(m, 1024, 1024) == pytest.approx(19.2 - 15.5 - 5.0)
-    assert room(m, 512, 768) == pytest.approx(19.2 - (15.5 - 2.5 + 0.9375) - 1.875)
-    assert room(m, 512, 768) > 2.15 > room(m, 1024, 1024)
+    assert room(m, 1024, 1024) == pytest.approx(19.2 - 15.5 - 1.25)
+    assert room(m, 512, 768) == pytest.approx(19.2 - (15.5 - 2.5 + 0.9375) - 0.46875)
+    assert room(m, 512, 768) > room(m, 1024, 1024) > 2.15
     # never below a quarter of the activations
     assert room(m, 64, 64) == pytest.approx(room(m, 512, 512))
+    # in stages the ControlNet stays loaded while the prompt is encoded: the room is next to that peak too
+    m.plan["est_peak_gb"] = 18.0
+    assert room(m, 512, 512) == pytest.approx(19.2 - 18.0)
+    # what a loaded ControlNet adds to the job's peak: its weights and its activations
+    assert engine.LoadedModel.controlnet_gb(m, 1024, 1024) == 0.0
+    m.controlnet = ("id", None, 2.15)
+    assert engine.LoadedModel.controlnet_gb(m, 1024, 1024) == pytest.approx(2.15 + 1.25)
 
 
 def test_union_models_are_shared_per_family():

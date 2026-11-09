@@ -95,6 +95,8 @@ export interface QueuedJob {
   waited?: Waited[]
   /** the engine's own peak footprint and disk reads over the job, and what its memory plan expected */
   footprint?: { peakGb: number; readGb: number; planGb?: number }
+  /** what the engine's memory plan expects for the running job (GB), from its start */
+  planGb?: number
   results: string[]
   error?: string
   addedAt: number
@@ -130,6 +132,11 @@ export interface ViewerAction {
 }
 
 type PosePoints = ([number, number] | null)[]
+
+/** a prompt Qwen3-VL wrote for a picture (Image to image); empty when it was stopped */
+export interface Caption {
+  text: string
+}
 
 /** The faces of a photo Restore would restore: 5 landmarks (eyes, nose tip, mouth corners) and the restored square
  *  [x, y, w, h], in the photo's pixels. */
@@ -563,8 +570,9 @@ export interface VulkaraApi {
     onChange(fn: () => void): () => void
   }
   benchmark: {
-    /** the job count times (the first picture loads the model, the next ones show the speed with it loaded) */
-    start(job: Omit<Job, 'id'>, count: number, model: string): Promise<string[]>
+    /** the job count times (the first picture loads the model, the next ones show the speed with it loaded);
+     * freshPrompt: each picture with a prompt of its own, so the text encoder runs every time */
+    start(job: Omit<Job, 'id'>, count: number, model: string, freshPrompt?: boolean): Promise<string[]>
     list(): Promise<BenchmarkRun[]>
     clear(): Promise<void>
     onChange(fn: (runs: BenchmarkRun[]) => void): () => void
@@ -663,6 +671,12 @@ export interface VulkaraApi {
     detect(path: string): Promise<DetectedPose>
     onProgress(fn: (stage: string, percent: number) => void): () => void
   }
+  caption: {
+    /** a prompt for the picture (Diffusers engine, Qwen3-VL 2B downloaded on first use); not while a job runs */
+    image(path: string): Promise<Caption>
+    stop(): Promise<void>
+    onProgress(fn: (stage: string, percent: number) => void): () => void
+  }
   dialog: {
     /** a question with two answers on the window; true when the first (yes) was chosen */
     ask(message: string, yes: string, no: string, detail?: string): Promise<boolean>
@@ -700,6 +714,10 @@ export interface VulkaraApi {
     /** downloads and checks the newest release, then restarts into it */
     installUpdate(): Promise<void>
     onUpdate(fn: (s: AppUpdateState) => void): () => void
+    /** a page the main window should show (the app menu and the menu bar: Settings …) */
+    onNavigate(fn: (route: string) => void): () => void
+    /** the monitor window: what VulKara and its engines hold with the GPU's share (GB), while a job runs */
+    onFootprint(fn: (gb: number) => void): () => void
   }
   remote: {
     /** whether the remote web UI is serving, the addresses it can be reached at on this Mac, and whether over HTTPS */

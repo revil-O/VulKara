@@ -291,8 +291,26 @@ footer .ai { color: var(--text); font-weight: 500; }
 
 /* five menu items, the language, Discord, theme and Download fit side by side from about 1240 px (Portuguese) */
 /* the wrap stays 1120 px wide above that: the longest menu (Portuguese) needs tighter gaps to fit */
+/* below that the menu folds into a button (no script: details/summary), as the language list does */
+.menu { display: none; position: relative; }
+.menu summary { list-style: none; cursor: pointer; display: flex; align-items: center; padding: 6px 8px; border-radius: 10px; color: var(--muted); border: 1px solid transparent; }
+.menu summary::-webkit-details-marker { display: none; }
+.menu summary:hover, .menu[open] summary { color: var(--text); border-color: var(--line); background: var(--card); }
+.menu summary .ico { width: 22px; height: 22px; }
+.menu summary .close, .menu[open] summary .ico:not(.close) { display: none; }
+.menu[open] summary .close { display: block; }
+.menu .panel {
+  position: absolute; right: 0; top: calc(100% + 6px); min-width: 220px; padding: 6px; display: flex; flex-direction: column;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow-lg);
+}
+.menu .panel a { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 9px; color: var(--text); text-decoration: none; }
+.menu .panel a:hover { background: var(--accent-tint); }
+.menu .panel a .ico { width: 18px; height: 18px; }
+.menu .panel .phone { display: none; }
+.menu .panel .theme { margin: 6px 6px 2px; }
 @media (max-width: 1240px) {
   .top nav { display: none; }
+  .menu { display: block; }
 }
 .top .wrap:has(nav) { gap: 14px; }
 .top nav { gap: 14px; }
@@ -300,9 +318,16 @@ footer .ai { color: var(--text); font-weight: 500; }
   .steps { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
-  body { font-size: 16px; }
-  .top .btn.small, .brandbox .ver { display: none; }
-  .community span, .lang summary span { display: none; }
+  body { font-size: 16px; overflow-x: hidden; }
+  .top .wrap { gap: 8px; }
+  .brandbox .ver { display: none; }
+  /* the bar keeps the brand, the language, the menu and Download; Discord and the appearance move into the menu */
+  .top .wrap > .community, .top .wrap > .theme { display: none; }
+  .menu .panel .phone { display: flex; }
+  /* the panel spans the screen: beside the brand it would reach past the left edge */
+  .menu .panel { position: fixed; left: 12px; right: 12px; top: 60px; min-width: 0; }
+  .lang summary span { display: none; }
+  .top .btn.small { padding: 7px 10px; }
   .hero { padding-top: 48px; }
   .hero .appicon { width: 104px; height: 104px; }
   .btn.big { width: 100%; }
@@ -312,6 +337,9 @@ footer .ai { color: var(--text); font-weight: 500; }
   .steps li { padding-left: 70px; }
 }
 
+@media (max-width: 360px) {
+  .top .btn.small { display: none; }  /* the hero's own download button is right below */
+}
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { transition: none !important; }
@@ -586,3 +614,16 @@ footer .legal a { color: inherit; display: inline-block; padding: 5px 2px; }
   .bench-page .chart { padding: 14px 12px 6px; }
   .bench-page .micro th:nth-child(3), .bench-page .micro td:nth-child(3), .bench-page .micro th:nth-child(4), .bench-page .micro td:nth-child(4) { display: none; }
 }
+
+/* results page: pictures at full width of their column, pairs side by side */
+.results-page .chart .prompt { font-family: var(--mono); font-size: 0.85rem; color: var(--text); background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 0 0 10px; white-space: pre-wrap; word-break: break-word; }
+.results-page .item { padding: 14px 0 6px; border-top: 1px solid var(--line); }
+.results-page .item h3 { margin: 0 0 8px; font-size: 1.05rem; }
+.results-page .item .note { color: var(--muted); margin: 0 0 8px; line-height: 1.5; }
+.results-page .runs { list-style: none; margin: 0 0 12px; padding: 0; font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+.results-page .runs b { color: var(--text); font-weight: 600; }
+.results-page .pics { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.results-page .pics figure { margin: 0; }
+.results-page .pics figure.wide { grid-column: 1 / -1; }
+.results-page .pics img, .results-page .pics video { display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: var(--shadow-lg); background: var(--bg-soft); }
+.results-page .pics figcaption { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); margin-top: 6px; }

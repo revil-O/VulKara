@@ -12,6 +12,8 @@ export default {
     lora: 'LoRA comparison',
     start: 'Start page',
     benchmark: 'Benchmark',
+    enhance: 'Enhance',
+    restore: 'Restore',
   },
   upscaleTo: '{from} to {to}',
   steps: '{n} steps',

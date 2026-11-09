@@ -4,7 +4,7 @@
 // measured (size and speed of a downloaded package). Report a problem opens one of the kept session logs, with
 // personal data replaced, to post it on GitHub.
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Bug } from 'lucide-vue-next'
+import { Bug } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import ReportDialog from '../components/ReportDialog.vue'
 import { t } from '../i18n'

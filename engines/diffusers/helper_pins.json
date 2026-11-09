@@ -134,5 +134,37 @@
    "yolox_l.onnx": "7860ae79de6c89a3c1eb72ae9a2756c0ccfbe04b7791bb5880afabd97855a411"
   },
   "revision": "1a7144101628d69ee7a3768d1ee3a094070dc388"
+ },
+ "baidu/ERNIE-Image-Turbo": {
+  "revision": "bc68c81e2a1730a394d5fc9fae70713dee940140",
+  "files": {
+   "pe/chat_template.jinja": null,
+   "pe/config.json": null,
+   "pe/generation_config.json": null,
+   "pe/tokenizer_config.json": null,
+   "pe/tokenizer.json": "286acad9b0e27fce778ac429763536accf618ccb6ed72963b6f94685e531c5c7",
+   "pe/model.safetensors": "abd26e2f4b5a0cc3922d3523649706f1d398050a766dc284161724d9ee47f808"
+  }
+ },
+ "lrzjason/Consistance_Edit_Lora": {
+  "files": {
+   "f2k_4B_consist_20260314.safetensors": "bed1e7e8747bc4572a20a7fcef436e82cfbfa5430d0162eda713b55d7a3c7ce4"
+  },
+  "revision": "825b73f9952186f807acb44f05dec4ec5044f394"
+ },
+ "Qwen/Qwen3-VL-2B-Instruct": {
+  "files": {
+   "chat_template.json": null,
+   "config.json": null,
+   "generation_config.json": null,
+   "merges.txt": null,
+   "model.safetensors": "7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+   "preprocessor_config.json": null,
+   "tokenizer.json": null,
+   "tokenizer_config.json": null,
+   "video_preprocessor_config.json": null,
+   "vocab.json": null
+  },
+  "revision": "89644892e4d85e24eaac8bacfd4f463576704203"
  }
 }

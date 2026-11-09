@@ -31,6 +31,7 @@ EXPECTED = {
     "hunyuan_dit_kohya": ("hunyuan_dit", None),
     # once taken for FLUX.1
     "klein9_peft_dump": ("flux2", "klein9b"),
+    "klein9_lcs_mixed_factor_names": ("flux2", "klein9b"),
     "hunyuan_video_diffusers": ("hunyuan_video", None),
     # once Qwen-Image instead of 2.1
     "qwen21_aitoolkit": ("qwen_image21", None),
@@ -49,6 +50,10 @@ EXPECTED = {
     "auraflow_kohya": ("auraflow", None),
     "lokr_flux_simpletuner": ("flux1", None),
     "anima_kohya_meta": ("anima", None),  # no modulation layers: its Cosmos blocks tell
+    "moss_comfy_nometa": ("moss_image", None),  # layers.N.proj.q/k/v/o, ffn_up_gate, ffn_down
+    "moss_kohya_nometa": ("moss_image", None),
+    "fibo2_diffusers_nometa": ("fibo2", None),  # 3584 wide, else NextDiT's names
+    "fibo2_comfy_nometa": ("fibo2", None),  # ComfyUI's fused qkv and w13
     # stay as they were
     "flux1_kohya_meta": ("flux1", None),
     "flux1_aitoolkit_meta": ("flux1", None),

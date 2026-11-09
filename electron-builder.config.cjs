@@ -18,6 +18,8 @@ module.exports = {
       // the tests, tools and caches of the engines are not part of the app
       filter: ['**/*', '!**/tests/**', '!**/tools/**', '!**/__pycache__/**', '!**/.pytest_cache/**', '!**/*.pyc'],
     },
+    // the menu bar icon (index.ts: process.resourcesPath/tray)
+    { from: 'build/tray', to: 'tray' },
     { from: 'LICENSE', to: 'LICENSE.txt' },
     { from: 'THIRD_PARTY_NOTICES.txt', to: 'THIRD_PARTY_NOTICES.txt' },
   ],

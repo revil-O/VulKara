@@ -38,6 +38,12 @@ const CHANGES = [
   { ref: '7bf', model: 'Inpainting, remove (empty prompt), FLUX.1 dev, 1024 px, Mac mini M4 16 GB (s per picture)', runtime: 'Diffusers, 4 bit', step: [832, 491], gb: [10.8, 11.5], why: 'LaMa fills the part first, the model refines 40 % of the steps; nothing invented there any more' },
   { ref: '7bd', model: 'Krea 2 Turbo, 1024 px, Mac mini M4 16 GB (MLX peak)', runtime: 'MLX, 4 bit', step: [41.3, 43.8], gb: [14.3, 11.3], why: 'the picture decoded in 256 px tiles instead of 512' },
   { ref: '7bd', model: 'Qwen-Image 2.1, 1024 px, Mac mini M4 16 GB', runtime: 'Diffusers, 8 bit', step: [42.4, 43.9], gb: [18.7, 12.3], range: ['42.2–42.5', '43.9', '18.6–20.2', '12.2–12.4'], why: 'the staged text encoder let go after encoding, the one-time quantization in a process of its own' },
+  { ref: '7bt', model: 'NetaYume v4 (Lumina 2), 1024 px, Mac mini M4 16 GB, pictures 2–5 (s per picture)', runtime: 'ComfyUI', step: [679, 684], gb: [10.51, 9.22], range: ['677–680', '683–684', '10.51', '9.18–9.22'], why: 'the text encoder freed before the sampler (VulKaraEncodeAndFree), the same picture' },
+  { ref: '7bt', model: 'FLUX.2 [klein] 4B, first picture, Mac mini M4 16 GB (s per picture)', runtime: 'MLX, 4 bit', step: [76, 62], gb: [6.85, 6.91], why: 'its 4 bit copy saved once next to it: 4.2 instead of 14.9 GB read' },
+  { ref: '7bt', model: 'ERNIE-Image Turbo, first picture, Mac mini M4 16 GB (s per picture)', runtime: 'MLX, 4 bit', step: [273, 252], gb: [10.11, 8.97], why: 'its 4 bit copy saved once: 6.2 instead of 21.6 GB read, no swap' },
+  { ref: '7bu', model: 'Z-Image Turbo, first picture, Mac mini M4 16 GB (s per picture)', runtime: 'MLX, 8 bit', step: [214, 180.5], gb: [12.03, 8.97], why: 'its 8 bit copy saved once, and a prompt encoded before does not read the text encoder' },
+  { ref: '7bv', model: 'SD 3.5 Medium, new prompt per picture, Mac mini M4 16 GB (s per picture)', runtime: 'Diffusers, 8 bit', step: [365, 361], gb: [11.1, 10.2], range: ['364–375', '359–373', '11.08–11.12', '9.72–10.77'], why: 'its GGUF copy read as views of the file instead of a copy of every tensor' },
+  { ref: '7bx', model: 'Fibo 2.0 Edit Turbo, edit at 1024 px, Mac mini M4 16 GB (s per picture)', runtime: 'MLX, 8 bit', step: [254, 263], gb: [13.55, 11.03], range: ['253–258', '254–274', '13.53–13.56', '11.02–11.05'], why: 'the transformer read after the text encoder and the picture to edit, the same pictures' },
 ]
 
 // the memory plan against the engine's measured peak, 1024 px (MEASUREMENTS 7m): [model, runtime, used, planned]
@@ -114,6 +120,20 @@ const PLAN_M4 = [
   ['SD 3.5 Medium, GGUF copy', 'Diffusers, 8 bit · 8.0 s/step (7bl)', 4.8, 10.4],
   ['Qwen-Image 2.1, GGUF copy instead of Quanto', 'Diffusers, 8 bit · 21.5 s/step, guidance 1 (7bl)', 12.3, 11.9],
   ['Juggernaut XL + ControlNet Canny, ControlNet by optimum-quanto', 'Diffusers · 6.0 s/step (7bl)', 11.2, 11.5],
+  ['DreamShaper 8, 512 px, pictures 2–5 (Phase 3)', 'Diffusers, 16 bit · 14 s (7bs)', 3.79, 3.6],
+  ['Juggernaut XL v7, pictures 2–5 (Phase 3)', 'Diffusers, 16 bit · 140 s (7bs)', 8.76, 9.4],
+  ['SD 3.5 Medium, pictures 2–5 (Phase 3)', 'Diffusers, 8 bit · 327 s (7bs)', 5.94, 10.4],
+  ['FLUX 3 Image Klein, pictures 2–5 (Phase 3)', 'MLX, 8 bit · 217 s (7bs)', 10.63, 10.0],
+  ['FLUX.1 [schnell] Q8, streamed, pictures 2–5 (Phase 3)', 'Diffusers · 122 s (7bs)', 8.93, 12.0],
+  ['GonzaLomo Chroma, streamed, pictures 2–5 (Phase 3)', 'Diffusers · 1617 s (7bs)', 9.32, 11.5],
+  ['FLUX.2 [klein] 4B, pictures 2–5 (Phase 3, after)', 'MLX, 4 bit · 51 s (7bt)', 6.91, 9.9],
+  ['ERNIE-Image Turbo, pictures 2–5 (Phase 3, after)', 'MLX, 4 bit · 238 s (7bt)', 8.98, 11.2],
+  ['Anima Turbo, pictures 2–5 (Phase 3, after)', 'ComfyUI · 64–87 s (7bt)', 10.02, 9.1],
+  ['NetaYume v4, pictures 2–5 (Phase 3, after)', 'ComfyUI · 683 s (7bt)', 9.22, 8.9],
+  ['Z-Image Turbo, first picture (Phase 3, after)', 'MLX, 8 bit · 180 s (7bu)', 8.97, 11.9],
+  ['FLUX.2 [klein] 9B, same prompt (Phase 3, after)', 'Diffusers · 116 s (7bt)', 9.04, 9.8],
+  ['FLUX.2 [klein] 9B, new prompt per picture', 'Diffusers · 158–170 s; the 8 bit text encoder alone takes 11 GB (7bv, 7bw)', 12.42, 9.8],
+  ['Fibo 2.0 Edit Turbo, edit (Phase 3, after)', 'MLX, 8 bit · 254–274 s (7bx)', 11.03, 14.4],
 ]
 
 // work done once and kept, and a stop that waited (MEASUREMENTS 7r, 7s, 7t, 7u, 7x, 7y, 7z): before, after, unit

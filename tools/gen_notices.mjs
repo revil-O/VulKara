@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 // what ends up in the app: the libraries bundled into the pages and Electron itself
-const START = ['vue', 'pinia', 'vue-router', 'lucide-vue-next', 'electron']
+const START = ['vue', 'pinia', 'vue-router', '@lucide/vue', 'electron']
 
 function packageDir(name, from = ROOT) {
   for (let dir = from; ; dir = dirname(dir)) {

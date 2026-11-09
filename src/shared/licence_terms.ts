@@ -90,6 +90,8 @@ export function baseLicence(family: string, arch = '', pageBase = ''): { title: 
     case 'anima': return { title: 'Anima', terms: TERMS['circlestone-labs-non-commercial-license'] }
     case 'lumina': return { title: 'Lumina 2', terms: TERMS['apache-2.0'] }
     case 'ernie': return { title: 'ERNIE-Image', terms: TERMS['apache-2.0'] }
+    case 'moss_image': return { title: 'MOSS-Image', terms: TERMS['apache-2.0'] }
+    case 'fibo2': return { title: 'Fibo 2.0', terms: TERMS['cc-by-nc-4.0'] }
     case 'auraflow': return is('pony') ? { title: 'Pony V7', terms: TERMS['pony-license'] } : { title: 'AuraFlow', terms: TERMS['apache-2.0'] }
     case 'ideogram4': return { title: 'Ideogram 4', terms: TERMS['ideogram-4-non-commercial'] }
     case 'wan': return { title: 'Wan 2.2', terms: TERMS['apache-2.0'] }

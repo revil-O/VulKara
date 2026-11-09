@@ -31,6 +31,7 @@ const RULES: Rule[] = [
   [/^Preparing (.+) control image$/, 'engine.preparingControl', ['type']],
   [/^Encoding prompt$/, 'engine.encodingPrompt'],
   [/^Generating$/, 'engine.generating'],
+  [/^Describing the picture$/, 'engine.describingPicture'],
   [/^Decoding$/, 'engine.decoding'],
   [/^Working on the picture$/, 'engine.workingOnPicture'],
   [/^Correcting colours and contrast$/, 'engine.correcting'],

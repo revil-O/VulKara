@@ -107,6 +107,8 @@ export interface RestoreOptions {
   rules: string[]
   /** refuse a result in which a face appeared, vanished or moved */
   checkFaces: boolean
+  /** the repair with the consistency LoRA (FLUX.2 [klein] 4B only; other models repair without it) */
+  consistency?: boolean
   /** how strongly the correction is applied, 0..1 (default 0.8) */
   correctStrength?: number
   /** dust and scratches found and filled from their surroundings (LaMa) */
@@ -154,6 +156,8 @@ export interface Job {
   /** how much of the input picture changes, 0..1 */
   strength?: number
   inputImage?: string
+  /** further pictures an edit model takes beside the input picture (Fibo 2.0: <image_2> to <image_4>) */
+  referenceImages?: string[]
   maskImage?: string
   loras?: { path: string; scale: number }[]
   controlnet?: { type: string; image: string; weight: number; preprocess: boolean }
@@ -172,6 +176,8 @@ export interface Job {
   consent?: boolean
   /** FLUX 3 Image Klein: the prompt upsampler writes the full caption first (text to image) */
   upsample?: boolean
+  /** FLUX.2 [klein] 4B, image to image: the consistency LoRA at half strength keeps the picture */
+  keepPicture?: boolean
   /** "AI generated .." written into the lower right corner of each picture (not videos) */
   aiLabel?: AiLabel
   label?: string
@@ -195,6 +201,8 @@ export interface HistoryEntry {
   /** how long the job ran, loading included, and its seconds per step (entries since 0.7.10) */
   seconds?: number
   secondsPerStep?: number
+  /** of seconds: starting the engine, loading the model and encoding the prompt before the first step (since 0.7.12) */
+  loadSeconds?: number
 }
 
 /** Events of the engines (protocol v2) as the main process passes them on. */
@@ -210,6 +218,8 @@ export type EngineEvent =
   /** the engine's own processes over the job: their peak footprint (with what the GPU holds), what they read from
    *  disk, and what its memory plan expected (missing where it has none) */
   | { event: 'footprint'; peak_gb: number; read_gb: number; plan_gb?: number | null }
+  /** what the memory plan expects for this job, sent before it starts (the monitor window) */
+  | { event: 'planned'; gb: number }
   | { event: 'result'; path: string }
   | { event: 'error'; message: string }
   | { event: 'preview'; model: string; preview?: string; error?: string }

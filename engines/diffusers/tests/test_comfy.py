@@ -61,6 +61,20 @@ def test_workflow_text_to_image_image_to_image_and_loras():
     assert g["pos"]["inputs"]["clip"] == ["lora0", 1]
 
 
+def test_a_staged_plan_frees_the_text_encoder_before_the_sampler():
+    wf = _workflows()
+    files = {"diffusion_model": "m.safetensors", "text_encoder": "te.safetensors", "vae": "v.safetensors"}
+    comfy = registry.ARCHS["lumina2"]["comfy"]
+    job = {"prompt": "a cat", "negative_prompt": "blurry", "width": 1024, "height": 1024, "steps": 40, "cfg": 4.0, "seed": 5}
+    g = wf.build(job, files, comfy, free_text_encoder=True)
+    assert "clip" not in g and "pos" not in g and g["enc"]["inputs"] == {
+        "clip_name": "te.safetensors", "type": "lumina2", "text": "a cat", "negative": "blurry"}
+    assert (g["sample"]["inputs"]["positive"], g["sample"]["inputs"]["negative"]) == (["enc", 0], ["enc", 1])
+    # a LoRA patches the text encoder too: then the standard nodes
+    assert g["enc"]["class_type"] == "VulKaraEncodeAndFree"
+    assert "enc" not in wf.build(job, files, comfy, loras=[("l.safetensors", 1.0)], free_text_encoder=True)
+
+
 def test_civitai_brings_the_versions_text_encoder_and_vae(monkeypatch):
     def f(name, ftype, primary=False):
         return {"name": name, "type": ftype, "primary": primary, "downloadUrl": "u/" + name, "sizeKB": 1000,
@@ -323,3 +337,126 @@ def test_a_comfyui_gguf_too_large_for_memory_is_planned_streamed(monkeypatch):
     assert not importer.make_plan(dict(info, file="big.safetensors"), ram_gb=16)["fits"]
     monkeypatch.setenv("VK_COMFY_STREAMING", "off")
     assert not importer.make_plan(info, ram_gb=16)["fits"]
+
+
+def _moss_keys():
+    return {"shared_block_modulation.weight": [3072, 256], "layers.0.proj.ffn_up_gate.weight": [16384, 3072],
+            "layers.0.proj.ffn_up_gate.comfy_quant": [32], "video_embedder.weight": [3072, 128]}
+
+
+def test_moss_image_is_recognised_and_its_workflow_follows_the_maker():
+    assert registry.detect_from_single_file(_moss_keys(), "moss_image_sft_int8_convrot.safetensors")[:2] == \
+        ("moss_image", "comfy_files")
+    dmd = registry.detect_from_single_file(_moss_keys(), "Spectrallic/x/moss_image_sft_8stepdmd_int8_convrot.safetensors")
+    assert dmd[2] == {"num_steps": 8, "guidance_scale": 1.0}
+    spec = registry.ARCHS["moss_image"]
+    assert spec["runtime"] == "comfyui" and spec["defaults"]["num_steps"] == 50 and spec["defaults"]["guidance_scale"] == 3.0
+    assert civitai.arch_of("MOSS-Image") == "moss_image"
+    workflows = _workflows()
+    job = {"prompt": "a sign reading \"Hi\"", "negative_prompt": "", "width": 1024, "height": 768, "steps": 50, "cfg": 3.0, "seed": 1}
+    g = workflows.build(job, {"diffusion_model": "m.safetensors", "text_encoder": "te.safetensors", "vae": "v.safetensors"},
+                        spec["comfy"])
+    assert g["clip"]["inputs"]["type"] == "moss_image" and g["latent"]["class_type"] == "EmptyFlux2LatentImage"
+    assert g["slg"]["inputs"]["single_layers"] == "22" and g["sample"]["inputs"]["model"] == ["slg", 0]
+    assert (g["sample"]["inputs"]["sampler_name"], g["sample"]["inputs"]["scheduler"]) == ("euler", "simple")
+    # other models keep their plain latent and no layer skipping
+    other = workflows.build(job, {"diffusion_model": "m", "text_encoder": "t", "vae": "v"}, registry.ARCHS["anima"]["comfy"])
+    assert other["latent"]["class_type"] == "EmptyLatentImage" and "slg" not in other
+
+
+def _fibo_keys():
+    return {"perceiver.latent_queries": [512, 3072], "layers.0.attention.qkv.weight": [9216, 3072],
+            "layers.0.feed_forward.w13.weight": [19456, 3072], "final_layer.linear.weight": [128, 3072]}
+
+
+def test_fibo2_is_recognised_and_edits_through_its_own_encode_node():
+    turbo = registry.detect_from_single_file(_fibo_keys(), "Comfy-Org/Fibo-2.0/fibo2_edit_turbo_int8_convrot.safetensors")
+    assert turbo[:3] == ("fibo2", "comfy_files", {})
+    dev = registry.detect_from_single_file(_fibo_keys(), "Comfy-Org/Fibo-2.0/fibo2_dev_int8_convrot.safetensors")
+    assert dev[2] == {"num_steps": 50, "guidance_scale": 5.0}
+    spec = registry.ARCHS["fibo2"]
+    assert spec["runtime"] == "comfyui" and (spec["defaults"]["num_steps"], spec["defaults"]["guidance_scale"]) == (4, 1.0)
+    assert civitai.arch_of("Fibo 2") == "fibo2"
+    workflows = _workflows()
+    job = {"prompt": "make it a snowy night", "negative_prompt": "", "width": 1024, "height": 768, "steps": 4, "cfg": 1.0, "seed": 1}
+    files = {"diffusion_model": "m.safetensors", "text_encoder": "te.safetensors", "vae": "v.safetensors"}
+    g = workflows.build(job, files, spec["comfy"], input_image="in.png")
+    enc, sample = g["enc"]["inputs"], g["sample"]["inputs"]
+    assert g["enc"]["class_type"] == "TextEncodeFibo2" and enc["images.image_1"] == ["image", 0] and enc["vae"] == ["vae", 0]
+    assert (enc["width"], enc["height"]) == (1024, 768) and g["clip"]["inputs"]["type"] == "fibo2"
+    assert (sample["positive"], sample["negative"], sample["latent_image"]) == (["enc", 0], ["enc", 1], ["enc", 2])
+    assert sample["denoise"] == 1.0 and "pos" not in g and "latent" not in g
+    # text to image: the same node without a picture
+    assert "images.image_1" not in workflows.build(job, files, spec["comfy"])["enc"]["inputs"]
+    # further pictures to edit with it: <image_2> ...
+    several = workflows.build(job, files, spec["comfy"], input_image="in.png", references=["b.png", "c.png"])
+    assert several["enc"]["inputs"]["images.image_3"] == ["image3", 0] and several["image3"]["inputs"]["image"] == "c.png"
+
+
+def test_a_masked_edit_greys_the_part_and_keeps_the_rest():
+    import masks
+    from PIL import Image, ImageDraw
+    picture = Image.new("RGB", (256, 256), (10, 200, 30))
+    mask = Image.new("L", (256, 256), 0)
+    ImageDraw.Draw(mask).rectangle((96, 96, 160, 160), fill=255)
+    grown = masks.grow_mask(mask, 48)
+    greyed = masks.grey_out(picture, grown)
+    assert greyed.getpixel((128, 128)) == (128, 128, 128) and greyed.getpixel((5, 5)) == (10, 200, 30)
+    painted = masks.blend_into(picture, Image.new("RGB", (512, 512), (250, 0, 0)), grown)
+    assert painted.size == (256, 256) and painted.getpixel((5, 5)) == (10, 200, 30) and painted.getpixel((128, 128))[0] > 240
+
+
+def test_a_file_comfyui_quantized_tells_its_format_and_counts_by_size(tmp_path, monkeypatch):
+    import json as _json
+    import struct
+
+    def quantized(name, fmt):
+        blob = _json.dumps({"format": fmt}).encode()
+        header = {"l.weight": {"dtype": "I8", "shape": [4, 4], "data_offsets": [0, 16]},
+                  "l.comfy_quant": {"dtype": "U8", "shape": [len(blob)], "data_offsets": [16, 16 + len(blob)]}}
+        data = _json.dumps(header).encode()
+        (tmp_path / name).write_bytes(struct.pack("<Q", len(data)) + data + b"\0" * 16 + blob)
+        return str(tmp_path / name)
+
+    assert registry.file_precision(quantized("dit.safetensors", "int8_tensorwise")) == "8 bit (int8)"
+    assert registry.file_precision(quantized("te.safetensors", "asym_w4a8_int8")) == "4 bit (W4A8)"
+
+    class _Meta:
+        tensors = {k: type("T", (), {"shape": v, "dtype": "I8"})() for k, v in _moss_keys().items()}
+
+    class _Api:
+        def __init__(self, token=None): pass
+        def model_info(self, ref, files_metadata=True):
+            return type("I", (), {"siblings": [type("S", (), {"rfilename": "diffusion_models/m.safetensors", "size": 5_413_698_958})()]})()
+        def parse_safetensors_file_metadata(self, ref, file):
+            return _Meta()
+    import huggingface_hub
+    monkeypatch.setattr(huggingface_hub, "HfApi", _Api)
+    monkeypatch.setattr(importer, "_hf_repo_info", lambda repo, token: (None, {
+        "text_encoders/qwen3.5_9b_w4a8_gptq.safetensors": 7_343_591_088, "vae/flux2-vae_small.safetensors": 249_521_340}))
+    info = importer.inspect("hf", "Comfy-Org/MOSS-Image", "diffusion_models/m.safetensors")
+    assert info["arch"] == "moss_image" and abs(info["components"]["transformer"] - 2.71) < 0.01
+    assert info["base_files"]["text_encoder"].endswith("w4a8_gptq.safetensors")
+    # ComfyUI's FP8 files are computed in 16 bit on the Mac: counted by their parameters, not by the file's size
+    _Meta.tensors = {k: type("T", (), {"shape": v, "dtype": "F8_E4M3"})() for k, v in _moss_keys().items()}
+    fp8 = importer.inspect("hf", "Comfy-Org/MOSS-Image", "diffusion_models/m.safetensors")
+    assert fp8["components"]["transformer"] < 0.1
+
+
+def test_fibo2_saved_by_mflux_runs_on_mlx_and_fits_16_gb(tmp_path):
+    import json as _json
+    assert registry.detect_mflux({"model_name": "fibo-2.0-edit-turbo"}) == ("fibo2_mlx", {})
+    assert registry.detect_mflux({"model_name": "fibo-2.0-dev"})[1] == {"num_steps": 50, "guidance_scale": 5.0}
+    assert registry.detect_mflux({"model_name": "z-image"}) is None
+    (tmp_path / "mflux_model.json").write_text(_json.dumps({"model_name": "fibo-2.0-edit-turbo", "quantize": 8}))
+    for part, gb in (("transformer", 8.64), ("text_encoder", 4.61), ("vae", 0.17)):
+        (tmp_path / part).mkdir()
+        with open(tmp_path / part / "0.safetensors", "wb") as f:
+            f.truncate(int(gb * 1e9))  # sparse: only the size counts
+    info = importer.inspect("dir", str(tmp_path))
+    assert info["arch"] == "fibo2_mlx" and info["layout"] == "folder"
+    assert abs(info["components"]["transformer"] - 4.32) < 0.01
+    small = importer.make_plan(info, ram_gb=16)
+    assert small["fits"] and small["staged_text_encoder"] and small["est_peak_gb"] < 12  # measured 11.0 GB (7aj)
+    assert registry.ARCHS["fibo2_mlx"]["runtime"] == "mlx" and registry.ARCHS["fibo2_mlx"]["inpaint"]
+    assert registry.ARCHS["fibo2_mlx"]["edit_gb"] > 2  # an edit's picture: 13.2-13.4 GB on the Mac mini (7bf)

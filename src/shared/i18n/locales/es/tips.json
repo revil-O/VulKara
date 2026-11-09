@@ -534,7 +534,19 @@
     },
     {
      "title": "LoRAs de detalle y de piel",
-     "body": "Las LoRAs de detalle o de piel realista añaden textura y microdetalle. Suelen usarse con un peso de bajo a moderado, y algunas admiten también pesos negativos para reducir el detalle; en exceso dan una piel granulada y demasiado enfocada."
+     "body": "Las LoRAs de detalle o de piel realista añaden textura y microdetalle. Suelen usarse con un peso de bajo a moderado, y algunas admiten también pesos negativos para reducir el detalle; en exceso dan una piel granulada y demasiado enfocada.",
+     "images": [
+      {
+       "file": "skin_nolora.jpg",
+       "caption": "Sin la LoRA",
+       "prompt": "close-up portrait of a middle-aged fisherman on a pier, natural light, photo"
+      },
+      {
+       "file": "skin_lora.jpg",
+       "caption": "Flux Skin Detailer a 0,7",
+       "prompt": "close-up portrait of a middle-aged fisherman on a pier, natural light, photo"
+      }
+     ]
     },
     {
      "title": "Retocadores de caras y manos",
@@ -550,7 +562,19 @@
     },
     {
      "title": "Amplía las ideas cortas para modelos de prompts largos",
-     "body": "Los modelos con codificadores de lenguaje (Qwen-Image, Z-Image, Krea 2, Wan, Ideogram 4) se benefician de convertir una idea corta en un párrafo detallado, a mano o con un modelo de lenguaje."
+     "body": "Los modelos con codificadores de lenguaje (Qwen-Image, Z-Image, Krea 2, Wan, Ideogram 4) se benefician de convertir una idea corta en un párrafo detallado, a mano o con un modelo de lenguaje.",
+     "images": [
+      {
+       "file": "z_plain.jpg",
+       "caption": "Idea corta (Z-Image Turbo)",
+       "prompt": "a woman at night"
+      },
+      {
+       "file": "z_long.jpg",
+       "caption": "Ampliada a un párrafo",
+       "prompt": "A street portrait of a woman in her thirties with short black hair and a yellow raincoat, standing under a neon pharmacy sign at night, wet pavement reflections, eye-level 50mm shot"
+      }
+     ]
     }
    ]
   },
@@ -562,7 +586,19 @@
     {
      "title": "Escribe prompts a base de palabras clave",
      "body": "SD 1.5 usa un codificador de texto CLIP que lee unos 75 tokens cada vez, así que las palabras clave cortas separadas por comas funcionan mejor que las frases largas. Pon primero el sujeto y las palabras de estilo clave.",
-     "example": "portrait of an old sailor, oil painting, dramatic lighting, rich colors, detailed"
+     "example": "portrait of an old sailor, oil painting, dramatic lighting, rich colors, detailed",
+     "images": [
+      {
+       "file": "sd1_plain.jpg",
+       "caption": "Prompt simple",
+       "prompt": "an old sailor"
+      },
+      {
+       "file": "sd1_good.jpg",
+       "caption": "Palabras clave con prompt negativo",
+       "prompt": "portrait of an old sailor, oil painting, dramatic lighting, rich colors, detailed"
+      }
+     ]
     },
     {
      "title": "Genera a 512-768 px",
@@ -599,6 +635,18 @@
      "body": "SDXL se entrenó en torno a 1024x1024. Buenas alternativas son 1152x896, 1216x832 y 1344x768 y sus versiones verticales. Los tamaños pequeños como 512 px se ven notablemente peor.",
      "do": [
       "Elige un tamaño de aprox. 1 MP en total"
+     ],
+     "images": [
+      {
+       "file": "sdxl_512.jpg",
+       "caption": "512 px",
+       "prompt": "a knight in armor standing in a castle courtyard at sunset, photo"
+      },
+      {
+       "file": "sdxl_1024.jpg",
+       "caption": "1024 px",
+       "prompt": "a knight in armor standing in a castle courtyard at sunset, photo"
+      }
      ]
     },
     {
@@ -641,7 +689,19 @@
    "tips": [
     {
      "title": "Escribe frases naturales",
-     "body": "SD 3.5 combina CLIP con un codificador T5, así que las frases descriptivas funcionan mejor que las listas de etiquetas. Incluye el estilo, la composición y la iluminación en lenguaje llano."
+     "body": "SD 3.5 combina CLIP con un codificador T5, así que las frases descriptivas funcionan mejor que las listas de etiquetas. Incluye el estilo, la composición y la iluminación en lenguaje llano.",
+     "images": [
+      {
+       "file": "sd3_tags.jpg",
+       "caption": "Lista de tags",
+       "prompt": "cabin, forest, winter, night, lantern, snow"
+      },
+      {
+       "file": "sd3_sentence.jpg",
+       "caption": "Frases",
+       "prompt": "A small wooden cabin in a snowy pine forest at night, a single lantern glowing by the door, soft snowfall, moonlight through the trees, cinematic wide shot"
+      }
+     ]
     },
     {
      "title": "Large: unos 28 pasos, guidance 3.5-4.5",
@@ -673,7 +733,19 @@
     {
      "title": "Describe la escena en prosa",
      "body": "FLUX usa un codificador de lenguaje T5 y sigue bien las frases completas. Escribe una descripción clara del sujeto, el escenario, la luz y el estilo; las listas de etiquetas y los pesos aportan poco.",
-     "example": "A cozy bookshop at dusk seen through a rain-streaked window, warm lamps inside, a cat asleep on a stack of novels, soft cinematic light"
+     "example": "A cozy bookshop at dusk seen through a rain-streaked window, warm lamps inside, a cat asleep on a stack of novels, soft cinematic light",
+     "images": [
+      {
+       "file": "flux1_plain.jpg",
+       "caption": "Dos palabras",
+       "prompt": "a bookshop"
+      },
+      {
+       "file": "flux1_prose.jpg",
+       "caption": "Prosa",
+       "prompt": "A cozy bookshop at dusk seen through a rain-streaked window, warm lamps inside, a cat asleep on a stack of novels, soft cinematic light"
+      }
+     ]
     },
     {
      "title": "Sin prompt negativo",
@@ -717,7 +789,19 @@
     },
     {
      "title": "Usa colores hex y texto entre comillas",
-     "body": "FLUX.2 puede seguir códigos de color hex asociados a un objeto (walls in #C4725A) y representa mejor el texto entre comillas cuando indicas posición, tamaño y estilo."
+     "body": "FLUX.2 puede seguir códigos de color hex asociados a un objeto (walls in #C4725A) y representa mejor el texto entre comillas cuando indicas posición, tamaño y estilo.",
+     "images": [
+      {
+       "file": "flux2_plain.jpg",
+       "caption": "Prompt simple",
+       "prompt": "a cafe wall with a sign"
+      },
+      {
+       "file": "flux2_hex.jpg",
+       "caption": "Color hex y texto entre comillas",
+       "prompt": "A café wall painted in #C4725A with a hanging wooden sign that reads \"MORNING\" in large white serif letters, centred above the door, soft morning light"
+      }
+     ]
     },
     {
      "title": "Editar requiere más pasos",
@@ -741,7 +825,19 @@
     },
     {
      "title": "Prompts en lenguaje natural",
-     "body": "Chroma lee los prompts con un codificador T5 como FLUX, así que las frases descriptivas funcionan, y es flexible tanto en estilos fotográficos como de ilustración."
+     "body": "Chroma lee los prompts con un codificador T5 como FLUX, así que las frases descriptivas funcionan, y es flexible tanto en estilos fotográficos como de ilustración.",
+     "images": [
+      {
+       "file": "chroma_plain.jpg",
+       "caption": "Prompt corto",
+       "prompt": "a red fox in a forest"
+      },
+      {
+       "file": "chroma_sentence.jpg",
+       "caption": "Lenguaje natural",
+       "prompt": "A red fox standing on a mossy log in a misty birch forest at dawn, golden backlight through the fog, shallow depth of field, wildlife photograph"
+      }
+     ]
     },
     {
      "title": "Chroma1-Flash: pocos pasos, CFG de aprox. 1",
@@ -769,7 +865,19 @@
     {
      "title": "Su punto fuerte: textos y pósteres",
      "body": "Representa texto en varias líneas en inglés y chino, incluidos pósteres e infografías. Pon cada texto entre comillas y di dónde va.",
-     "example": "A minimalist concert poster: large title \"NIGHT TRAIN\" at the top in bold white sans-serif, smaller line \"Live at the Harbor Hall\" below, deep blue background with a single orange train light"
+     "example": "A minimalist concert poster: large title \"NIGHT TRAIN\" at the top in bold white sans-serif, smaller line \"Live at the Harbor Hall\" below, deep blue background with a single orange train light",
+     "images": [
+      {
+       "file": "qwen_plain.jpg",
+       "caption": "Prompt simple",
+       "prompt": "a concert poster"
+      },
+      {
+       "file": "qwen_poster.jpg",
+       "caption": "Texto entre comillas con su lugar",
+       "prompt": "A minimalist concert poster: large title \"NIGHT TRAIN\" at the top in bold white sans-serif, smaller line \"Live at the Harbor Hall\" below, deep blue background with a single orange train light"
+      }
+     ]
     },
     {
      "title": "Ajustes del Qwen-Image original",
@@ -805,7 +913,19 @@
     {
      "title": "Prompts largos en lenguaje natural",
      "body": "Z-Image usa un codificador de lenguaje Qwen3 y funciona mejor con frases detalladas que con listas de etiquetas. Convertir una idea corta en un párrafo completo suele mejorar los resultados.",
-     "example": "A street portrait of a woman in her thirties with short black hair and a yellow raincoat, standing under a neon pharmacy sign at night, wet pavement reflections, eye-level 50mm shot"
+     "example": "A street portrait of a woman in her thirties with short black hair and a yellow raincoat, standing under a neon pharmacy sign at night, wet pavement reflections, eye-level 50mm shot",
+     "images": [
+      {
+       "file": "z_plain.jpg",
+       "caption": "Idea corta",
+       "prompt": "a woman at night"
+      },
+      {
+       "file": "z_long.jpg",
+       "caption": "Párrafo completo",
+       "prompt": "A street portrait of a woman in her thirties with short black hair and a yellow raincoat, standing under a neon pharmacy sign at night, wet pavement reflections, eye-level 50mm shot"
+      }
+     ]
     },
     {
      "title": "Texto entre comillas en inglés o chino",
@@ -833,7 +953,19 @@
     {
      "title": "Lenguaje natural con dirección de arte",
      "body": "Krea recomienda prompts en lenguaje natural: los prompts largos y detallados dan el mayor control, aunque los cortos también se ven bien. Nombra con claridad el ambiente, la iluminación y el estilo visual.",
-     "example": "Editorial fashion photo of a man in a rust-colored linen suit on a sun-bleached rooftop, hard midday shadows, desaturated warm palette"
+     "example": "Editorial fashion photo of a man in a rust-colored linen suit on a sun-bleached rooftop, hard midday shadows, desaturated warm palette",
+     "images": [
+      {
+       "file": "krea_plain.jpg",
+       "caption": "Prompt corto",
+       "prompt": "a man in a suit"
+      },
+      {
+       "file": "krea_good.jpg",
+       "caption": "Con dirección de arte",
+       "prompt": "Editorial fashion photo of a man in a rust-colored linen suit on a sun-bleached rooftop, hard midday shadows, desaturated warm palette"
+      }
+     ]
     },
     {
      "title": "Mantén los pesos cerca de 1",
@@ -857,7 +989,19 @@
     {
      "title": "Pon el texto entre comillas y describe su aspecto",
      "body": "Da la cadena exacta, mantenla corta, describe el estilo tipográfico (por ejemplo, condensed bold sans-serif) en lugar de un nombre de fuente, e indica la posición y la jerarquía.",
-     "example": "Headline \"FRESH ROAST\" centered in tall condensed black letters, small subline \"since 1998\" beneath, printed on a kraft-paper coffee bag"
+     "example": "A kraft-paper coffee bag, product photo, with the headline \"FRESH ROAST\" in bold black serif letters and the small line \"since 1998\" beneath it",
+     "images": [
+      {
+       "file": "ideo_plain.jpg",
+       "caption": "Prompt simple",
+       "prompt": "a coffee bag"
+      },
+      {
+       "file": "ideo_text.jpg",
+       "caption": "Texto entre comillas con su aspecto y lugar",
+       "prompt": "A kraft-paper coffee bag, product photo, with the headline \"FRESH ROAST\" in bold black serif letters and the small line \"since 1998\" beneath it"
+      }
+     ]
     },
     {
      "title": "Controla el color y la composición",
@@ -881,7 +1025,14 @@
     {
      "title": "Describe el movimiento en el tiempo",
      "body": "Di qué se mueve y cómo: quién camina hacia dónde, qué hace el viento, cómo cambia la luz. Un prompt de imagen fija suele dar un clip casi estático.",
-     "example": "A woman in a long coat walks slowly toward the camera along a foggy pier, her scarf moving in the wind, gulls passing overhead"
+     "example": "A woman in a long coat walks slowly toward the camera along a foggy pier, her scarf moving in the wind, gulls passing overhead",
+     "images": [
+      {
+       "file": "wan_motion.jpg",
+       "caption": "Movimiento y cámara: primer fotograma, el del medio y el último del clip de cinco segundos",
+       "prompt": "the lighthouse beam sweeps slowly across the dusk sky, waves roll onto the rocks, slow push-in"
+      }
+     ]
     },
     {
      "title": "Usa términos de cinematografía para la cámara",
@@ -909,6 +1060,438 @@
     {
      "title": "Las LoRAs de velocidad cambian calidad por tiempo",
      "body": "Las LoRAs de destilación como LightX2V reducen la generación a unos pocos pasos con guidance de aprox. 1, lo que desactiva los prompts negativos y puede reducir el movimiento; buenas para borradores."
+    }
+   ]
+  },
+  {
+   "id": "ernie",
+   "title": "ERNIE-Image Turbo",
+   "intro": "El modelo de 8 pasos de Baidu (Apache 2.0) con texto denso, carteles y diseños, y su propio mejorador de prompts.",
+   "tips": [
+    {
+     "title": "8 pasos, guidance 1",
+     "body": "ERNIE-Image Turbo está destilado para 8 pasos con guidance 1,0 (los valores de su ficha); más pasos o más guidance no ayudan, y un prompt negativo no tiene efecto. En VulKara corre en el runtime MLX a 4 bits.",
+     "do": [
+      "Mantener los 8 pasos y guidance 1 del modelo"
+     ],
+     "avoid": [
+      "Prompts negativos: sin guidance se ignoran"
+     ]
+    },
+    {
+     "title": "Escribe una descripción completa, o deja que el mejorador la escriba",
+     "body": "El prompt de ejemplo de la ficha es un párrafo largo: ángulo de cámara, composición, luz y paleta de color. Los prompts cortos funcionan, pero la opción Mejorador de prompts los reescribe antes en una descripción así (el propio modelo mejorador de Baidu, 7,7 GB, descargado una vez). Escribe la descripción en inglés; el mismo prompt y seed dan la misma descripción y la misma imagen, y la descripción queda como nota de la imagen.",
+     "example": "a lighthouse on a rocky coast at dusk",
+     "do": [
+      "Activar el mejorador de prompts para una idea corta",
+      "Escribir el párrafo tú mismo cuando el diseño deba quedar exactamente como dices"
+     ],
+     "avoid": [
+      "Esperar otra descripción del mismo prompt y seed"
+     ],
+     "images": [
+      {
+       "file": "ernie_short.jpg",
+       "caption": "Prompt corto tal cual",
+       "prompt": "a lighthouse on a rocky coast at dusk"
+      },
+      {
+       "file": "ernie_pe.jpg",
+       "caption": "Mismo prompt y seed, descripción escrita por el mejorador",
+       "prompt": "a lighthouse on a rocky coast at dusk"
+      }
+     ]
+    },
+    {
+     "title": "Texto denso, carteles y viñetas",
+     "body": "El modelo está hecho para texto largo y sensible al diseño: carteles, infografías, imágenes tipo interfaz, cómics y diseños de varias viñetas. Pon cada texto entre comillas y di dónde va y cómo se ve; sus peores puntuaciones son la asignación de atributos y la posición, así que indica qué objeto recibe qué color o lugar.",
+     "example": "A travel poster of a mountain lake: the title \"ALPENSEE\" in large serif letters at the top, a line \"open all year\" in small caps at the bottom, teal water, a red cabin on the left shore",
+     "do": [
+      "Citar las palabras exactas y nombrar su lugar y estilo"
+     ],
+     "avoid": [
+      "Varios objetos con colores o lugares intercambiados en una frase"
+     ]
+    },
+    {
+     "title": "Sus propios tamaños",
+     "body": "La ficha lista 1024x1024, 848x1264, 1264x848, 768x1376, 896x1200, 1376x768 y 1200x896. Los tamaños cercanos dan las imágenes más limpias; uno menor sirve para borradores.",
+     "do": [
+      "Elegir un tamaño de la lista de la ficha para la imagen final"
+     ]
+    },
+    {
+     "title": "Memoria en un Mac de 16 GB",
+     "body": "El modelo a 4 bits necesita unos 9 GB; el mejorador unos 7 GB más. En un Mac con 16 GB la app descarga el modelo de imagen antes de ejecutar el mejorador y lo vuelve a cargar después, así que una imagen con mejorador tarda un minuto más.",
+     "do": [
+      "Cerrar otros programas antes de una imagen con mejorador en 16 GB"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "moss_image",
+   "title": "MOSS-Image",
+   "intro": "El modelo 5B de OpenMOSS (Apache 2.0) para texto en imágenes, carteles y diseños; la versión DMD de 8 pasos para velocidad.",
+   "tips": [
+    {
+     "title": "50 pasos con CFG 3, u 8 pasos con la versión DMD",
+     "body": "Los ajustes del fabricante son 50 pasos, CFG 3 y shift 5 con sampler Euler; CFG de 3 a 6, más alto para prompts cortos. La destilación DMD de 8 pasos de la comunidad (MOSS-Image 8-step en la lista de modelos) corre en 8 pasos sin guidance: unos 4,5 minutos en vez de 40 a 1024 px en un M2 con 24 GB. Su prompt negativo no tiene efecto.",
+     "do": [
+      "Bocetar con la versión de 8 pasos, terminar con 50 pasos cuando la imagen importe"
+     ],
+     "avoid": [
+      "Un prompt negativo con la versión de 8 pasos"
+     ]
+    },
+    {
+     "title": "Lenguaje natural, tags o un diseño",
+     "body": "MOSS-Image lee lenguaje natural, listas de tags y diseños JSON, hasta unos 4K tokens. El inglés tiene más datos de entrenamiento; el chino y otros idiomas también funcionan. Para tags, el orden del fabricante es calidad, score, meta, año, personaje, serie, artista, general.",
+     "example": "A cozy bookshop window at dusk, a hand-painted wooden sign above the door reading \"VulKara Books\", warm light, rain on the glass, photograph",
+     "do": [
+      "Escribir en inglés cuando puedas",
+      "Poner el texto exacto entre comillas"
+     ]
+    },
+    {
+     "title": "Saltos de línea en el texto",
+     "body": "Para texto de varias líneas, escribe los saltos en el prompt (un salto real o \\n) para que el modelo corte las líneas donde quieras.",
+     "example": "A chalkboard menu that reads \"SOUP OF THE DAY\\nTOMATO BASIL\\n6 EUR\" in white hand lettering"
+    },
+    {
+     "title": "Un diseño como prompt",
+     "body": "Pega el JSON del nodo de diseño de ComfyUI (o del skill Prompt Enhancer de MOSS) como prompt: un resumen y elementos con etiqueta, descripción, texto y una caja [arriba, izquierda, abajo, derecha] en píxeles desde el centro de la imagen (bbox_coord_space abs_centralized, bbox_format yxyx). El tamaño de la imagen debe coincidir con el lienzo del diseño. Texto y objetos caen donde dicen las cajas.",
+     "example": "{\"summary\":{\"caption\":\"A poster for a bakery, warm morning light, a round loaf of bread on a wooden board, clean typography\"},\"items\":[{\"label\":\"text\",\"caption\":\"headline in bold serif letters\",\"text\":\"FRESH BREAD\",\"bbox\":[-340,-300,-220,300]},{\"label\":\"object\",\"caption\":\"a round loaf of sourdough bread on a wooden board\",\"bbox\":[-150,-250,250,250]},{\"label\":\"text\",\"caption\":\"small caption line\",\"text\":\"baked every morning\",\"bbox\":[300,-200,360,200]}],\"bbox_coord_space\":\"abs_centralized\",\"bbox_format\":\"yxyx\"}",
+     "do": [
+      "Poner el tamaño de la imagen igual al lienzo del diseño (aquí 768 px)"
+     ],
+     "avoid": [
+      "Cajas que se solapan o salen del lienzo"
+     ],
+     "images": [
+      {
+       "file": "moss_plain.jpg",
+       "caption": "El mismo cartel descrito con palabras",
+       "prompt": "A poster for a bakery, warm morning light, a round loaf of sourdough bread on a wooden board, the headline \"FRESH BREAD\" in bold serif letters at the top and the small caption \"baked every morning\" at the bottom, clean typography"
+      },
+      {
+       "file": "moss_layout.jpg",
+       "caption": "El JSON del diseño como prompt",
+       "prompt": "{\"summary\":{\"caption\":\"A poster for a bakery, warm morning light, a round loaf of bread on a wooden board, clean typography\"},\"items\":[{\"label\":\"text\",\"caption\":\"headline in bold serif letters\",\"text\":\"FRESH BREAD\",\"bbox\":[-340,-300,-220,300]},{\"label\":\"object\",\"caption\":\"a round loaf of sourdough bread on a wooden board\",\"bbox\":[-150,-250,250,250]},{\"label\":\"text\",\"caption\":\"small caption line\",\"text\":\"baked every morning\",\"bbox\":[300,-200,360,200]}],\"bbox_coord_space\":\"abs_centralized\",\"bbox_format\":\"yxyx\"}"
+      }
+     ]
+    },
+    {
+     "title": "Rayas en zonas lisas: la LoRA Destripe",
+     "body": "El modelo SFT pinta a menudo rayas verticales de color, espaciadas por igual, en zonas lisas (cielos, niebla, paredes, fondos). La LoRA Destripe de nynxz, extraída del modelo en vez de entrenada, las quita: fuerza 1 a 768 px, 1,5 a 1024 px, solo sobre el modelo SFT y la versión de 8 pasos, no sobre Base.",
+     "do": [
+      "Importar la LoRA Destripe para carteles y colores planos"
+     ],
+     "avoid": [
+      "Fuerza 2: no mejora a 1,5"
+     ]
+    },
+    {
+     "title": "Tamaños y memoria",
+     "body": "El modelo hace de 1 a 2 megapíxeles y acepta tamaños de 512 px a 2K en múltiplos de 16, cualquier proporción. En VulKara el transformer corre a 8 bits y el codificador de texto a 4 bits: unos 9 GB, así que cabe en un Mac de 16 GB."
+    }
+   ]
+  },
+  {
+   "id": "fibo2",
+   "title": "Fibo 2.0 Edit Turbo y Dev",
+   "intro": "Los modelos 8B de Bria AI (CC BY-NC 4.0): Edit Turbo edita por instrucción en 4 pasos, Dev pinta a partir de texto en 50.",
+   "tips": [
+    {
+     "title": "Edit Turbo: 4 pasos, guidance 1",
+     "body": "Edit Turbo está destilado: 4 pasos con guidance 1,0 (los valores de la ficha) y sin prompt negativo. Fibo 2.0 Dev es la base sin destilar: 50 pasos con guidance 5,0, dos pasadas por paso, cerca de una hora por imagen a 1024 px en un M2 con 24 GB. En VulKara, Edit Turbo corre en ComfyUI desde 20 GB y en MLX a 8 bits en Macs de 16 GB.",
+     "do": [
+      "Edit Turbo para ediciones e imágenes rápidas, Dev cuando el prompt deba seguirse con precisión"
+     ],
+     "avoid": [
+      "Un prompt negativo con Edit Turbo"
+     ]
+    },
+    {
+     "title": "Editar con una instrucción sencilla",
+     "body": "Da la imagen inicial y di qué debe cambiar, como a una persona: reemplaza, añade, quita, conviértelo en. El modelo mantiene identidad, composición, luz y lo que no mencionaste. Toda la imagen se repinta, así que pequeñas desviaciones son normales; usa una máscara cuando nada más deba moverse.",
+     "example": "Make it a snowy winter night with a full moon",
+     "do": [
+      "Un cambio por instrucción",
+      "Nombrar lo que debe quedarse cuando importe: mantén la cara y la pose"
+     ],
+     "images": [
+      {
+       "file": "fibo_start.jpg",
+       "caption": "Imagen inicial",
+       "prompt": "a lighthouse on a rocky coast at dusk"
+      },
+      {
+       "file": "fibo_edit.jpg",
+       "caption": "Editada por instrucción (MLX, 8 bits, 4 pasos)",
+       "prompt": "Make it a snowy winter night with a full moon"
+      }
+     ]
+    },
+    {
+     "title": "Las ediciones con máscara mantienen el resto píxel a píxel",
+     "body": "Con una máscara (Inpainting, AI Canvas) solo se repinta la parte blanca y todo lo demás se copia del original. Describe toda la zona bajo la máscara, no solo el objeto nuevo.",
+     "example": "the white base of the lighthouse tower with a small red wooden cabin beside it"
+    },
+    {
+     "title": "Hasta cuatro imágenes en una edición",
+     "body": "Imagen a imagen admite hasta tres imágenes más en Más imágenes. Refiérete a ellas en orden como <image_1> (la imagen inicial), <image_2>, etc. Cada imagen adicional cuesta memoria (unos 2,2 GB en ComfyUI, 0,5 GB en MLX) y tiempo: con cuatro imágenes un paso tarda de 3,5 a 4 veces más.",
+     "example": "Put the lighthouse from <image_1> as a small framed painting in the shop window of <image_2>",
+     "avoid": [
+      "Esperar que se use cada imagen: el modelo puede quedarse con el letrero de <image_2> en vez de tomar el de <image_3>"
+     ]
+    },
+    {
+     "title": "Texto a imagen: describe como una descripción",
+     "body": "Fibo 2.0 se entrenó con descripciones estructuradas (el JSON VGL de Bria: objetos con cantidades, posiciones y atributos, un bloque de estilo). Un prompt simple funciona; cuanto más se parezca a esa descripción, con más precisión se siguen cantidades, lugares y colores. El texto corto entre comillas se renderiza bien.",
+     "example": "A cozy bookshop window at dusk, a hand-painted wooden sign above the door reading \"VulKara Books\", warm light, rain on the glass, photograph"
+    },
+    {
+     "title": "Tamaños",
+     "body": "Alrededor de un megapíxel en múltiplos de 16: 1024x1024, 1424x800 o 1248x832 (los ejemplos de la ficha). Una edición a menor tamaño reconstruye más la imagen que a 1024 px: edita a 1024 px cuando la imagen inicial deba seguir reconocible.",
+     "do": [
+      "Editar a 1024 px"
+     ],
+     "avoid": [
+      "Ediciones a 512 px: la escena cambia más de lo pedido"
+     ]
+    },
+    {
+     "title": "LoRAs en ambos runtimes",
+     "body": "Las LoRAs entrenadas para Fibo 2.0 funcionan en ComfyUI y en MLX: VulKara convierte entre los dos formatos al importar. Empieza con fuerza 0,9 y usa la palabra de activación; una LoRA entrenada con pocos cientos de pasos cambia más la composición que el estilo."
+    }
+   ]
+  },
+  {
+   "id": "flux3",
+   "title": "FLUX 3 Image Klein",
+   "intro": "El modelo destilado de Black Forest Labs con su propio ampliador de prompts, ediciones a partir de imágenes de referencia y composiciones por cajas; en Mac en 6 u 8 bits sobre el runtime MLX (FLUX Kommunity License, no comercial).",
+   "tips": [
+    {
+     "title": "16 pasos sin guidance",
+     "body": "El Klein destilado muestrea 16 pasos sin guidance (los valores del fabricante); con 4 pasos la imagen sale poco limpia y con grano. Klein Base es la versión sin destilar: 50 pasos con guidance (3,5 a 4 en los ejemplos del fabricante). Unos 7 s por paso a 1024 px en un M4 Pro en 6 bits; haz borradores pequeños y renderiza la imagen final más grande, hasta 4K.",
+     "do": [
+      "Mantén los 16 pasos",
+      "Borrador pequeño, imagen final a tamaño completo"
+     ],
+     "avoid": [
+      "Menos pasos para ahorrar tiempo: grano en vez de detalle"
+     ]
+    },
+    {
+     "title": "Deja que el ampliador escriba la descripción",
+     "body": "El modelo se entrenó con descripciones que escribe su propio ampliador, así que un prompt corto tal cual da una imagen genérica; el fabricante dice que no se use el modelo sin él. La opción Ampliador de prompt convierte una idea corta en la descripción completa (un modelo de visión y lenguaje, unos 10-20 s más) y la guarda como nota de la imagen. Escribirla tú también funciona: primero el encuadre, luego el sujeto con su acción, colores y materiales, el fondo, la luz y una línea corta de estilo con medio, objetivo y paleta.",
+     "example": "a double exposure of a wolf and a pine forest",
+     "do": [
+      "Activa el ampliador de prompt con un prompt corto",
+      "El encuadre primero si escribes la descripción tú"
+     ],
+     "avoid": [
+      "Una etiqueta de producto sin nombrar: el modelo le inventa texto"
+     ],
+     "images": [
+      {
+       "file": "flux3_plain.jpg",
+       "caption": "Tal como se escribió",
+       "prompt": "a double exposure of a wolf and a pine forest"
+      },
+      {
+       "file": "flux3_pup.jpg",
+       "caption": "Con el ampliador de prompt",
+       "prompt": "a double exposure of a wolf and a pine forest"
+      }
+     ]
+    },
+    {
+     "title": "Ediciones desde una imagen de referencia",
+     "body": "El modelo edita a partir de hasta diez imágenes de referencia y las nombra por posición (la segunda imagen); la primera referencia fija el tamaño de salida. En VulKara la imagen inicial de Imagen a imagen es la referencia. El ampliador es para texto a imagen: una edición usa la instrucción tal como está escrita.",
+     "do": [
+      "Di qué debe cambiar, como a una persona"
+     ]
+    },
+    {
+     "title": "La misma semilla mantiene la composición",
+     "body": "El mismo prompt y la misma semilla dan la misma imagen. Mantén la semilla y cambia una frase cada vez para probar luz o estilo mientras la composición se conserva en gran parte; un ancla fuerte, no un cerrojo: cambios mayores mueven más la escena.",
+     "do": [
+      "Cambia una frase cada vez con la semilla fija"
+     ]
+    },
+    {
+     "title": "Manos, caras y texto",
+     "body": "El autor de la conversión para Mac señala errores ocasionales en manos y dedos y una piel lisa, algo cerosa, en algunos retratos; el texto puede salir inexacto. Ayudan los prompts detallados, el ampliador y otra semilla.",
+     "avoid": [
+      "Texto largo en la imagen"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "anima",
+   "title": "Anima",
+   "intro": "El modelo anime de 2B de CircleStone Labs y Comfy Org en las versiones Base, Aesthetic y Turbo, con fine-tunes de la comunidad para otros estilos; en ComfyUI. Licencia no comercial, las imágenes pueden usarse comercialmente.",
+   "tips": [
+    {
+     "title": "Turbo: 8-12 pasos, CFG 1",
+     "body": "Anima-Turbo está destilado: CFG 1 y 8-12 pasos, de media solo un poco por debajo de Aesthetic pero menos variado; VulKara pone 10 pasos y CFG 1 para un checkpoint Turbo. Base y Aesthetic necesitan 30-50 pasos con CFG 4-5. El sampler del fabricante es er_sde; euler a da líneas más suaves y finas, euler va bien con Turbo y Aesthetic.",
+     "do": [
+      "Borrador en Turbo, acabado en Aesthetic o un fine-tune"
+     ],
+     "avoid": [
+      "CFG mayor que 1 en Turbo"
+     ]
+    },
+    {
+     "title": "Etiquetas Danbooru, en minúsculas con espacios",
+     "body": "Entrenado con etiquetas Danbooru, lenguaje natural y mezclas de ambos. Escribe las etiquetas en minúsculas y con espacios, no con guiones bajos (salvo las de score); donde Danbooru y Gelbooru difieren, la forma de Gelbooru. El prefijo del fabricante es masterpiece, best quality, score_7, safe, con el prompt negativo worst quality, low quality, blurry, jpeg artifacts; en la versión Aesthetic las etiquetas de calidad son opcionales y las de score se quedan fuera de ambos prompts. Orden: calidad, meta, año y seguridad, luego número de sujetos, personaje, serie, artista, etiquetas generales.",
+     "example": "masterpiece, best quality, score_7, safe, 1girl, cat ears, silver hair, blue eyes, school uniform, standing by a window, holding a cup of tea, rain outside the window, warm lamp light, soft shading, detailed background",
+     "do": [
+      "Etiquetas en minúsculas con espacios",
+      "La etiqueta de seguridad en cada prompt"
+     ],
+     "avoid": [
+      "Guiones bajos en las etiquetas",
+      "Etiquetas de score con la versión Aesthetic"
+     ],
+     "images": [
+      {
+       "file": "anima_plain.jpg",
+       "caption": "Tres etiquetas",
+       "prompt": "1girl, cat ears, safe"
+      },
+      {
+       "file": "anima_tags.jpg",
+       "caption": "Prefijo de calidad, sujeto, escena y luz",
+       "prompt": "masterpiece, best quality, score_7, safe, 1girl, cat ears, silver hair, blue eyes, school uniform, standing by a window, holding a cup of tea, rain outside the window, warm lamp light, soft shading, detailed background"
+      }
+     ]
+    },
+    {
+     "title": "Artistas con @, pesos más altos que en SDXL",
+     "body": "El nombre de un artista lleva una @ delante; sin ella el efecto es muy débil. La ponderación funciona pero necesita valores más altos que SDXL: el ejemplo del fabricante es (chibi:2).",
+     "example": "@artist name, 1girl, (chibi:2), simple background"
+    },
+    {
+     "title": "Lenguaje natural: al menos dos frases",
+     "body": "Los prompts muy cortos dan imágenes inesperadas; escribe al menos dos frases y, con varios personajes, describe el aspecto de cada uno. Los prompts cortos o vagos también pueden traer contenido no deseado: ayudan la etiqueta de seguridad y el detalle.",
+     "do": [
+      "Describe cada personaje cuando hay varios"
+     ],
+     "avoid": [
+      "Una línea vaga"
+     ]
+    },
+    {
+     "title": "Anime, no realismo ni texto largo",
+     "body": "Anima es débil en realismo a propósito (los fine-tunes realistas, como las versiones de piel realista, lo llevan hacia allí) y malo con texto largo; palabras sueltas y frases cortas salen mejor.",
+     "avoid": [
+      "Un párrafo de texto en la imagen"
+     ]
+    }
+   ]
+  },
+  {
+   "id": "lumina",
+   "title": "Lumina 2, Neta Lumina y NetaYume",
+   "intro": "Lumina-Image 2.0 de 2B de Alpha-VLLM (Apache 2.0) y sus fine-tunes anime Neta Lumina y NetaYume con un codificador de texto Gemma 2; en ComfyUI.",
+   "tips": [
+    {
+     "title": "40-50 pasos con CFG 4-7",
+     "body": "La ficha de NetaYume: 40-50 pasos, CFG 4-7, los samplers Euler a o res_multistep (Neta Lumina: 30 pasos, CFG 4-5,5, scheduler linear_quadratic); el ejemplo de Lumina 2 usa 50 pasos con guidance 4. VulKara pone 40 pasos, CFG 5,5 y res_multistep para los modelos Neta y 36 pasos con CFG 4 para Lumina 2.",
+     "do": [
+      "40 pasos o más para una imagen acabada"
+     ]
+    },
+    {
+     "title": "El prompt de sistema va primero",
+     "body": "Los modelos Neta se entrenaron con un prompt de sistema para anime (\"You are an assistant designed to generate anime images based on textual prompts.\" seguido de una marca de inicio). VulKara les antepone el prefijo adecuado a cada prompt; tú escribes solo la imagen.",
+     "do": [
+      "Escribe solo la imagen, el prefijo se añade"
+     ]
+    },
+    {
+     "title": "Etiquetas Danbooru o frases, tres idiomas",
+     "body": "Funcionan tanto las etiquetas como el lenguaje natural; Neta Lumina nombra chino, inglés y japonés como primeros idiomas. Etiquetas al estilo Danbooru con las palabras de calidad primero, luego el personaje, luego la escena.",
+     "example": "masterpiece, best quality, 1girl, silver hair, long hair, green eyes, reading a book, sitting, library, bookshelf, warm light, window, detailed background, highres",
+     "do": [
+      "Etiquetas de calidad primero, luego personaje, luego escena"
+     ],
+     "images": [
+      {
+       "file": "neta_plain.jpg",
+       "caption": "Tres palabras",
+       "prompt": "a girl reading"
+      },
+      {
+       "file": "neta_tags.jpg",
+       "caption": "Etiquetas Danbooru con palabras de calidad",
+       "prompt": "masterpiece, best quality, 1girl, silver hair, long hair, green eyes, reading a book, sitting, library, bookshelf, warm light, window, detailed background, highres"
+      }
+     ]
+    },
+    {
+     "title": "Tamaños de alrededor de un megapíxel",
+     "body": "Neta Lumina indica 1024 × 1024, 768 × 1532 y 968 × 1322 o más. En un Mac de 16 GB VulKara carga NetaYume por partes (el codificador de texto y el modelo por separado).",
+     "do": [
+      "Vertical 768 × 1532 para una figura de pie"
+     ]
+    },
+    {
+     "title": "El prompt negativo funciona",
+     "body": "Guidance real, así que el prompt negativo cuenta: el valor por defecto de VulKara para los modelos Neta es blurry, worst quality, low quality, jpeg artifacts, signature, watermark.",
+     "example": "Negative: blurry, worst quality, low quality, jpeg artifacts, signature, watermark"
+    }
+   ]
+  },
+  {
+   "id": "auraflow",
+   "title": "AuraFlow y Pony V7",
+   "intro": "El modelo de flujo abierto de 6,8B AuraFlow v0.3 de fal (Apache 2.0) y Pony V7, el modelo de personajes construido sobre él (Pony License); en Diffusers, Pony V7 como GGUF en ComfyUI.",
+   "tips": [
+    {
+     "title": "50 pasos con guidance 3,5, hasta 1536 px",
+     "body": "El ejemplo de AuraFlow v0.3: 50 pasos, guidance 3,5, tamaños de hasta 1536 px por lado en varias proporciones (1536 × 768 en la ficha). Pony V7 pide al menos 30 pasos y 768-1536 px, cuanto más alto mejor.",
+     "example": "Astronaut in a jungle, cold color palette, muted colors, detailed, 8k",
+     "do": [
+      "Más resolución y 30 pasos o más en Pony V7"
+     ],
+     "images": [
+      {
+       "file": "aura_plain.jpg",
+       "caption": "Prompt simple",
+       "prompt": "an astronaut in a jungle"
+      },
+      {
+       "file": "aura_card.jpg",
+       "caption": "El ejemplo de la ficha: paleta, ambiente y palabras de calidad",
+       "prompt": "Astronaut in a jungle, cold color palette, muted colors, detailed, 8k"
+      }
+     ]
+    },
+    {
+     "title": "Pony V7: etiquetas especiales, hechos, estilo, etiquetas",
+     "body": "La plantilla: etiquetas especiales (score_X, style_cluster_x, source_X), luego una descripción objetiva de la imagen, luego el estilo (medio, tipo de plano, luz), luego más etiquetas de contenido. Empieza con una frase que resuma la imagen y sigue con los detalles; el lenguaje natural funciona casi siempre, y las etiquetas añadidas al final enfatizan.",
+     "example": "A lone lighthouse keeper on a stormy cliff at night, digital painting, wide shot, cold rim light",
+     "do": [
+      "Primero una frase que resuma, luego los detalles"
+     ]
+    },
+    {
+     "title": "Personajes: especie, género, nombre, origen",
+     "body": "Nombra un personaje como especie, género, nombre y origen; el ejemplo de la ficha: Anthro bunny female Lola Bunny from Space Jam.",
+     "example": "Anthro bunny female Lola Bunny from Space Jam"
+    },
+    {
+     "title": "Etiquetas de calidad más débiles, sin texto, caras pequeñas",
+     "body": "En V7 las etiquetas especiales y de calidad actúan mucho menos que en V6 (score_9 no ayuda de forma fiable), el texto en la imagen no está soportado y los detalles pequeños y las caras pueden degradarse según el estilo; los autores remiten a V7.1. Inpainta una cara a mayor tamaño cuando importe.",
+     "avoid": [
+      "Confiar en score_9",
+      "Texto en la imagen"
+     ]
     }
    ]
   }
@@ -1093,6 +1676,70 @@
   {
    "title": "PromptHero Stable Diffusion prompt gallery",
    "url": "https://prompthero.com/stable-diffusion-prompts"
+  },
+  {
+   "title": "ERNIE-Image-Turbo model card (Baidu)",
+   "url": "https://huggingface.co/baidu/ERNIE-Image-Turbo"
+  },
+  {
+   "title": "MOSS-Image repository (OpenMOSS)",
+   "url": "https://github.com/OpenMOSS/MOSS-Image"
+  },
+  {
+   "title": "MOSS-Image user guide (sampling and prompts)",
+   "url": "https://github.com/OpenMOSS/MOSS-Image/blob/main/USERGUIDE.md"
+  },
+  {
+   "title": "Destripe LoRA for MOSS-Image (nynxz)",
+   "url": "https://huggingface.co/nynxz/MOSS-Image"
+  },
+  {
+   "title": "Fibo 2.0 Edit Turbo model card (Bria AI)",
+   "url": "https://huggingface.co/briaai/FIBO-2.0-Edit-Turbo"
+  },
+  {
+   "title": "Fibo 2.0 Dev model card (Bria AI)",
+   "url": "https://huggingface.co/briaai/FIBO-2.0-Dev"
+  },
+  {
+   "title": "FLUX 3 Image Klein repository (Black Forest Labs)",
+   "url": "https://github.com/black-forest-labs/flux-3-image-klein"
+  },
+  {
+   "title": "FLUX 3 Image Klein MLX 6 bit model card (VisualInference)",
+   "url": "https://huggingface.co/VisualInference/FLUX-3-Image-Klein-MLX-6bit"
+  },
+  {
+   "title": "FLUX 3 Image Klein prompting guide (Runware)",
+   "url": "https://runware.ai/docs/models/bfl-flux-3-image-klein/guides/prompting"
+  },
+  {
+   "title": "Anima model card (CircleStone Labs)",
+   "url": "https://huggingface.co/circlestone-labs/Anima"
+  },
+  {
+   "title": "Lumina-Image 2.0 model card (Alpha-VLLM)",
+   "url": "https://huggingface.co/Alpha-VLLM/Lumina-Image-2.0"
+  },
+  {
+   "title": "Neta Lumina model card (Neta.art)",
+   "url": "https://huggingface.co/neta-art/Neta-Lumina"
+  },
+  {
+   "title": "NetaYume Lumina Image 2.0 model card",
+   "url": "https://huggingface.co/duongve/NetaYume-Lumina-Image-2.0"
+  },
+  {
+   "title": "AuraFlow v0.3 model card (fal)",
+   "url": "https://huggingface.co/fal/AuraFlow-v0.3"
+  },
+  {
+   "title": "Pony V7 base model card (PurpleSmartAI)",
+   "url": "https://huggingface.co/purplesmartai/pony-v7-base"
+  },
+  {
+   "title": "Flux Skin Detailer, Realistic Skin DoRa (CivArchive)",
+   "url": "https://civarchive.com/models/1018511"
   }
  ]
 }

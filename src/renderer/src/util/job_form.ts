@@ -3,6 +3,7 @@
 // The form of the generate pages and how it becomes a job.
 
 import { controlTypesFor } from '@shared/controlnet'
+import { MAX_REFERENCES } from '@shared/engine_job'
 import { loraFits } from '@shared/lora_fit'
 import { SIGMA_SCHEDULES, samplersFor } from '@shared/samplers'
 import type { AiLabel, Asset, Job } from '@shared/types'
@@ -30,6 +31,8 @@ export interface GenerateForm {
   /** how much of the input picture changes, 0..1 */
   strength: number
   inputImage: string
+  /** further pictures beside the input picture, for a model that edits several together (takesReferences) */
+  references: string[]
   /** with an input picture: use width and height instead of the picture's proportions */
   customSize: boolean
   /** the size chosen before a model that can not compute it changed it, and the size it was changed to: switching to a
@@ -48,6 +51,10 @@ export interface GenerateForm {
   /** the EU's icon for AI content in the lower right corner of the pictures */
   /** FLUX 3 Image Klein, text to image: the prompt upsampler writes the full caption from the prompt */
   upsample: boolean
+  /** FLUX.2 [klein] 4B, image to image: the consistency LoRA keeps the picture while the prompt changes it */
+  keepPicture: boolean
+  /** FLUX.1 [dev]: the Turbo-Alpha LoRA with its 8 steps (TURBO) */
+  fast: boolean
   aiLabel: boolean
   aiLabelSize: AiLabel['size']
   /** auto: "AI GENERATED" from a prompt, "AI MODIFIED" from a picture; ai: the round icon */
@@ -81,9 +88,9 @@ export const formPage = (page: string): Mode => (Object.hasOwn(MODES, page) ? (p
 export function emptyForm(mode: Mode): GenerateForm {
   return {
     prompt: '', negativePrompt: '', style: '', modelId: '', width: 512, height: 512, steps: 25, guidance: 7, seed: null, count: 1,
-    sampler: 'Default', sigmaSchedule: 'Default', loras: [], strength: mode === 'inpaint' ? 1 : 0.6, inputImage: '', customSize: false,
+    sampler: 'Default', sigmaSchedule: 'Default', loras: [], strength: mode === 'inpaint' ? 1 : 0.6, inputImage: '', references: [], customSize: false,
     videoSeconds: 2, videoResolution: '480p', patternStrength: 1.1,
-    controlType: '', controlImage: '', controlPreprocess: true, controlWeight: 1, upsample: true, aiLabel: false, aiLabelSize: 'medium', aiLabelIcon: 'auto', aiLabelTone: 'auto', aiLabelSubtle: false,
+    controlType: '', controlImage: '', controlPreprocess: true, controlWeight: 1, upsample: true, keepPicture: false, fast: false, aiLabel: false, aiLabelSize: 'medium', aiLabelIcon: 'auto', aiLabelTone: 'auto', aiLabelSubtle: false,
   }
 }
 
@@ -180,6 +187,8 @@ export function formProblem(mode: Mode, form: GenerateForm, model: Asset | undef
   if (MODES[mode].mask && !hasMask) return t('generate.problem.paintMask')
   if (MODES[mode].promptNeeded && !form.prompt.trim()) return t('generate.problem.describe')
   if (MODES[mode].control && form.controlType && !form.controlImage) return t('generate.problem.chooseControl')
+  // Fast adds Turbo-Alpha as one of the LoRAs: one of the user's own was dropped silently before
+  if (form.fast && takesTurbo(model.meta) && form.loras.length >= MAX_LORAS) return t('generate.problem.tooManyForFast', { n: MAX_LORAS - 1 })
   return ''
 }
 
@@ -191,8 +200,28 @@ export interface JobExtras {
   patternImage?: string
 }
 
-/** FLUX 3 Image Klein reads full scene captions: its prompt upsampler writes one from a short prompt (MLX runtime). */
-export const takesUpsampler = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'flux3_klein'
+/** FLUX 3 Image Klein reads full scene captions: its prompt upsampler writes one from a short prompt (MLX runtime);
+ * ERNIE-Image brings its own prompt enhancer, which does the same. */
+/**
+ * The fast option of FLUX.1 [dev] and its fine-tunes: alimama's step-distilling LoRA (FLUX.1-dev non-commercial
+ * licence), 8 steps at guidance 3.5 as its card says. On the 16 GB Mac mini a 1024 px picture took 4:18 instead of
+ * 11:04 min (28 steps), each step 34 % longer beside the 4 bit weights (MEASUREMENTS 7be).
+ */
+export const TURBO = { ref: 'alimama-creative/FLUX.1-Turbo-Alpha', file: 'diffusion_pytorch_model.safetensors', name: 'FLUX.1-Turbo-Alpha', steps: 8, guidance: 3.5, scale: 1 }
+export const takesTurbo = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'flux1_dev'
+/** The installed Turbo-Alpha LoRA, by where it came from (its folder may be renamed). */
+export const turboLora = (loras: Asset[]): Asset | undefined => loras.find((l) => l.source?.ref === TURBO.ref)
+
+/** FLUX.2 [klein] edits keep closer to the picture with the consistency LoRA (made for 4B; 9B edits without it). */
+export const keepsPicture = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'flux2_klein'
+
+export const takesUpsampler = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'flux3_klein' || meta?.arch === 'ernie_image'
+
+/** The helper model that writes the caption for a model (Models → Helper models). */
+export const upsamplerHelper = (meta: Asset['meta'] | undefined): string => (meta?.arch === 'ernie_image' ? 'ernie_pe' : 'flux3_pup')
+
+/** Fibo 2.0 edits the input picture together with further ones (<image_2> …), on Image to image. */
+export const takesReferences = (meta: Asset['meta'] | undefined): boolean => meta?.family === 'fibo2'
 
 export function buildJob(mode: Mode, form: GenerateForm, model: Asset, loras: Asset[], opts: JobExtras = {}): Omit<Job, 'id'> {
   const does = MODES[mode]
@@ -210,6 +239,12 @@ export function buildJob(mode: Mode, form: GenerateForm, model: Asset, loras: As
     .map((l) => ({ asset: loras.find((a) => a.id === l.id), scale: Number.isFinite(Number(l.scale)) && String(l.scale) !== '' ? Number(l.scale) : 1 }))
     .filter((l): l is { asset: Asset; scale: number } => !!l.asset && loraFits(l.asset, model))
   if (does.loras && chosen.length) job.loras = chosen.slice(0, MAX_LORAS).map((l) => ({ path: l.asset.folder, scale: l.scale }))
+  const turbo = form.fast && does.loras && takesTurbo(model.meta) ? turboLora(loras) : undefined
+  if (turbo) {
+    job.steps = TURBO.steps
+    job.guidance = TURBO.guidance
+    if (!job.loras?.some((l) => l.path === turbo.folder)) job.loras = [...(job.loras ?? []).slice(0, MAX_LORAS - 1), { path: turbo.folder, scale: TURBO.scale }]
+  }
   if (form.aiLabel && mode !== 'video') job.aiLabel = aiLabelOf(form, mode)
   if (form.upsample && mode === 'text' && takesUpsampler(model.meta)) job.upsample = true
 
@@ -227,6 +262,9 @@ export function buildJob(mode: Mode, form: GenerateForm, model: Asset, loras: As
   } else if (does.input) {
     job.inputImage = form.inputImage
     job.strength = form.strength
+    const refs = form.references.filter(Boolean).slice(0, MAX_REFERENCES)
+    if (mode === 'image' && takesReferences(model.meta) && refs.length) job.referenceImages = refs
+    if (mode === 'image' && form.keepPicture && keepsPicture(model.meta)) job.keepPicture = true
     if (mode === 'inpaint') {
       job.maskImage = opts.maskImage
     } else if (form.customSize) {
@@ -267,6 +305,7 @@ export function applyJob(form: GenerateForm, job: Job, models: Asset[], loras: A
   form.sampler = job.sampler ?? 'Default'
   form.sigmaSchedule = job.sigmaSchedule ?? 'Default'
   if (job.strength !== undefined) form.strength = job.strength
+  form.keepPicture = !!job.keepPicture
   if (job.videoSeconds) form.videoSeconds = job.videoSeconds
   if (job.controlnet?.type === 'Illusion') {
     form.patternStrength = job.controlnet.weight
@@ -278,6 +317,7 @@ export function applyJob(form: GenerateForm, job: Job, models: Asset[], loras: A
   } else {
     form.controlType = ''
   }
+  form.references = [...(job.referenceImages ?? [])]
   form.loras = (job.loras ?? [])
     .map((l) => ({ id: modelOfJob({ modelDir: l.path, modelId: '' }, loras)?.id ?? '', scale: l.scale }))
     .filter((l) => l.id)

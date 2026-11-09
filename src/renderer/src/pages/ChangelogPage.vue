@@ -3,7 +3,7 @@
 // What changed from version to version: the changelog shipped with the app, newest first.
 import { onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { RefreshCw } from 'lucide-vue-next'
+import { RefreshCw } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import { isRemote } from '../remote_vk'
 import { parseChangelog } from '../util/changelog'

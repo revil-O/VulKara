@@ -11,7 +11,7 @@ export const FAMILY_TITLES: Record<string, string> = {
   sd1: 'SD 1.x', sd2: 'SD 2.x', sdxl: 'SDXL', sd3: 'SD 3.5', flux1: 'FLUX.1', flux2: 'FLUX.2', flux3: 'FLUX 3', krea2: 'Krea 2',
   ideogram4: 'Ideogram 4', anima: 'Anima', qwen_image: 'Qwen-Image', qwen_image21: 'Qwen-Image 2.1', wan: 'Wan',
   chroma: 'Chroma', z_image: 'Z-Image', lumina: 'Lumina 2', ernie: 'ERNIE-Image', hidream: 'HiDream', hidream_o1: 'HiDream-O1',
-  hunyuan_video: 'HunyuanVideo', hunyuan_dit: 'Hunyuan-DiT', auraflow: 'AuraFlow',
+  hunyuan_video: 'HunyuanVideo', hunyuan_dit: 'Hunyuan-DiT', auraflow: 'AuraFlow', moss_image: 'MOSS-Image', fibo2: 'Fibo 2.0',
 }
 
 export const VARIANT_TITLES: Record<string, string> = {

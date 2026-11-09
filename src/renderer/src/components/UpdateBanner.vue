@@ -4,7 +4,7 @@
 // download and the check of the update while they run.
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { Download, ExternalLink, RotateCw, X } from 'lucide-vue-next'
+import { Download, ExternalLink, RotateCw, X } from '@lucide/vue'
 import { t } from '../i18n'
 import { cleanError } from '../stores/runtimes'
 import { useAppUpdateStore } from '../stores/appUpdate'

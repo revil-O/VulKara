@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
-// VulKara, main process: one window, the engines and the job queue behind it.
+// VulKara, main process: one window, the engines and the job queue behind it; the app menu and the menu bar icon
+// (closing the window leaves VulKara running there, with its jobs).
 
 import { app, BrowserWindow, nativeTheme, screen, systemPreferences, session, shell, type Rectangle } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { bindWindow, fileAccess, registerIpc, repairRuntimes, sendToRemote, shutdown } from './ipc'
-import { startRemote, stopRemote } from './remote'
+import { bindWindow, fileAccess, navigate, queueStatus, registerIpc, repairRuntimes, sendToRemote, shutdown } from './ipc'
+import { remoteRunning, startRemote, stopRemote } from './remote'
 import { logTo } from './log'
 import { PAGE_URL, PRELOAD, RENDERER_DIR } from './pages'
 import { engineEnv, getSettings, onSettingChanged } from './settings'
-import { mainLanguage, setMainLang } from './i18n'
+import { mainLanguage, setMainLang, t } from './i18n'
+import { setMenus } from './menus'
+import { openMonitor } from './monitor_window'
+import { formatDuration } from '@shared/duration'
 import { LOCALES, resolveLang } from '@shared/i18n'
 import { recheckLibrary } from './migrate'
 import { engineCommand } from './runtimes'
@@ -53,10 +57,56 @@ function applyLanguage(): void {
   const region = setting === 'system' ? Intl.DateTimeFormat.supportedLocalesOf([app.getSystemLocale() || LOCALES[lang]])[0] : undefined
   setMainLang(lang, region ?? LOCALES[lang])
   for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('i18n:lang', mainLanguage())
+  if (app.isReady()) applyMenus()
 }
 
-/** The main window. behindSplash: shown once the splash is confirmed; inactive: shown without coming to the front. */
-function createWindow(behindSplash: boolean, inactive = false): BrowserWindow {
+let main: BrowserWindow | undefined
+
+/** The main window, made again if it was closed (VulKara keeps running in the menu bar), on a page of it. */
+function showMain(route?: string): void {
+  if (!main || main.isDestroyed()) {
+    // the page loaded directly: a message sent after loading would come before the page listens
+    main = createWindow(false, false, route)
+    return
+  }
+  if (main.webContents.isLoading()) return  // it shows itself when it is ready
+  if (main.isMinimized()) main.restore()
+  main.show()
+  main.focus()
+  if (route) navigate(route)
+}
+
+/** The app menu (in the app's language) and the menu bar icon with what runs now. */
+function applyMenus(): void {
+  setMenus({
+    name: 'VulKara',
+    texts: () => ({
+      about: t('app.menu.about'), settings: t('app.menu.settings'), monitor: t('app.menu.monitor'),
+      services: t('app.menu.services'), hide: t('app.menu.hide'), hideOthers: t('app.menu.hideOthers'),
+      showAll: t('app.menu.showAll'), quit: t('app.menu.quit'), open: t('app.menu.open'),
+    }),
+    showMain,
+    openMonitor,
+    status: () => {
+      const q = queueStatus()
+      const run = q.running
+      const lines = [{
+        label: !run ? t('app.menu.noJob')
+          : run.eta !== undefined ? t('app.menu.runningEta', { model: run.model, progress: String(Math.max(0, run.progress)), eta: formatDuration(run.eta) })
+          : t('app.menu.running', { model: run.model, progress: String(Math.max(0, run.progress)) }),
+        enabled: false,
+      }]
+      if (q.waiting) lines.push({ label: t('app.menu.waiting', { n: String(q.waiting) }), enabled: false })
+      // the remote web UI stays reachable with the window closed: said here, Quit ends it
+      if (remoteRunning()) lines.push({ label: t('app.menu.remoteOn'), enabled: false })
+      return lines
+    },
+  }, app.isPackaged ? join(process.resourcesPath, 'tray') : join(app.getAppPath(), 'build', 'tray'))
+}
+
+/** The main window. behindSplash: shown once the splash is confirmed; inactive: shown without coming to the front;
+ *  route: the page it opens on. */
+function createWindow(behindSplash: boolean, inactive = false, route?: string): BrowserWindow {
   const win = new BrowserWindow({
     width: 1360, height: 880, ...storedBounds(), minWidth: 980, minHeight: 640,
     show: false,
@@ -86,7 +136,7 @@ function createWindow(behindSplash: boolean, inactive = false): BrowserWindow {
     const [to, own] = [new URL(url), new URL(PAGE_URL)]
     if (to.protocol !== own.protocol || to.host !== own.host) event.preventDefault()
   })
-  void win.loadURL(PAGE_URL)
+  void win.loadURL(route ? `${PAGE_URL}#${route}` : PAGE_URL)
   return win
 }
 
@@ -94,11 +144,9 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    const win = splashWindow() ?? BrowserWindow.getAllWindows().find((w) => w.isVisible())
-    if (win) {
-      if (win.isMinimized()) win.restore()
-      win.focus()
-    }
+    const splash = splashWindow()
+    if (splash) splash.focus()
+    else showMain()
   })
 
   void app.whenReady().then(async () => {
@@ -122,7 +170,6 @@ if (!app.requestSingleInstanceLock()) {
     // the VulKara icon in the Dock also when started from the sources
     const icon = join(app.getAppPath(), 'build', 'icon.png')
     if (!app.isPackaged && existsSync(icon)) app.dock?.setIcon(icon)
-    let main: BrowserWindow | undefined
     // --no-splash: straight to the main window (automated runs; it keeps them from coming to the front)
     if (process.argv.includes('--no-splash')) {
       main = createWindow(false, true)
@@ -130,9 +177,8 @@ if (!app.requestSingleInstanceLock()) {
       openSplash(windowBackground(), () => { if (main && !main.isDestroyed()) main.show() })
       main = createWindow(true)
     }
-    app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow(false)
-    })
+    // the Dock icon: the main window again (the monitor window may still be open)
+    app.on('activate', () => { if (!splashWindow()) showMain() })
     // once, in the background (after the runtimes are whole): installed LoRAs and models checked with the current
     // detection; the pages reload the list
     void repaired.then(() => recheckLibrary(engineCommand('diffusers', ['recheck_loras']), engineEnv(), app.getPath('userData'), () => {
@@ -141,8 +187,17 @@ if (!app.requestSingleInstanceLock()) {
     }))
   })
 
-  // jobs belong to the window: closing it ends the app and its engines
-  app.on('window-all-closed', () => app.quit())
+  // closing the window leaves VulKara in the menu bar with its jobs and the remote web UI; Quit (⌘Q, the menu bar menu)
+  // ends it. Without this listener Electron would quit when the last window closes.
+  app.on('window-all-closed', () => {})
+  // sent by macOS at log out or by `kill`: quit the usual way, so will-quit stops the engines
+  // a second one ends at once, the engines stopped first (a hanging quit would leave only SIGKILL)
+  let terms = 0
+  process.on('SIGTERM', () => {
+    if (terms++ === 0) return app.quit()
+    shutdown()
+    app.exit(0)
+  })
   app.on('will-quit', () => {
     void stopRemote()
     shutdown()

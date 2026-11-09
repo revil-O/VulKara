@@ -83,6 +83,11 @@ def test_sdxl_vae_stays_in_bfloat16_when_it_encodes_a_picture():
     assert latents.dtype == torch.bfloat16 and vae.dtype == torch.bfloat16
     engine._bf16_vae(vae)  # a second time changes nothing
     assert vae.encode(torch.zeros(1, 3, 16, 16, dtype=torch.float16)).latent_dist.mode().dtype == torch.bfloat16
+    # the SDXL inpainting VAE sets no force_upcast: its float16 input is cast as well
+    plain = AutoencoderKL(block_out_channels=(8,), norm_num_groups=8, latent_channels=4, force_upcast=False)
+    plain.to(torch.float16)
+    engine._bf16_vae(plain)
+    assert plain.encode(torch.zeros(1, 3, 16, 16, dtype=torch.float16)).latent_dist.mode().dtype == torch.bfloat16
 
 
 def test_benchmarks_learn_the_bit_size_of_a_weights_file(tmp_path):
@@ -115,8 +120,12 @@ def test_benchmarks_get_the_plans_peak_at_the_pictures_size():
     assert abs(memory.peak_at(p, 512, 512) - (p["denoise_peak_gb"] - 0.75 * p["activations_gb"])) < 1e-9
     assert memory.peak_at(p, 256, 256) == memory.peak_at(p, 512, 512)
     # staged (the text encoder only for encoding): encoding both may be the peak, whatever the size
-    staged = memory.plan({"transformer": 6.0, "text_encoder": 4.0, "vae": 0.08}, "transformer", "z_image", 24)
+    staged = memory.plan({"transformer": 6.0, "text_encoder": 4.0, "vae": 0.08}, "transformer", "z_image", 26)
     assert staged["est_peak_gb"] > staged["denoise_peak_gb"] and memory.peak_at(staged, 512, 512) == staged["est_peak_gb"]
+    # further pictures of an edit add to the denoising peak
+    assert abs(memory.peak_at(p, 1024, 1024, 2 * 2.2) - (p["denoise_peak_gb"] + 4.4)) < 1e-9
+    # a ControlNet stays loaded through the encoding too
+    assert abs(memory.peak_at(staged, 512, 512, resident_gb=3.0) - (staged["est_peak_gb"] + 3.0)) < 1e-9
 
 
 def test_the_engines_measure_their_own_footprint_over_a_job():
@@ -135,8 +144,13 @@ def test_the_engines_measure_their_own_footprint_over_a_job():
         m.close()
     finally:
         protocol.event = old
-    name, f = sent[0]
+    # the plan as soon as it is known (the monitor window), then the job's footprint with it
+    assert sent[0] == ("planned", {"gb": 3.46})
+    name, f = sent[1]
     assert name == "footprint" and f["peak_gb"] >= 0.29 and f["plan_gb"] == 3.46 and f["read_gb"] >= 0
+    # another process's footprint (ComfyUI's server, what it holds counts as free for its next job)
+    import os
+    assert protocol.footprint_gb(os.getpid()) > 0 and protocol.footprint_gb(os.getppid()) > 0
 
 
 def test_attention_with_a_head_size_mps_does_not_fuse_is_padded_to_the_same_result():
@@ -171,3 +185,34 @@ def test_staging_that_frees_the_denoiser_still_counts_a_second_one():
     comps = {"transformer": 4.0, "unconditional_transformer": 4.0, "text_encoder": 12.0, "vae": 0.1}
     p = memory.plan(comps, "transformer", "ideogram4", 24, quant="q8", staging_frees_denoiser=True)
     assert p["staged_text_encoder"] and p["est_peak_gb"] >= p["text_gb"] + 4.0
+
+
+def test_the_memory_note_is_graded_by_how_much_is_short(monkeypatch):
+    # within the noise: no note; a small shortage: idle programs swap; a large one: the picture itself (7az)
+    monkeypatch.setattr(memory, "free_gb", lambda held=0.0: 10.0)
+    assert memory.short_of(12.0, 0, total_gb=24) is None
+    small = memory.short_of(14.1, 0, total_gb=24)
+    assert small.startswith("Only 10.0 GB of memory free for the planned 14.1 GB (other programs or engines hold 14.0 GB)")
+    assert small.endswith("the picture is usually as fast")
+    assert memory.short_of(20.1, 0, total_gb=24).endswith("this picture may take many times longer, close other programs or wait for the other engine's job")
+    # a 16 GB Mac: the strong note from 4 GB short (7ba), the mild one below
+    assert memory.short_of(14.1, 0, total_gb=16).endswith("this picture may take many times longer, close other programs or wait for the other engine's job")
+    assert memory.short_of(13.5, 0, total_gb=16).endswith("the picture is usually as fast")
+
+
+def test_auto_keeps_16_bit_only_with_room_under_the_budget():
+    # AuraFlow on 24 GB: 16 bit would plan 18.7 GB under a 19.2 GB budget, the weights were read again every step
+    comps = {"text_encoder": 1.22, "transformer": 6.86, "vae": 0.08}
+    p = memory.plan(comps, "transformer", "auraflow", 24)
+    assert p["quant"]["transformer"] == "q8"
+    assert memory.plan(comps, "transformer", "auraflow", 32)["quant"]["transformer"] == "none"
+    assert memory.plan(comps, "transformer", "auraflow", 24, quant="none")["quant"]["transformer"] == "none"
+
+
+def test_a_4_bit_denoiser_comes_before_streaming_with_the_text_encoder_kept_in_8_bit_or_more():
+    # FLUX.2 [klein] 9B on 16 GB: streamed 16 bit took the SSD's time (MEASUREMENTS 7be); 4 bit in memory instead
+    comps = {"text_encoder": 8.19, "transformer": 9.08, "vae": 0.08}
+    p = memory.fitting_plan(comps, "transformer", "flux2", 16)
+    assert p["fits"] and p["quant"]["transformer"] == "q4" and p["quant"]["text_encoder"] != "q4"
+    # a forced level stays as asked
+    assert memory.fitting_plan(comps, "transformer", "flux2", 16, quant="none")["quant"]["transformer"] == "none"

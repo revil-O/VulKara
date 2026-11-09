@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
 import { describe, expect, it } from 'vitest'
-import { ConsentRequired, JobQueue, type QueueEvent } from './queue'
+import { ConsentRequired, JobQueue, loadTime, type QueueEvent } from './queue'
 import type { Job } from '@shared/types'
 
 const JOB: Omit<Job, 'id'> = {
@@ -185,7 +185,7 @@ describe('job queue', () => {
     sent[0]({ event: 'result', path: '/images/a.png' })
     sent[0]({ event: 'state', state: 'idle' })
     await new Promise((r) => setTimeout(r, 0))
-    expect(timings).toEqual([{ seconds: 12.3, secondsPerStep: 2 }])
+    expect(timings).toEqual([{ seconds: 12.3, secondsPerStep: 2, loadSeconds: 1 }])  // 10 % at 3 s with 0.2 s per %: the steps began at 1 s
   })
 
   it('goes on with the next job when the finished one can not be saved', async () => {
@@ -247,5 +247,14 @@ describe('job queue', () => {
     emit({ event: 'state', state: 'idle' })
     await new Promise((r) => setTimeout(r, 0))
     expect(labels).toEqual([{ size: 'large', kind: 'generated', tone: 'auto' }, undefined])
+  })
+})
+
+describe('loadTime', () => {
+  it('takes the steps before the first progress value back at the measured pace', () => {
+    // started at 0, 8 steps at 5 s, the first value (12.5 %, one step) at 125 s: the steps began at 120 s
+    expect(loadTime({ startedAt: 0, progressStart: [125_000, 12.5], secondsPerStep: 5, job: { steps: 8 } })).toBe(120)
+    expect(loadTime({ startedAt: 0, progressStart: [125_000, 12.5], job: { steps: 8 } })).toBeUndefined()
+    expect(loadTime({ startedAt: 10_000, progressStart: [5_000, 50], secondsPerStep: 5, job: { steps: 8 } })).toBe(0)
   })
 })

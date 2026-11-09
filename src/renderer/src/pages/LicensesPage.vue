@@ -5,7 +5,7 @@
 // the list gets the licence its origin states (read once, kept in its folder) and that of its base model.
 import { licenceListText } from '../util/data_texts'
 import { computed, onActivated, reactive, ref, watch } from 'vue'
-import { ExternalLink, RefreshCw, Search } from 'lucide-vue-next'
+import { ExternalLink, RefreshCw, Search } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import { useAssetsStore } from '../stores/assets'
 import { cleanError } from '../stores/runtimes'

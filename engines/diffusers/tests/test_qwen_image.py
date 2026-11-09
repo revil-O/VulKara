@@ -272,6 +272,17 @@ def test_encoded_masks_keep_their_type():
     assert "negative_prompt_embeds_mask" not in out  # no padding: the pipeline takes no mask
 
 
+def test_staged_encoding_lets_go_of_the_text_encoder(monkeypatch):
+    # staged (16 GB): the text encoder is loaded for a new prompt and dropped after; the pipeline kept it before (18.7 GB)
+    import torch
+    lm = engine.LoadedModel.__new__(engine.LoadedModel)
+    lm.embed_cache, lm.text_pipe, lm.staged, lm.dtype = None, FakeTextPipe(), True, torch.bfloat16
+    lm.spec, lm.device = registry.ARCHS["qwen_image"], "cpu"
+    monkeypatch.setattr(engine.prompt_cache, "limit_gb", lambda: 0)
+    lm.encode("a lighthouse", "", 4.0)
+    assert lm.text_pipe is None
+
+
 def test_gguf_weights_outside_linear_layers_are_unpacked_once():
     """A BF16 norm weight stays raw bytes after a GGUF load (twice its length); the norm must get real values."""
     torch = pytest.importorskip("torch")
@@ -289,6 +300,11 @@ def test_gguf_weights_outside_linear_layers_are_unpacked_once():
     assert norm.weight.shape == (8,) and not hasattr(norm.weight, "quant_type")
     assert torch.equal(norm.weight, values.float())
     assert hasattr(linear.weight, "quant_type")  # the linear layer unpacks its own weight while computing
+    # a buffer too (SD 3.5's pos_embed from a GGUF copy, MEASUREMENTS 7bk)
+    table = torch.nn.Module()
+    table.register_buffer("pos_embed", GGUFParameter(values.view(torch.uint8), quant_type=gguf.GGMLQuantizationType.BF16))
+    engine._dequantize_gguf_outside_linear(torch.nn.Sequential(table), torch.float32)
+    assert table.pos_embed.shape == (8,) and torch.equal(table.pos_embed, values.float())
 
 
 def test_an_import_without_a_name_is_named_after_its_file_unless_the_file_name_says_nothing():

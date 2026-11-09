@@ -109,6 +109,20 @@ ARCHS = {
         "resolutions": _res(512, 1536),
         "fallback_params": {"unet": 2.57, "text_encoder": 0.12, "text_encoder_2": 0.69, "vae": 0.08},
     },
+    # SDXL with the 9 channel inpainting UNet (diffusers' inpainting-0.1 and fine-tunes such as RealVisXL inpainting):
+    # trained to fill a mask, so it continues the picture where the plain SDXL models invent (MEASUREMENTS 7bf)
+    "sdxl_inpaint": {
+        "family": "sdxl", "label": "Stable Diffusion XL Inpainting",
+        "pipeline": "StableDiffusionXLInpaintPipeline", "img2img_pipeline": None,
+        "inpaint_pipeline": "StableDiffusionXLInpaintPipeline", "inpaint_only": True,
+        "denoiser": "unet", "denoiser_class": "UNet2DConditionModel",
+        "base_repo": "diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
+        "torch_dtype": "float16", "negative_prompt": True, "size_multiple": 64,
+        # the model card: 20-30 steps, guidance 8, strength below 1 (at 1 the picture is degraded)
+        "defaults": {"num_steps": 25, "guidance_scale": 8.0, "width": 1024, "height": 1024}, "max_strength": 0.99,
+        "resolutions": _res(512, 1536),
+        "fallback_params": {"unet": 2.57, "text_encoder": 0.12, "text_encoder_2": 0.69, "vae": 0.08},
+    },
     "sd35_medium": {
         "family": "sd3", "label": "Stable Diffusion 3.5 Medium",
         "pipeline": "StableDiffusion3Pipeline", "img2img_pipeline": "StableDiffusion3Img2ImgPipeline",
@@ -156,6 +170,25 @@ ARCHS = {
         "resolutions": _res(512, 1536),
         "fallback_params": {"transformer": 11.9, "text_encoder": 0.12, "text_encoder_2": 4.76, "vae": 0.08},
     },
+    # FLUX.1 Fill [dev] (Black Forest Labs, FLUX.1-dev non-commercial licence): FLUX.1 [dev] trained to fill a mask,
+    # the masked picture and the mask as extra input channels (384 instead of 64)
+    "flux1_fill": {
+        "family": "flux1", "label": "FLUX.1 Fill [dev]",
+        "pipeline": "FluxFillPipeline", "img2img_pipeline": None,
+        "inpaint_pipeline": "FluxFillPipeline", "inpaint_only": True,
+        "denoiser": "transformer", "denoiser_class": "FluxTransformer2DModel",
+        "base_repo": "black-forest-labs/FLUX.1-Fill-dev", "gated": True,
+        # not in float16: at 1024 px and guidance 30 its activations overflow, NaN from step 4-10 on (a black or
+        # flat brown mask on the Mac mini, MEASUREMENTS 7bf)
+        "torch_dtype": "bfloat16", "negative_prompt": False, "size_multiple": 16,
+        # a new prompt measured 11.9-12.6 GB against a plan of 10.6 on the Mac mini (its T5 restored from the cache
+        # leaves part of it on the CPU side, MEASUREMENTS 7bf): on 16 GB the transformer makes room then
+        "encode_extra_gb": 2.0,
+        # the model card: 50 steps, guidance 30
+        "defaults": {"num_steps": 50, "guidance_scale": 30.0, "width": 1024, "height": 1024},
+        "resolutions": _res(512, 1536),
+        "fallback_params": {"transformer": 11.9, "text_encoder": 0.12, "text_encoder_2": 4.76, "vae": 0.08},
+    },
     # Chroma (lodestones, Apache 2.0): FLUX.1 [schnell] reworked to 8.9B, its modulation layers replaced by one
     # small network (distilled_guidance_layer); T5-XXL as the only text encoder (no CLIP), FLUX.1's VAE. Real
     # classifier-free guidance with a negative prompt (two passes per step). Chroma1-HD / -Base / -Flash and
@@ -191,6 +224,7 @@ ARCHS = {
     "flux2_klein": {
         "family": "flux2", "label": "FLUX.2 [klein]",
         "pipeline": "Flux2KleinPipeline", "img2img_pipeline": None,
+        "inpaint_pipeline": "Flux2KleinInpaintPipeline", "inpaint_reference": True,
         "denoiser": "transformer", "denoiser_class": "Flux2Transformer2DModel",
         "base_repo": "black-forest-labs/FLUX.2-klein-4B",
         "torch_dtype": "bfloat16", "negative_prompt": False, "size_multiple": 16,
@@ -340,6 +374,71 @@ ARCHS = {
                      "prompt_prefix": LUMINA_SYSTEM_PROMPT},
         "resolutions": _res(512, 1536),
         "fallback_params": {"transformer": 2.61, "text_encoder": 2.61, "vae": 0.08},
+    },
+    # MOSS-Image (OpenMOSS, Apache 2.0): a 5B single-stream DiT with Qwen 3.5 9B as its text encoder and the small FLUX.2
+    # VAE, text in the picture (English, Chinese) and layouts. Runs on the ComfyUI runtime (0.42 and later) from
+    # Comfy-Org's files: the transformer in int8, the text encoder in 4 bit weights (W4A8). The maker's settings: flow
+    # Euler, 50 steps, CFG 3, shift 5 (ComfyUI's default for it), layer 22 skipped in the negative branch, no negative
+    # prompt; 0.25 to 4 megapixels (float16 on MPS stays finite up to 2048², vulkara_memory)
+    "moss_image": {
+        "family": "moss_image", "label": "MOSS-Image",
+        "pipeline": None, "img2img_pipeline": None, "img2img": True,
+        "denoiser": "transformer", "denoiser_class": None,
+        "base_repo": "Comfy-Org/MOSS-Image", "runtime": "comfyui",
+        "comfy": {"clip_type": "moss_image", "sampler": "euler", "scheduler": "simple", "latent": "flux2",
+                  "skip_layers": "22",
+                  "base_files": {"text_encoder": "text_encoders/qwen3.5_9b_w4a8_gptq.safetensors",
+                                 "vae": "vae/flux2-vae_small.safetensors"}},
+        "license": "Apache 2.0",
+        "prompt_hint": "Detailed sentences; text to render in quotes, line breaks where they belong; a layout as the JSON "
+                       "of ComfyUI's MOSS-Image Layout Prompt node (summary.caption, items with label, caption, text, bbox)",
+        "torch_dtype": "bfloat16", "negative_prompt": True, "size_multiple": 16,
+        "defaults": {"num_steps": 50, "guidance_scale": 3.0, "width": 1024, "height": 1024},
+        "resolutions": _res(512, 2048),
+        # the text encoder's 7.3 GB file and the VAE in 16 bit equivalents (a quantized file counts by its size)
+        "fallback_params": {"transformer": 5.08, "text_encoder": 3.67, "vae": 0.13},
+    },
+    # Fibo 2.0 (Bria AI, CC BY-NC 4.0): an 8B single-stream DiT; Qwen3-VL 4B reads the prompt and the pictures to edit,
+    # the FLUX.2 VAE. Edit Turbo edits and paints in 4 steps without guidance, Dev takes 50 with CFG 5. Runs on the
+    # ComfyUI runtime from Comfy-Org's files (TextEncodeFibo2): an input picture is edited, a mask's part greyed out
+    # first as in training
+    "fibo2": {
+        "family": "fibo2", "label": "Fibo 2.0",
+        "pipeline": None, "img2img_pipeline": None, "img2img": True, "inpaint": True,
+        "denoiser": "transformer", "denoiser_class": None,
+        "base_repo": "Comfy-Org/Fibo-2.0", "runtime": "comfyui",
+        "comfy": {"clip_type": "fibo2", "sampler": "euler", "scheduler": "simple", "encode": "fibo2",
+                  "base_files": {"text_encoder": "text_encoders/qwen3vl_4b_int8_convrot.safetensors",
+                                 "vae": "vae/flux2-vae.safetensors"}},
+        "license": "CC BY-NC 4.0",
+        "prompt_hint": "The change in one sentence (\"make it a snowy night\"), or a picture described in detail",
+        "torch_dtype": "bfloat16", "negative_prompt": False, "size_multiple": 16,
+        "defaults": {"num_steps": 4, "guidance_scale": 1.0, "width": 1024, "height": 1024},
+        # trained at about 1 megapixel; far above it the prompt drifts into a corner (Comfy-Org's workflow notes)
+        "resolutions": _res(512, 1536),
+        # the text encoder's 4.9 GB int8 file and the VAE in 16 bit equivalents (a quantized file counts by its size)
+        "fallback_params": {"transformer": 8.2, "text_encoder": 2.43, "vae": 0.08},
+        # each further picture of an edit (cropped to about 1 megapixel): 2.2 GB covers 2 to 4 pictures (7al, 7am)
+        "reference_gb": 2.2,
+    },
+    # Fibo 2.0 on the MLX runtime (mflux 0.24) from mflux's saved files (mflux-community's 8 and 4 bit repos,
+    # mflux_model.json): the weights as they lie on disk; the transformer's load lazily, so on a small Mac the text
+    # encoder is dropped before they come in (engines/mlx/main.py). The 16 GB way to Fibo 2.0 (MEASUREMENTS 7aj)
+    "fibo2_mlx": {
+        "family": "fibo2", "label": "Fibo 2.0",
+        "pipeline": None, "img2img_pipeline": None, "img2img": True, "inpaint": True,
+        "denoiser": "transformer", "denoiser_class": None,
+        "base_repo": "mflux-community/fibo-2-0-edit-turbo-mflux-q8", "runtime": "mlx",
+        "plan_on_disk": True, "activations_gb": 1.7, "reference_gb": 0.5,  # per further picture (7al, 7am)
+        # an edit's picture, masked or not: 13.2-13.4 GB on the Mac mini M4 against 10.5 for text to image (7bf; the
+        # M2 measured 11.1 against 10.9, 7aj)
+        "edit_gb": 2.9,
+        "license": "CC BY-NC 4.0",
+        "prompt_hint": "The change in one sentence (\"make it a snowy night\"), or a picture described in detail",
+        "torch_dtype": "bfloat16", "negative_prompt": False, "size_multiple": 16,
+        "defaults": {"num_steps": 4, "guidance_scale": 1.0, "width": 1024, "height": 1024},
+        "resolutions": _res(512, 1536),
+        "fallback_params": {"transformer": 4.3, "text_encoder": 2.3, "vae": 0.08},
     },
     # AuraFlow (fal) and Pony V7 (PurpleSmartAI), its best known fine-tune: a 6.8B MMDiT with Pile-T5-XL as its text
     # encoder and the SDXL VAE. Runs on the ComfyUI runtime; the transformer as GGUF (Pony's own Q8_0 / Q4_0, what its
@@ -496,6 +595,15 @@ def detect_flux3(config, modular_index=None):
     return "flux3_klein", (dict(FLUX3_BASE_DEFAULTS) if base else {})
 
 
+def detect_mflux(meta):
+    """("fibo2_mlx", default overrides) for a folder mflux saved (mflux_model.json) of Fibo 2.0, else None. Dev gets the
+    maker's 50 steps with guidance 5."""
+    name = str((meta or {}).get("model_name") or "")
+    if not name.startswith("fibo-2.0"):
+        return None
+    return "fibo2_mlx", ({"num_steps": 50, "guidance_scale": 5.0} if name == "fibo-2.0-dev" else {})
+
+
 def detect_from_model_index(model_index, denoiser_config=None, ref="", scheduler_config=None):
     """Returns (arch, default_overrides) for a diffusers repo / folder (scheduler_config: where the scheduler tells
     a model's version, as Z-Image's shift does)."""
@@ -510,11 +618,15 @@ def detect_from_model_index(model_index, denoiser_config=None, ref="", scheduler
         if unet.get("cross_attention_dim") == 1024:  # OpenCLIP: SD 2.x
             return ("sd21" if unet.get("sample_size", 64) >= 96 else "sd21_base"), overrides
         return "sd15", overrides
-    if cls == "StableDiffusionXLPipeline":
+    if cls in ("StableDiffusionXLPipeline", "StableDiffusionXLInpaintPipeline"):
+        if (denoiser_config or {}).get("in_channels") == 9 or cls == "StableDiffusionXLInpaintPipeline":
+            return "sdxl_inpaint", overrides
         return "sdxl", overrides
     if cls == "StableDiffusion3Pipeline":
         arch = "sd35_large" if denoiser_config.get("num_layers", 24) >= 30 else "sd35_medium"
         return arch, overrides
+    if cls == "FluxFillPipeline" or (cls == "FluxPipeline" and denoiser_config.get("in_channels") == 384):
+        return "flux1_fill", overrides
     if cls == "FluxPipeline":
         arch = "flux1_dev" if denoiser_config.get("guidance_embeds", False) else "flux1_schnell"
         return arch, overrides
@@ -788,6 +900,8 @@ _META_FAMILIES = [
     (r"^hunyuan[-_ ]?dit", "hunyuan_dit", None),
     (r"^lumina", "lumina", None),
     (r"^ernie", "ernie", None),
+    (r"^moss[-_. ]?image", "moss_image", None),
+    (r"^fibo[-_. ]?2", "fibo2", None),
     (r"^aura[-_ ]?flow", "auraflow", None),
     (r"^sd[-_ ]?3|^stable-diffusion-v?3", "sd3", None),
     (r"^sdxl|^stable-diffusion-xl", "sdxl", None),
@@ -817,6 +931,8 @@ _REPO_FAMILIES = [
     (r"^qwen/qwen-image(-2512)?$", "qwen_image", None),
     (r"^krea/krea-2", "krea2", None),
     (r"^circlestone-labs/anima", "anima", None),
+    (r"^(openmoss-team|comfy-org)/moss-image", "moss_image", None),
+    (r"^(briaai|comfy-org)/fibo-2\.0", "fibo2", None),
     (r"^ideogram-ai/ideogram-4", "ideogram4", None),
     (r"^wan-ai/wan2\.2-ti2v-5b", "wan", "5b"),
     (r"^wan-ai/wan2\.[12]-.*14b", "wan", "14b"),
@@ -1034,9 +1150,14 @@ def _structure(L, te):
         return "hunyuan_dit", None, ()
     if L.has(r"^layers_\d+_self_attention_|^layers_\d+_mlp_(gate_proj|up_proj|linear_fc[12])$"):
         return "ernie", None, ()
+    if L.has(r"^layers_\d+_proj_(q|k|v|qkv|o|ffn_up_gate|ffn_down)$|^shared_block_modulation$"):
+        return "moss_image", None, ()  # ComfyUI's names (also lora_unet_layers_N_proj_q); its loader maps q/k/v onto the fused files
     if L.has(r"^(layers|context_refiner|noise_refiner)_\d+_(attention|feed_forward)_"):
         # NextDiT: Z-Image (3840 wide), Lumina 2 (2304), Ideogram 4 (4608, its attention output is "o")
         width = L.width(r"_(attention_(qkv|to_q|to_k|to_v)|feed_forward_w[13])$")
+        # Fibo 2.0 (3584 wide): its perceiver, the cross attention of its injection layers, ComfyUI's fused w13
+        if width == 3584 or L.has(r"^perceiver_layers_\d+_|^layers_\d+_cross_attention_|_feed_forward_w13$"):
+            return "fibo2", None, ()
         if L.has(r"^layers_\d+_attention_o$") or width == 4608 or L.has(r"llm_cond_proj"):
             return "ideogram4", None, ()
         if width == 3840:
@@ -1203,6 +1324,28 @@ def lora_mismatch(lm, m):
 _FILE_PRECISION = {}
 
 
+# ComfyUI's own quantized layers (a "<layer>.comfy_quant" entry per layer, JSON in a byte tensor): their formats
+COMFY_QUANT_LABELS = {"int8_tensorwise": "8 bit (int8)", "asym_w4a8_int8": "4 bit (W4A8)", "w6a8_int8": "6 bit (W6A8)",
+                      "convrot_w4a4": "4 bit (W4A4)", "float8_e4m3fn": "8 bit (FP8)", "float8_e5m2": "8 bit (FP8)"}
+
+
+def _comfy_quant_formats(path, header):
+    """{format: layers} of the layers ComfyUI quantized itself, {} for other files."""
+    # a few dozen bytes each; anything larger is not ComfyUI's
+    entries = [v["data_offsets"] for k, v in header.items() if k.endswith(".comfy_quant")
+               and 0 < v["data_offsets"][1] - v["data_offsets"][0] <= 4096]
+    if not entries:
+        return {}
+    formats = {}
+    with open(path, "rb") as f:
+        start = 8 + struct.unpack("<Q", f.read(8))[0]
+        for a, b in entries:
+            f.seek(start + a)
+            fmt = json.loads(f.read(b - a)).get("format", "?")
+            formats[fmt] = formats.get(fmt, 0) + 1
+    return formats
+
+
 def file_precision(path):
     """The bit size most of a weights file is in: its GGUF type ("Q8_0", "Q4_K") or "16 bit", "8 bit (FP8)" from a
     safetensors header; read once per file."""
@@ -1216,8 +1359,11 @@ def file_precision(path):
                     counts[t.tensor_type.name] = counts.get(t.tensor_type.name, 0) + int(t.n_elements)
                 label = max(counts, key=counts.get) if counts else None
             else:
-                dtypes = {v["dtype"] for k, v in read_safetensors_json(path).items() if k != "__metadata__"}
-                label = ("8 bit (FP8)" if any(d.startswith("F8") for d in dtypes) else
+                header = read_safetensors_json(path)
+                dtypes = {v["dtype"] for k, v in header.items() if k != "__metadata__"}
+                quant = _comfy_quant_formats(path, header)
+                label = (COMFY_QUANT_LABELS.get(max(quant, key=quant.get), "8 bit") if quant else
+                         "8 bit (FP8)" if any(d.startswith("F8") for d in dtypes) else
                          "16 bit" if dtypes & {"BF16", "F16"} else "32 bit" if "F32" in dtypes else None)
         except Exception:
             pass
@@ -1368,6 +1514,9 @@ def detect_from_single_file(shapes, ref=""):
         turbo = {"num_steps": 10, "guidance_scale": 1.0} if "turbo" in (ref or "").lower() else {}
         return "anima", "comfy_files", turbo, params
     if has("conditioner.embedders.1."):
+        first_conv = next((v for k, v in shapes.items() if k.endswith("input_blocks.0.0.weight")), None)
+        if first_conv is not None and len(first_conv) == 4 and first_conv[1] == 9:
+            return "sdxl_inpaint", "single_full", overrides, None
         return "sdxl", "single_full", overrides, None
     if has("cond_stage_model.") or (has("input_blocks.") and not has("label_emb.")):
         return sd1_or_2(shapes, keys, ref, overrides)
@@ -1383,11 +1532,13 @@ def detect_from_single_file(shapes, ref=""):
         return ("flux2_dev" if params > 20 else "flux2_klein"), "single_denoiser", overrides, params
     if has("double_blocks.") and has("single_blocks.") and not has("img_in."):
         raise UnsupportedModel("Incomplete FLUX checkpoint (no input layer): the file holds only some blocks")
+    # FLUX.1 Fill: its input layer takes 384 channels (64 + the masked picture and the mask); GGUF lists them reversed
+    fill = any(k.endswith(("img_in.weight", "x_embedder.weight")) and 384 in v for k, v in shapes.items())
     if has("double_blocks.") and has("single_blocks."):
-        arch = "flux1_dev" if has("guidance_in.") else "flux1_schnell"
+        arch = "flux1_fill" if fill else "flux1_dev" if has("guidance_in.") else "flux1_schnell"
         return arch, "single_denoiser", overrides, params
     if has("transformer_blocks.") and has("single_transformer_blocks."):  # diffusers-format flux
-        arch = "flux1_dev" if has("time_text_embed.guidance_embedder.") else "flux1_schnell"
+        arch = "flux1_fill" if fill else "flux1_dev" if has("time_text_embed.guidance_embedder.") else "flux1_schnell"
         return arch, "single_denoiser", overrides, params
     if has("head.modulation") and has("patch_embedding."):  # Wan 2.x video models
         # GGUF lists dimensions in reverse order: take them by size, not by position
@@ -1413,6 +1564,14 @@ def detect_from_single_file(shapes, ref=""):
         return "qwen_image", "single_denoiser", _qwen_overrides(ref, overrides), params
     if has("llm_cond_proj.") and has("layers.0.attention.qkv."):  # Ideogram 4 (one of its two transformers)
         return "ideogram4", "single_denoiser", {}, params
+    if "shared_block_modulation.weight" in keys and has("layers.0.proj.ffn_up_gate."):  # MOSS-Image, ComfyUI's names
+        # lodestones' 8-step DMD distillation (merged files): 8 steps without guidance, one pass per step
+        dmd = re.search(r"dmd|8[-_ ]?steps?\b", (ref or "").lower())
+        return "moss_image", "comfy_files", {"num_steps": 8, "guidance_scale": 1.0} if dmd else {}, params
+    if "perceiver.latent_queries" in keys and has("layers.0.attention.qkv."):  # Fibo 2.0, ComfyUI's names
+        # Dev is the full model (the maker's 50 steps, CFG 5); Edit Turbo its 4-step distillation
+        dev = "dev" in re.split(r"[^a-z0-9]+", (ref or "").lower().rsplit("/", 1)[-1])
+        return "fibo2", "comfy_files", {"num_steps": 50, "guidance_scale": 5.0} if dev else {}, params
     width = _next_dit_width(shapes)
     if width == 3840:
         # Z-Image: ComfyUI's original names (fused attention.qkv) or diffusers' (to_q / to_k / to_v); safetensors in

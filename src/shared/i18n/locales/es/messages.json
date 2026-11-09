@@ -79,7 +79,9 @@
    "illusion": "Ilusión",
    "lora": "Comparación de LoRA",
    "start": "Página de inicio",
-   "benchmark": "Benchmark"
+   "benchmark": "Benchmark",
+   "enhance": "Mejorar",
+   "restore": "Restaurar"
   },
   "upscaleTo": "{from} a {to}",
   "steps": "{n} pasos",
@@ -132,7 +134,7 @@
    "inpaint": {
     "title": "Inpainting",
     "subtitle": "Volver a pintar una parte de una imagen",
-    "prompt": "Describe qué debe aparecer en la parte pintada"
+    "prompt": "Describe qué debe aparecer en la parte pintada; vacío elimina lo pintado"
    },
    "video": {
     "title": "Imagen a vídeo",
@@ -152,12 +154,33 @@
    "noModel": "Aún no hay ningún modelo instalado para esta página.",
    "noModelLink": "Consigue uno en la página Modelos."
   },
+  "caption": {
+   "button": "Prompt desde imagen",
+   "hint": "Qwen3-VL 2B (Qwen, Apache-2.0) mira la imagen y escribe un prompt para ella: motivo, entorno, luz, colores, estilo y cámara en un párrafo en inglés, que puedes cambiar antes de crear. Se ejecuta en este Mac en unos 20 s y se descarga una vez (4,1 GB); el modelo de imagen cargado se libera para ello. Los colores de las fotos en blanco y negro son una suposición.",
+   "replace": "¿Sustituir el prompt por una descripción de la imagen?",
+   "replaceYes": "Sustituir",
+   "starting": "Iniciando …"
+  },
   "upsample": {
    "label": "Ampliador de prompts",
    "hint": "FLUX 3 Image Klein está entrenado con descripciones completas de escenas. El ampliador (de Black Forest Labs, 4 bits) escribe una a partir de tu prompt antes de crear la imagen: motivo, entorno, luz, cámara, colores. Un prompt que ya lo describe todo se usa tal cual. Se descarga una vez (5,7 GB, con el botón junto a la opción o en la página Modelos); ocupa la memoria solo para el prompt y luego se libera. La descripción que escribió aparece con la imagen.",
    "download": "Descargar (5,7 GB)",
    "downloading": "Descargando …",
-   "missing": "El ampliador de prompts aún no está descargado: descárgalo con el botón junto a la opción o desactiva la opción."
+   "missing": "El ampliador de prompts aún no está descargado: descárgalo con el botón junto a la opción o desactiva la opción.",
+   "labelErnie": "Mejorador de prompts",
+   "hintErnie": "El mejorador de prompts propio de ERNIE-Image (de Baidu, Ministral 3 3B, 16 bits) reescribe un prompt corto como una descripción visual rica antes de crear la imagen; la descripción pasa a ser la nota de la imagen. Desactivado, el prompt va tal como está escrito.",
+   "downloadErnie": "Descargar (7,7 GB)",
+   "missingErnie": "El mejorador de prompts aún no está descargado: descárgalo con el botón junto a la opción o desactiva la opción."
+  },
+  "keepPicture": {
+   "label": "Mantener la imagen (FLUX.2 [klein] 4B)",
+   "hint": "Cambia solo lo que pide el prompt y mantiene el resto de la imagen: el mismo lugar, las mismas personas, el mismo encuadre. Un cambio fuerte de estilo (una pintura a partir de una foto) sale más suave. La LoRA de consistencia de lrzjason a media fuerza (Apache-2.0, 0,4 GB, se descarga una vez), hecha para FLUX.2 [klein] 4B: otros modelos editan sin ella. Unos 0,3 GB más de memoria mientras el modelo trabaja."
+  },
+  "fast": {
+   "label": "Rápido (8 pasos)",
+   "hint": "FLUX.1 [dev] y sus fine-tunes en 8 pasos en lugar de 20–50, con el LoRA Turbo-Alpha de alimama (pasos y guidance como indica su ficha: 8 y 3,5). En un Mac mini con 16 GB, una imagen de 1024 px tardó 4:18 en lugar de 11:04 min con 28 pasos; cambia la composición, la calidad se mantiene. El LoRA se descarga una vez en tus LoRAs (694 MB, la licencia no comercial de FLUX.1 [dev]).",
+   "download": "Descargar el LoRA Turbo (694 MB)",
+   "missing": "El LoRA Turbo aún no está descargado: descárgalo con el botón junto a la opción o desactiva la opción."
   },
   "aiLabel": {
    "label": "Etiqueta IA de la UE",
@@ -190,7 +213,10 @@
    "height": "Alto",
    "change": "Cambio",
    "changeInpaintHint": "Cuánto se aleja la parte pintada de lo que hay.",
+   "flux1MaskHint": "FLUX.1 no se entrenó para pintar dentro de una máscara: puede quedar un contorno tenue de la parte pintada. FLUX.1 Fill [dev] (Modelos → Recomendados) la integra sin costuras.",
    "changeHint": "Cuánto se aleja el resultado de la imagen.",
+   "references": "Más imágenes",
+   "referencesHint": "Fibo 2.0 edita hasta cuatro imágenes juntas. En el prompt la imagen de arriba es <image_1> y estas son <image_2> a <image_4>: «viste a la persona de <image_1> con el vestido de <image_2>».",
    "modelDefaults": "Valores del modelo",
    "suggestsHint": "Este modelo sugiere {steps} pasos y guidance {guidance}; el botón Valores del modelo los aplica. Al cambiar de modelo se conservan tus ajustes.",
    "suggestsSizeHint": "Este modelo sugiere {steps} pasos y guidance {guidance}, {width}×{height}; el botón Valores del modelo los aplica. Al cambiar de modelo se conservan tus ajustes.",
@@ -228,7 +254,8 @@
    "choosePicture": "Elige una imagen.",
    "paintMask": "Pinta sobre la parte de la imagen que debe cambiar.",
    "describe": "Describe la imagen.",
-   "chooseControl": "Elige la imagen de control o ajusta Control a Ninguno."
+   "chooseControl": "Elige la imagen de control o ajusta Control a Ninguno.",
+   "tooManyForFast": "Rápido añade el LoRA Turbo-Alpha: quita un LoRA (como máximo {n} propios) o desactiva Rápido."
   },
   "fit": {
    "steps": "Hecho para {n} pasos: más pasos tardan más sin dar una imagen mejor.",
@@ -535,6 +562,9 @@
   "needsModel": "Necesita un modelo FLUX.2:",
   "needsModelLink": "Modelos → Recomendados",
   "modelSteps": "Pasos del modelo",
+  "consistency": "LoRA de consistencia (FLUX.2 [klein] 4B)",
+  "consistencyHint": "Mantiene la reparación más cerca de la foto; los arañazos desaparecen mejor. LoRA de lrzjason (Apache-2.0, 0,4 GB, se descarga una vez), hecha para FLUX.2 [klein] 4B: otros modelos reparan sin ella. Unos 1,7 GB más de memoria mientras el modelo trabaja.",
+  "klein9bTint": "FLUX.2 [klein] 9B tiñe las fotos en blanco y negro y en sepia al repararlas. FLUX.2 [klein] 4B con el LoRA de consistencia mantiene su color.",
   "guardRails": "Límites de seguridad",
   "lock": "Conservar el original fuera de los daños pintados",
   "checkFaces": "Rechazar resultados con caras cambiadas",
@@ -1211,6 +1241,9 @@
    "strength": "Intensidad",
    "length": "Duración",
    "duration": "Tiempo de generación",
+   "loadTime": "carga y prompt {time}",
+   "stepsTime": "{n} pasos {time} ({pace})",
+   "finishTime": "decodificar y guardar {time}",
    "loras": "LoRAs",
    "controlnet": "ControlNet",
    "label": "Etiqueta",
@@ -1441,6 +1474,8 @@
    "size": "Tamaño",
    "ownSize": "Su propio tamaño",
    "pictures": "Imágenes",
+   "freshPrompt": "Prompt nuevo por imagen",
+   "freshPromptHint": "Añade un número al prompt de cada imagen, para que cada una vuelva a codificarlo, como cuando cambias el prompt. Sin esto, las imágenes después de la primera reutilizan el prompt ya codificado y solo muestran los pasos del modelo.",
    "start": "Medir",
    "stop": "Detener",
    "how": "La primera imagen también carga el modelo; las siguientes muestran la velocidad con él cargado. Las imágenes se guardan en el historial.",
@@ -1471,6 +1506,45 @@
   }
  },
  "app": {
+  "menu": {
+   "about": "Acerca de VulKara",
+   "settings": "Ajustes…",
+   "monitor": "Monitor",
+   "services": "Servicios",
+   "hide": "Ocultar VulKara",
+   "hideOthers": "Ocultar otros",
+   "showAll": "Mostrar todo",
+   "quit": "Salir de VulKara",
+   "open": "Abrir VulKara",
+   "noJob": "Ningún trabajo en curso",
+   "running": "{model} · {progress} %",
+   "runningEta": "{model} · {progress} % · faltan {eta}",
+   "waiting": "{n} en espera",
+   "remoteOn": "Acceso remoto activado: salir lo detiene"
+  },
+  "monitor": {
+   "title": "Monitor",
+   "hint": "El trabajo en curso frente a lo esperado: la memoria frente al plan del propio trabajo y, en el Mac donde se hicieron las mediciones (Mac mini M4, 16 GB, docs/MEASUREMENTS.md), el tiempo y la memoria medidos del modelo con sus ajustes estándar. Verde está por debajo, naranja más de un 10 % por encima, rojo más de un 25 %. Entre trabajos no se compara nada.",
+   "idle": "No hay ningún trabajo en curso.",
+   "job": "Trabajo en curso",
+   "progress": "Progreso",
+   "perStep": "Por paso",
+   "left": "Faltan",
+   "memory": "VulKara con sus motores",
+   "plan": "Plan",
+   "measured": "Medido ({ref})",
+   "perPicture": "Por imagen",
+   "peak": "Máximo",
+   "thisMac": "Este Mac",
+   "cpu": "CPU",
+   "gpu": "GPU",
+   "used": "Memoria en uso",
+   "swap": "Swap",
+   "swapAdded": "Swap añadido",
+   "streamCache": "Caché de streaming SSD",
+   "waiting": "{n} en espera",
+   "notMeasured": "No medido en este Mac con estos ajustes"
+  },
   "about": {
    "title": "Acerca de VulKara",
    "subtitle": "Versión {version} · {mac} · {os} · Electron {electron}",
@@ -1851,6 +1925,7 @@
    "training": "Se está entrenando una LoRA: genera cuando el entrenamiento termine o se detenga.",
    "installing": "Se está instalando un runtime: genera cuando termine.",
    "exporting": "Se está exportando un modelo: genera cuando termine.",
+   "captioning": "Se está escribiendo un prompt a partir de una imagen: genera cuando termine o se cancele.",
    "incomplete": "Esta tarea está incompleta.",
    "needsFilter": "El filtro de contenido necesita el runtime Diffusers: instálalo en Ajustes → Runtimes.",
    "notPassed": "El resultado no pasó el filtro de contenido.",
@@ -1961,6 +2036,10 @@
    "needsDiffusers": "Las poses se detectan con el runtime Diffusers: instálalo en Ajustes → Runtimes",
    "facesNeedDiffusers": "Las caras se detectan con el runtime Diffusers: instálalo en Ajustes → Runtimes"
   },
+  "caption": {
+   "needsDiffusers": "El prompt desde una imagen se escribe con el runtime Diffusers: instálalo en Ajustes → Runtimes",
+   "busy": "Hay un trabajo en marcha: el prompt desde la imagen se puede escribir cuando la cola esté vacía."
+  },
   "logs": {
    "noLogFile": "No hay archivo de registro en esta sesión.",
    "noSession": "No existe esa sesión de registro."
@@ -1986,6 +2065,7 @@
   "preparingControl": "Preparando la imagen de control {type}",
   "encodingPrompt": "Codificando el prompt",
   "generating": "Generando",
+  "describingPicture": "Describiendo la imagen",
   "decoding": "Decodificando",
   "workingOnPicture": "Procesando la imagen",
   "correcting": "Corrigiendo colores y contraste",

@@ -15,6 +15,10 @@ An FP8 model stays in 16 bit: ComfyUI keeps one in FP8 where 16 bit would not fi
 type Float8_e4m3fn" at the first step), so a Mac short of memory swaps instead of stopping the job. And a model that
 may run in float16 does so instead of bfloat16: MPS computes bfloat16 at half the speed (MEASUREMENTS 7ab). Of the
 models VulKara runs here that is Anima alone (Lumina 2 allows only bfloat16, AuraFlow and Wan pick float16 already).
+MOSS-Image is allowed float16 first: its residual stream stays finite in float16 up to 2048² (KBlueLeaf's measurements,
+the app's largest size; it overflows from 2560²), and its int8 layers then compute in float16 too (MEASUREMENTS 7ag).
+Fibo 2.0 likewise: float16 gives the same picture as bfloat16 (PSNR 47 dB) at 69 instead of 111 s per step (MEASUREMENTS
+7ai).
 """
 import asyncio
 import comfy.model_management as mm
@@ -54,6 +58,12 @@ def mac_weights():
             dt = torch.float16
         return dt
     mm.unet_dtype = dtype
+    if mm.get_torch_device().type == "mps":
+        import comfy.supported_models as sm
+        if hasattr(sm, "MOSSImage"):
+            sm.MOSSImage.supported_inference_dtypes = [torch.float16, torch.bfloat16, torch.float32]
+        if hasattr(sm, "Fibo2"):
+            sm.Fibo2.supported_inference_dtypes = [torch.float16, torch.bfloat16, torch.float32]
 
 
 pad_attention()
@@ -79,5 +89,36 @@ async def set_memory_mode(request):
     return web.json_response({"mode": mm.vram_state.name})
 
 
-NODE_CLASS_MAPPINGS = {}
+class EncodeAndFree:
+    """Loads the text encoder, encodes the prompt and its negative, and lets the text encoder go before the sampler
+    loads the diffusion model, as the app's staged plan counts it. With CLIPLoader its output stays in ComfyUI's cache
+    for the whole prompt (--cache-ram frees only older ones), so both were in memory together: NetaYume v4 10.5 GB
+    against 8.9 planned on 16 GB (docs/MEASUREMENTS.md 7bs). Only the conditionings are cached here."""
+    CATEGORY = "vulkara"
+    FUNCTION = "encode"
+    RETURN_TYPES = ("CONDITIONING", "CONDITIONING")
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"clip_name": ("STRING", {}), "type": ("STRING", {}), "text": ("STRING", {"multiline": True}),
+                             "negative": ("STRING", {"multiline": True})}}
+
+    def encode(self, clip_name, type, text, negative):
+        import gc
+        import folder_paths
+        import nodes
+        # a free text field, not CLIPLoader's list: only a text encoder ComfyUI lists may load
+        if clip_name not in folder_paths.get_filename_list("text_encoders"):
+            raise ValueError("unknown text encoder: %s" % clip_name)
+        clip = nodes.CLIPLoader().load_clip(clip_name, type)[0]
+        encode = nodes.CLIPTextEncode().encode
+        out = (encode(clip, text)[0], encode(clip, negative)[0])
+        del clip, encode  # ComfyUI's loaded models hold only weak references
+        gc.collect()
+        mm.cleanup_models_gc()
+        mm.soft_empty_cache()
+        return out
+
+
+NODE_CLASS_MAPPINGS = {"VulKaraEncodeAndFree": EncodeAndFree}
 NODE_DISPLAY_NAME_MAPPINGS = {}

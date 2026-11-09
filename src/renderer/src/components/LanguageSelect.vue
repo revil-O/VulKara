@@ -3,7 +3,7 @@
 // The app's language: System (macOS's) or one of the four, each under its own name. Settings → Appearance and the
 // Start page; icon: with the Languages icon in front (the Start page, where it stands alone).
 import { computed, ref, watch } from 'vue'
-import { Languages } from 'lucide-vue-next'
+import { Languages } from '@lucide/vue'
 import { LANG_NAMES, LANGS, type LangSetting } from '@shared/i18n'
 import { useSettingsStore } from '../stores/settings'
 import { isRemote } from '../remote_vk'

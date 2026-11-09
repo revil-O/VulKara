@@ -242,3 +242,36 @@ def test_removing_dust_fills_the_specks(monkeypatch):
     a = np.asarray(out.convert("L")).astype(int)
     assert 0 < share < 0.01
     assert all(a[y, x] > 80 for y, x in specks)  # the dark specks are gone (OpenCV filled them)
+
+
+def test_the_consistency_lora_is_a_pinned_helper_for_klein_4b(monkeypatch, tmp_path):
+    import helpers
+    import pinned
+    h = next(x for x in helpers.catalog() if x["id"] == rs.CONSISTENCY_HELPER)
+    revision, files = pinned.pins(h["repo"])
+    assert files[rs.CONSISTENCY_FILE] and len(revision) == 40
+    fetched = []
+    monkeypatch.setattr(rs, "helper_folder", lambda helper_id: str(tmp_path))
+    monkeypatch.setattr(helpers, "install", lambda helper_id, report=None: fetched.append(helper_id))
+    lora = rs.consistency_lora()
+    assert fetched == [rs.CONSISTENCY_HELPER]  # downloaded on first use
+    assert lora["file"] == os.path.join(str(tmp_path), rs.CONSISTENCY_FILE) and lora["scale"] == 1.0
+    assert lora["plan_gb"] >= 1.1  # it adds 1.1-2.2 GB while denoising (7bh)
+
+
+def test_keep_the_picture_adds_the_consistency_lora_at_half_strength_for_klein_4b(monkeypatch):
+    # image to image: at 1.0 the LoRA held the edit back, at 0.5 it kept the picture and made the edit (7bi)
+    import engine
+    import protocol
+    notes = []
+    monkeypatch.setattr(protocol, "note", notes.append)
+    monkeypatch.setattr(rs, "consistency_lora", lambda scale=1.0, report=None: {"scale": scale})
+    k4 = {"arch": "flux2_klein", "family": "flux2", "components": {"transformer": 3.9}}
+    k9 = {"arch": "flux2_klein", "family": "flux2", "components": {"transformer": 8.1}}
+    on = {"keep_picture": True}
+    assert engine.keep_picture_loras(on, k4, picture=True) == [{"scale": rs.KEEP_PICTURE_SCALE}]
+    assert rs.KEEP_PICTURE_SCALE == 0.5
+    assert engine.keep_picture_loras({}, k4, picture=True) == []
+    assert engine.keep_picture_loras(on, k4, picture=False) == []  # text to image
+    assert engine.keep_picture_loras({**on, "mask_image": "m.png"}, k4, picture=True) == []  # inpainting
+    assert engine.keep_picture_loras(on, k9, picture=True) == [] and "made for FLUX.2 [klein] 4B" in notes[0]

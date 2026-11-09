@@ -4,7 +4,7 @@
 // ← and → go through the list the view was opened from.
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { canCopyImage, canShare, copyPicture, sharePicture } from '../share'
-import { Check, ChevronLeft, ChevronRight, Clapperboard, Copy, Download, Eraser, FolderSearch, Images, Maximize2, Repeat, Share, X } from 'lucide-vue-next'
+import { Check, ChevronLeft, ChevronRight, Clapperboard, Copy, Download, Eraser, FolderSearch, Images, Maximize2, Repeat, Share, X } from '@lucide/vue'
 import { EDITION } from '@shared/edition'
 import type { ViewerAction, ViewerItem } from '@shared/api'
 import { t } from '../i18n'

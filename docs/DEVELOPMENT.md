@@ -32,7 +32,9 @@ VulKara has to work on a Mac mini M4 with 16 GB, not only on the 24 GB developme
 - **GGUF streams too**: `streaming.unpack_gguf` writes a GGUF denoiser's blocks unpacked (16 bit) into the stream
   cache once, block by block, and the other weights into `rest.safetensors`; `unpacked.json` names the file
   (SHA-256) and the dtype. Later loads build the denoiser on the meta device from its config and read only the
-  rest, never the GGUF file (diffusers copies a whole GGUF file into RAM). Tests: `tests/test_streaming.py`.
+  rest, never the GGUF file. The unpacking itself reads the file memory-mapped (`streaming._gguf_mapped`, in place
+  of diffusers' `load_gguf_checkpoint`, which copies every tensor): 4.9 GB instead of 14.2 for an 8 bit FLUX.1 on
+  16 GB (MEASUREMENTS 7bp). Tests: `tests/test_streaming.py`, `tests/test_gguf_cache.py`.
 - The import check, the engine and the recommended models (`min_ram_gb`, `min_ram_gb_mlx`, `min_ram_gb_streamed`,
   recomputed with `engines/diffusers/tools/update_curated_ram.py`) must agree on what fits.
 - Results are reported for both Macs; what was only planned and not run is called a plan.
@@ -56,7 +58,7 @@ VulKara has to work on a Mac mini M4 with 16 GB, not only on the 24 GB developme
   model's suggestions are offered (**Model defaults**), never applied silently.
 - A UI change is checked in the running app with a real hover or click and a screenshot, not only in code.
 - **No emoji in the documents**: README and guides use the app's own Lucide icons, written as SVG files into
-  `docs/icons` by `node tools/doc_icons.mjs` (from the app's lucide-vue-next, in the accent colour); a new icon is added
+  `docs/icons` by `node tools/doc_icons.mjs` (from the app's @lucide/vue, in the accent colour); a new icon is added
   to its list. Arrows and key symbols (→, ⌘, ⇧, ↩) stay text, as in the app. The changelog stays plain text: the app
   shows it on its Changelog page.
 - **Example pictures are labelled**: every picture generated as an example for the app itself (Tips & tricks and the
@@ -71,6 +73,12 @@ VulKara has to work on a Mac mini M4 with 16 GB, not only on the 24 GB developme
 - A **stop** belongs to the job read before it: the command reader clears it when the next job is read, never when a
   job starts (a stop sent while an engine starts or loads would be lost).
 - LoRA loading must work on quantized models (quanto keeps `x.weight._data`): `_plain_weight_names` in `engine.py`.
+- A denoiser in 8 or 4 bit (Diffusers runtime) is a GGUF copy written once in a process of its own (`gguf_cache.py`,
+  `quantize_once.py` kind `gguf`, Q8_0/Q4_0 tensor by tensor from the shards, the diffusers names kept) and loaded like an
+  imported GGUF model; Diffusers' Quanto backend goes with version 1.0 (MEASUREMENTS 7bk). Text encoders stay with
+  Transformers' Quanto (`quant_cache.py`), ControlNets in 8 bit are quantized by optimum-quanto itself (kind
+  `controlnet`, Union/FLUX/SD3 ControlNets do not load as a single file). Writing the copy removes the component's old
+  Quanto cache.
 - New architectures and LoRA formats are tested with real headers (fixtures) and, before they are called supported,
   with a real picture; until then the docs say *not yet tried with a real picture*.
 
@@ -118,7 +126,7 @@ Concepts not built yet are in `docs/concepts/` ([Characters](concepts/CHARACTERS
 | App shell | Electron 44, electron-vite 5, TypeScript 5.9 |
 | Pages | Vue 3.5, Pinia, Vue Router (hash history), lucide icons |
 | Tests | vitest (TypeScript), pytest (engines) |
-| Engines | Python 3.11 in separate runtimes (uv venvs): diffusers / PyTorch MPS, MLX (mflux), ComfyUI 0.38 with ComfyUI-GGUF |
+| Engines | Python 3.11.18 in separate runtimes (uv 0.13.7 venvs): diffusers / PyTorch MPS, MLX (mflux), ComfyUI 0.44 with ComfyUI-GGUF |
 | Packaging | electron-builder, `@electron/osx-sign`, `@electron/notarize`, notarytool |
 
 ## Layout
@@ -130,8 +138,8 @@ Concepts not built yet are in `docs/concepts/` ([Characters](concepts/CHARACTERS
 | `src/renderer` | The pages (`pages/`), shared components (`components/`), Pinia stores (`stores/`), helpers (`util/`), the splash picture (`assets/splash`) |
 | `src/shared` | Types, the page API (`api.ts`), the texts in four languages (`i18n/`), settings, content policy, styles, samplers, ControlNet kinds, LoRA bases and fit, licence terms, editions, data (recommended models, licences) |
 | `engines/diffusers` | PyTorch / diffusers engine and the architecture registry (`registry.py`); also imports, previews, pose detection, content filter, photo restoration (`restore.py`, DDColor, LaMa), SSD streaming, the LoRA / model recheck, SDXL training; on MPS attention heads the fused kernel does not take are padded to 64 (`fused_attention`) |
-| `engines/mlx` | MLX engine (mflux): FLUX, Krea 2, Ideogram 4, ERNIE-Image; FLUX 3 Image Klein with flux3-mlx and its prompt upsampler with mlx-lm (`flux3.py`); training for FLUX.2 [klein] and Krea 2; Z-Image on its reference schedule (`mlx_schedulers.py`: fixed shift instead of mflux's resolution shift); MLX's buffer cache limited to 1 GB and emptied after loading and each picture (`free_buffers`); on Macs with 16 GB or less, or when the one-piece decode (`DECODE_GB`) does not fit into the memory free before a picture (`_plan_job`, `memory.free_gb`), the VAE decodes in tiles (`low_ram`); every engine reports its footprint per job against its plan (`protocol.Footprint`, `protocol.planned`) |
-| `engines/comfy` | Runs ComfyUI as a background process for the models only it supports (Anima, Lumina 2, AuraFlow / Pony V7, Wan) and for upscaling; started with PyTorch attention, its node `vulkara_memory` pads attention heads the fused MPS kernel does not take to 64 keeps the VAE on split attention and FP8 models in 16 bit (MPS cannot cast FP8) |
+| `engines/mlx` | MLX engine (mflux): FLUX, Krea 2, Ideogram 4, ERNIE-Image, Fibo 2.0 (mflux's saved files); FLUX 3 Image Klein with flux3-mlx and its prompt upsampler with mlx-lm (`flux3.py`); training for FLUX.2 [klein] and Krea 2; Z-Image on its reference schedule (`mlx_schedulers.py`: fixed shift instead of mflux's resolution shift); MLX's buffer cache limited to 1 GB and emptied after loading and each picture (`free_buffers`); on Macs with 16 GB or less, or when the one-piece decode (`DECODE_GB`) does not fit into the memory free before a picture (`_plan_job`, `memory.free_gb`), the VAE decodes in tiles (`low_ram`); every engine reports its footprint per job against its plan (`protocol.Footprint`, `protocol.planned`) |
+| `engines/comfy` | Runs ComfyUI as a background process for the models only it supports (Anima, Lumina 2, AuraFlow / Pony V7, MOSS-Image, Fibo 2.0, Wan) and for upscaling; started with PyTorch attention, its node `vulkara_memory` pads attention heads the fused MPS kernel does not take to 64 keeps the VAE on split attention and FP8 models in 16 bit (MPS cannot cast FP8) and lets MOSS-Image and Fibo 2.0 compute in float16 |
 | `tools` | Release, dev bundle, licence data, notices, icon, the clean check |
 | `build` | Icon and entitlements |
 | `docs` | User guide, this guide, screenshots, sample pictures |
@@ -210,8 +218,16 @@ the requests of the same name. Every other output line goes to the log (`log.ts`
 and tags each line with its source).
 
 The diffusers runtime's `main.py` also has one-shot commands, run as separate processes: `import_model` (the
-importer, also its dry run behind **Check**), `previews`, `train`, `hardware`, `detect_pose`, `recheck_loras` and
-`content_check`.
+importer, also its dry run behind **Check**), `previews`, `train`, `hardware`, `detect_pose`, `recheck_loras`,
+`caption_image` and `content_check`.
+
+`caption_image <picture>` (`caption.py`, IPC `caption:image` / `caption:stop`, Image to image's **Prompt from
+picture**) answers with `__caption__ {"text": …}`: Qwen3-VL 2B Instruct (helper `qwen3_vl`, pinned in
+`helper_pins.json`) in bfloat16 on MPS, greedy, at most 300 new tokens, the text cut back to its last whole sentence
+when it hits them, the picture made at most 1024 px first. The main process refuses it while a job, an import or a
+training runs, frees the engines' models first (`unloadEngines`) and kills the process on Stop. Its channel is not
+in `REMOTE_CHANNELS`, and the page hides the button in the remote web UI. 8 bit (optimum-quanto) was measured and
+left out (MEASUREMENTS 7br).
 
 ## Models and manifests
 
@@ -258,6 +274,9 @@ model or LoRA as `licence.json` (`licence_info.ts`).
 | `lumina` | `lumina2` (`runtime: comfyui`; the system prompt as `prompt_prefix` in its defaults) | |
 | `auraflow` | `auraflow` (`runtime: comfyui`, Pony V7; `t5_min_padding`; GGUF counted by its size), `auraflow_diffusers` (AuraFlowPipeline repositories; `max_sequence_length` 768; ComfyUI-named LoRAs converted in `lora_convert.py`) | |
 | `ernie` | `ernie_image` (`runtime: mlx`, repository layout; `pe/` not downloaded: `OPTIONAL_COMPONENTS`) | |
+| `moss_image` | `moss_image` (`runtime: comfyui`, ComfyUI 0.42 or later; `latent: flux2`, `skip_layers` 22; files ComfyUI quantized itself (int8, W4A8: `.comfy_quant` entries) counted by their size; float16 on MPS in `vulkara_memory`; 8-step DMD files by name) | |
+| `fibo2` | `fibo2` (`runtime: comfyui`, ComfyUI 0.43 and later; `encode: fibo2`: `TextEncodeFibo2` takes the prompt, the input picture as reference and gives the latent; a mask's part is greyed out first (`masks.grey_out`) and the result blended back (`masks.blend_into`); size from the input picture at 1 megapixel; float16 on MPS in `vulkara_memory`; Dev files by name: 50 steps, CFG 5) | |
+| `fibo2_mlx` | `fibo2_mlx` (`runtime: mlx`, mflux 0.24: folders mflux saved, `mflux_model.json` with `model_name` fibo-2.0-*; `plan_on_disk` with 1.7 GB activations; the engine's `_generate_fibo2`: `Fibo2Edit` loaded once, text to image through `Fibo2.generate_image`, lazily loaded weights so the text encoder is dropped before the transformer's on small Macs; masks as on ComfyUI) | |
 | `wan` | `wan22_ti2v`, `wan22_i2v_14b` (`runtime: comfyui`, `kind: video`) | `5b`, `14b` |
 
 LoRA families without an architecture (`hidream`, `hunyuan_video`, `hunyuan_dit` …) are known by
@@ -312,7 +331,8 @@ on a USB SSD (0.93 GB/s; internal 2.7–3.3 GB/s): at 1024 px streaming is compu
 Chroma with guidance 1 %), so batching the guided and the unguided pass would save nothing there; at 512 px it is
 reading-bound (55–63 % waiting). The streaming cache is
 `<model>/stream_cache`, or `<VK_STREAM_CACHE_DIR>/<model>` when *SSD streaming cache* is set (`engineEnv` in
-`src/main/settings.ts`). A Hugging Face repository without a full model answers the dry run with *Pick one of its
+`src/main/settings.ts`); it holds one file per block and `rest.safetensors` with the other weights, so a later load builds
+the model empty and reads only those (`streaming.from_cache`), never the model file. A Hugging Face repository without a full model answers the dry run with *Pick one of its
 model files: …*, which the Add tab shows as buttons.
 
 ## Development
@@ -378,7 +398,9 @@ what would change.
    detection in `detect_from_model_index` and the single-file / GGUF detection. LoRA structure in `_structure`, and
    `model_variant` when the family has sizes. `fp16_compute: True` lets the denoiser and VAE run in float16 where
    bfloat16 is emulated (M1/M2; the text encoders stay bfloat16) — measured on FLUX.1 and Chroma (about 40 % faster,
-   same picture); test a real generation before setting it, some models overflow in float16.
+   same picture); test a real generation before setting it, some models overflow in float16. Whether
+   bfloat16 is slow is timed once per Mac and kept in `<data dir>/bf16_check.json` (`engine.bf16_is_slow`): timed at
+   every start it flipped on the M4, and each flip wrote the stream cache and the quantized text encoders again.
 2. The engine that runs it: diffusers (`engine.py`), `engines/mlx/main.py` (plus `MLX_ONLY` / `MLX_ALSO` in
    `src/main/engines.ts`) or a ComfyUI workflow (`engines/comfy/workflows.py`).
 3. `engines/diffusers/memory.py`: `ACTIVATIONS_GB` for the family.
@@ -465,7 +487,11 @@ them); `_face_points` moves them into a preview's part and the result's scale. A
 (`_preview_box`; "auto": around the largest face) into `<pictures>/.previews` (`preview_x…_y…_w…_h…_id.png`, the
 page crops the same part of the original for `CompareSlider`), at most 12 kept, never in the history
 (`ipc.ts` `finished`). The helper `codeformer` (kind `faces`) downloads both files from GitHub at fixed SHA-256
-(`restore.FACE_FILES`). Choices and numbers: docs/MEASUREMENTS.md, section 4 (*Restore: faces and soft detail*).
+(`restore.FACE_FILES`). With `consistency` on and a FLUX.2 [klein] 4B model (`registry.model_variant`) the repair
+takes the helper `klein4b_consistency` (kind `lora`, pinned in helper_pins.json) as a resolved LoRA through
+`generate(job, helper_loras)`, with its measured `plan_gb` in the memory plan (MEASUREMENTS 7bh); other models repair
+without it and get a note. Image to image takes the same helper at half strength when the job carries
+`keep_picture` (`engine.keep_picture_loras`, `restore.KEEP_PICTURE_SCALE`, MEASUREMENTS 7bi). Choices and numbers: docs/MEASUREMENTS.md, section 4 (*Restore: faces and soft detail*).
 
 ## Export as one file
 
@@ -781,6 +807,12 @@ A dependency changes only like this, before the release build:
    picture or video with a model of each family it runs, on the 16 GB plan too where streaming is involved.
 3. Lock it: `python3 tools/lock_runtimes.py <runtime>` freezes the accepted runtime into `constraints.txt` and the
    pins. Review the diff (what moved, which majors), note the change in `CHANGELOG.md`, commit.
+
+uv, Python and ComfyUI are pinned in `src/main/runtimes.ts` (`UV_VERSION` with the SHA-256 of its archives,
+`PYTHON` to the patch, `COMFY_RELEASE` with its content hash; `tools/pin_runtimes.py` computes the hashes). The
+Python version is part of a runtime's fingerprint: a runtime on another Python is made again at the next start
+(`venvPython`), its packages come from uv's cache. Check the security advisories before each release: OSV for every
+package of the locks, GitHub's advisories for Electron, uv and ComfyUI.
 
 `tools/check_pins.py` (step 0 of the release, and `src/main/runtime_lock.test.ts` in every `npm test`) fails when a
 requirement is not pinned, when the pins and the lock disagree, or when an installed runtime holds anything other

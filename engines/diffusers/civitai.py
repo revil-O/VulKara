@@ -52,6 +52,8 @@ BASE_MODELS = [
     (r"^hunyuan 1", None, "hunyuan_dit", None),
     (r"^lumina", "lumina2", "lumina", None),
     (r"^ernie", None, "ernie", None),
+    (r"^moss", "moss_image", "moss_image", None),
+    (r"^fibo[- ]?2", "fibo2", "fibo2", None),
 ]
 
 

@@ -24,7 +24,7 @@ import { t } from './i18n'
 const EVENT_PREFIX = '@vk '
 
 // only the MLX runtime loads these checkpoints
-const MLX_ONLY = ['krea2', 'ideogram4', 'flux3_klein', 'ernie_image']
+const MLX_ONLY = ['krea2', 'ideogram4', 'flux3_klein', 'ernie_image', 'fibo2_mlx']
 // what MLX runs as well as Diffusers (models in repository layout, text to image)
 const MLX_ALSO = ['flux1_schnell', 'flux1_dev', 'flux2_klein', 'z_image']
 

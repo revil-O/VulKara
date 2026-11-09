@@ -8,7 +8,7 @@
 // compare slider shows the change (left of the line) against the original (right).
 import { computed, onActivated, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { BookmarkPlus, Eye, Plus, ShieldCheck, WandSparkles, X } from 'lucide-vue-next'
+import { BookmarkPlus, Eye, Plus, ShieldCheck, WandSparkles, X } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import CompareSlider from '../components/CompareSlider.vue'
 import FaceBoxes, { type Face } from '../components/FaceBoxes.vue'
@@ -23,6 +23,8 @@ import { useQueueStore } from '../stores/queue'
 import { cleanError } from '../stores/runtimes'
 import { useSettingsStore } from '../stores/settings'
 import { num, t, type PlainKey } from '../i18n'
+import { isMonochrome } from '../util/monochrome'
+import { kleinTints, takesConsistency } from '@shared/hints'
 import type { QueuedJob } from '@shared/api'
 import type { RestoreTemplate } from '@shared/settings'
 import type { Job, RestoreOptions } from '@shared/types'
@@ -69,7 +71,8 @@ const size = ref<[number, number]>()
 const mask = ref<InstanceType<typeof MaskCanvas>>()
 const painted = ref(false)
 const grayscale = ref(false)
-const opts = ref<RestoreOptions>({ correct: true, repair: false, colorize: false, colorStrength: 1, sharpen: false, sharpness: 0.25, lock: true, maxChange: 0.06, rules: [], checkFaces: true, ...AI_STEPS })
+const monochrome = ref(false)
+const opts = ref<RestoreOptions>({ correct: true, repair: false, colorize: false, colorStrength: 1, sharpen: false, sharpness: 0.25, lock: true, maxChange: 0.06, rules: [], checkFaces: true, consistency: true, ...AI_STEPS })
 const modelId = ref('')
 const steps = ref(4)
 const note = ref('')
@@ -85,6 +88,7 @@ const model = computed(() => models.value.find((m) => m.id === modelId.value))
 // the first FLUX.2 model is chosen until the user picks another one
 watch(models, (list) => { if (!list.some((m) => m.id === modelId.value)) modelId.value = list[0]?.id ?? '' }, { immediate: true })
 const usesAi = computed(() => opts.value.repair)
+const tints = computed(() => kleinTints(monochrome.value, model.value?.meta))
 // previews are shown in the compare slider, not as results
 const jobs = computed(() => queue.ofPage('restore').filter((q) => !q.job.restore?.preview))
 const previewJob = computed(() => queue.ofPage('restore').find((q) => q.job.restore?.preview && q.job.inputImage === input.value))
@@ -135,6 +139,7 @@ function measure(event: Event): void {
     sat += max ? (max - Math.min(d[i], d[i + 1], d[i + 2])) / max : 0
   }
   grayscale.value = sat / (d.length / 4) < 0.08
+  monochrome.value = isMonochrome(d)
   opts.value.colorize = grayscale.value
 }
 
@@ -249,7 +254,8 @@ async function send(o: RestoreOptions, kind: string): Promise<void> {
     const job: Omit<Job, 'id'> = {
       page: 'restore', prompt: note.value.trim(), modelId: usesAi.value ? model.value!.id : '', modelDir: usesAi.value ? model.value!.folder : '',
       width: size.value[0] * scale, height: size.value[1] * scale, seed: -1, steps: usesAi.value ? steps.value : 0, guidance: 1, inputImage: input.value, maskImage,
-      restore: { ...o, scale, rules: [...userRules.value], facePoints: facesState.value === 'found' ? faces.value.map((f) => f.points.map(([x, y]) => [x, y] as [number, number])) : undefined },
+      // the consistency LoRA only where it is made for (klein 4B); its switch is hidden for the others
+      restore: { ...o, consistency: o.consistency && takesConsistency(model.value?.meta), scale, rules: [...userRules.value], facePoints: facesState.value === 'found' ? faces.value.map((f) => f.points.map(([x, y]) => [x, y] as [number, number])) : undefined },
       label: `${kind || 'Restored'}: ${what}`, // i18n-ok: stored in English, shown by jobLabel()
     }
     await queue.add(job)
@@ -386,11 +392,16 @@ function open(q: QueuedJob, file: string): void {
             <select v-model="modelId" class="entry">
               <option v-for="m in models" :key="m.id" :value="m.id">{{ m.title }}</option>
             </select>
+            <small v-if="tints" class="dim">{{ t('restore.klein9bTint') }}</small>
             <small v-if="!models.length" class="dim">{{ t('restore.needsModel') }} <RouterLink to="/models">{{ t('restore.needsModelLink') }}</RouterLink>.</small>
           </label>
           <label class="field">
             <span>{{ t('restore.modelSteps') }} <b>{{ steps }}</b></span>
             <input v-model.number="steps" type="range" min="2" max="12" step="1" />
+          </label>
+          <label v-if="takesConsistency(model?.meta)" class="check">
+            <input v-model="opts.consistency" type="checkbox" /> {{ t('restore.consistency') }}
+            <HintBadge :text="t('restore.consistencyHint')" />
           </label>
 
           <div class="field guard">

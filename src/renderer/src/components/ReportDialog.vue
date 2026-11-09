@@ -3,7 +3,7 @@
 // Report a problem: pick one of the kept session logs, read it with personal data replaced by **** (the main process
 // redacts it, log_redact.ts), then copy it or open a new GitHub issue and paste it there. Nothing is sent by the app.
 import { computed, onMounted, ref } from 'vue'
-import { ArrowLeft, Check, Copy, ExternalLink, TriangleAlert, X } from 'lucide-vue-next'
+import { ArrowLeft, Check, Copy, ExternalLink, TriangleAlert, X } from '@lucide/vue'
 import HintBadge from './HintBadge.vue'
 import { cleanError } from '../stores/runtimes'
 import { dateTime, t } from '../i18n'

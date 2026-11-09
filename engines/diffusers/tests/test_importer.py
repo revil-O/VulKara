@@ -127,3 +127,15 @@ def test_installs_need_50_gb_free_on_the_models_disk(tmp_path, monkeypatch):
     # 50 GB free is enough
     monkeypatch.setattr(shutil, "disk_usage", lambda p: usage(0, 0, 50 * 1024 ** 3))
     importer.ensure_install_room(str(tmp_path))
+
+
+def test_an_mflux_repository_downloads_only_what_mflux_reads():
+    import importer
+    names = ["model_index.json", "transformer/0.safetensors", "text_encoder/config.json", "text_encoder/LICENSE",
+             "tokenizer/tokenizer.json", "tokenizer/chat_template.jinja", "fonts/DejaVuSans.ttf",
+             "fonts/Aileron-Regular.otf", "fonts/LICENSE-DejaVu.txt", "LICENSE.md", "NOTICE.md", "preview.jpg",
+             "README.md", "gallery/a.png", "pytorch_model.bin", "handler.py", ".gitattributes"]
+    assert importer.mflux_files(names) == sorted(
+        ["model_index.json", "transformer/0.safetensors", "text_encoder/config.json", "text_encoder/LICENSE",
+         "tokenizer/tokenizer.json", "tokenizer/chat_template.jinja", "fonts/DejaVuSans.ttf",
+         "fonts/Aileron-Regular.otf", "fonts/LICENSE-DejaVu.txt", "LICENSE.md", "NOTICE.md"])

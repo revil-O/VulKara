@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Copyright (C) 2026 Oliver Schmidt
 """Runs imported diffusers models (SDXL, SD 3.5, FLUX.1, Chroma, FLUX.2, Qwen-Image, Z-Image) on MPS."""
+import contextlib
 import gc
 import inspect
 import json
@@ -18,12 +19,15 @@ import memory
 import paths
 import prompt_cache
 import protocol
+import gguf_cache
 import quant_cache
+import quantize_once
 import registry
 import samplers
 import step_cache
 import streaming
 from importer import MANIFEST
+from masks import blend_into as _blend_into, grow_mask as _grow_mask
 
 def stream_mode():
     """SSD streaming of the denoiser (Settings → Engine and memory, env VK_SSD_STREAMING):
@@ -116,6 +120,37 @@ def _torch_dtype(name, device):
 
 
 _BF16_SLOW = None
+# measured once per Mac and kept: on the M4 the timing came out "fast" and "slow" on the same day, and every flip
+# wrote the stream cache and the quantized text encoders again in the other type (MEASUREMENTS 7bp)
+BF16_FILE = paths.DATA_DIR / "bf16_check.json"
+
+
+def _chip():
+    import subprocess
+    try:
+        return subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True,
+                              timeout=10).stdout.strip()
+    except Exception:
+        return ""
+
+
+def _bf16_timing(device):
+    import torch
+    timings = {}
+    for dt in (torch.bfloat16, torch.float16):
+        a = torch.randn(1024, 2048, device=device, dtype=dt)
+        b = torch.randn(2048, 2048, device=device, dtype=dt)
+        a @ b
+        torch.mps.synchronize()
+        best = None
+        for _ in range(3):  # the best of three rounds: a busy GPU slows one round, not all
+            t0 = time.time()
+            for _ in range(10):
+                a @ b
+            torch.mps.synchronize()
+            best = min(best or 1e9, time.time() - t0)
+        timings[dt] = best
+    return timings[torch.bfloat16] > 1.3 * timings[torch.float16]
 
 
 def bf16_is_slow(device):
@@ -125,18 +160,23 @@ def bf16_is_slow(device):
         return False
     if _BF16_SLOW is None:
         import torch
-        timings = {}
-        for dt in (torch.bfloat16, torch.float16):
-            a = torch.randn(1024, 2048, device=device, dtype=dt)
-            b = torch.randn(2048, 2048, device=device, dtype=dt)
-            a @ b
-            torch.mps.synchronize()
-            t0 = time.time()
-            for _ in range(10):
-                a @ b
-            torch.mps.synchronize()
-            timings[dt] = time.time() - t0
-        _BF16_SLOW = timings[torch.bfloat16] > 1.3 * timings[torch.float16]
+        # measured again with another torch (its kernels decide the speed); a chip that could not be read is not kept,
+        # it would match any Mac
+        key = {"chip": _chip(), "torch": torch.__version__}
+        try:
+            saved = json.loads(BF16_FILE.read_text())
+            if key["chip"] and all(saved.get(k) == v for k, v in key.items()) and isinstance(saved.get("slow"), bool):
+                _BF16_SLOW = saved["slow"]
+        except (OSError, ValueError):
+            pass
+        if _BF16_SLOW is None:
+            _BF16_SLOW = _bf16_timing(device)
+            try:
+                if key["chip"]:
+                    BF16_FILE.parent.mkdir(parents=True, exist_ok=True)
+                    BF16_FILE.write_text(json.dumps(dict(key, slow=_BF16_SLOW)))
+            except OSError:
+                pass
         protocol.log("[diffusers] bfloat16 %s on this GPU" % ("slow, computing in float16 where safe" if _BF16_SLOW else "fast"))
     return _BF16_SLOW
 
@@ -150,9 +190,9 @@ def _snap(v, multiple):
     return max(multiple, int(round(v / multiple)) * multiple)
 
 
-def _quanto_configs(quant_map, denoiser):
-    """quant_map {component: none|q8|q4|gguf} -> PipelineQuantizationConfig mapping."""
-    import diffusers
+def _quanto_configs(quant_map):
+    """quant_map {text encoder: none|q8|q4} -> Transformers' Quanto configs. Denoisers are written as GGUF instead
+    (gguf_cache.py): Diffusers' Quanto backend goes with version 1.0."""
     import transformers
     import quanto_mps
     levels = {"q8": "int8", "q4": "int4"}
@@ -160,11 +200,7 @@ def _quanto_configs(quant_map, denoiser):
     if any(q in levels for q in quant_map.values()):
         quanto_mps.patch()
     for comp, q in quant_map.items():
-        if q not in levels:
-            continue
-        if comp == denoiser:
-            mapping[comp] = diffusers.QuantoConfig(weights_dtype=levels[q])
-        else:
+        if q in levels:
             mapping[comp] = transformers.QuantoConfig(weights=levels[q])
     return mapping
 
@@ -192,6 +228,7 @@ def place_adapters(module, device):
 class LoadedModel:
     """One imported model with the pipelines needed for the current RAM plan."""
     stop = None  # whether the job was stopped (the engine's reader), for long one-time preparations
+    interruptible = contextlib.nullcontext  # a context in which a stop breaks off a load at once (the reader's)
 
 
     def __init__(self, model_dir, device, ram_gb=None):
@@ -218,7 +255,8 @@ class LoadedModel:
         # a whole checkpoint file loads in one piece: no 4 bit text encoder, no stages (memory.plan alone)
         planner = memory.plan if self.m["layout"] == "single_full" else memory.fitting_plan
         self.plan = planner(self.m["components"], self.m["denoiser"], self.spec["family"], ram,
-                            quant=self.m.get("quant_request", "auto"), denoiser_fixed_gb=fixed_gb)
+                            quant=self.m.get("quant_request", "auto"), denoiser_fixed_gb=fixed_gb,
+                            encode_extra_gb=self.spec.get("encode_extra_gb", 0.0))
         self.stream = False
         self.stream_keep = 0.0  # share of a streamed denoiser kept on the GPU
         self.stream_release = False  # the kept blocks make room while a new prompt is encoded
@@ -229,13 +267,14 @@ class LoadedModel:
             # emergency mode for models that do not fit otherwise
             comps = dict(self.m["components"])
             comps[self.m["denoiser"]] = comps[self.m["denoiser"]] * memory.stream_resident_share(self.spec["family"])
-            plan = memory.plan(comps, self.m["denoiser"], self.spec["family"], ram, quant="auto")
+            plan = memory.plan(comps, self.m["denoiser"], self.spec["family"], ram, quant="auto",
+                               full_precision_margin_gb=0)
             te_opts = None
             if not plan["fits"]:
                 # last resort: a big text encoder (Qwen-Image 2.1: 8.8B) in 4 bit, quantized once and cached
                 te_opts = memory.QUANT_ORDER
                 plan = memory.plan(comps, self.m["denoiser"], self.spec["family"], ram, quant="auto",
-                                   text_quant_opts=te_opts)
+                                   text_quant_opts=te_opts, full_precision_margin_gb=0)
             if plan["fits"]:
                 self.stream_keep, plan, self.stream_release = keep_plan(
                     self.m["components"], self.m["denoiser"], self.spec["family"], ram, plan, te_opts)
@@ -258,7 +297,7 @@ class LoadedModel:
         self.pipe = None          # denoiser pipeline (holds everything when not separate_text)
         self.embed_cache = None   # (key, kwargs)
         self.lora_key = ()        # LoRAs currently loaded into the pipeline
-        self.controlnet = None    # (id, model) of the loaded ControlNet
+        self.controlnet = None    # (id, model, GB of its weights) of the loaded ControlNet
 
     def precision(self):
         """The bit size of each part as the plan loads it (benchmarks): a GGUF denoiser keeps its type, a streamed
@@ -319,17 +358,23 @@ class LoadedModel:
         m = self.m
         protocol.status("Streaming the model from the SSD (slow)" if stream_mode() == "always"
                       else "Model larger than memory: streaming it from the SSD (slow)")
-        if m["layout"] == "repo":
-            folder = self._path(m["weights_dir"])
-            cls = self._component_class(folder, m["denoiser"])
-            extra = {"variant": registry.file_variant(m)} if registry.file_variant(m) else {}
-            model = cls.from_pretrained(folder, subfolder=m["denoiser"], dtype=self.dtype, **extra)
-        elif m.get("file_format") == "gguf":
+        if m.get("file_format") == "gguf":
             model = self._unpacked_gguf_denoiser()
         else:
-            cls = getattr(diffusers, self.spec["denoiser_class"])
-            model = cls.from_single_file(self._path(m["file"]), config=self._path(m["base_dir"]),
-                                         subfolder=m["denoiser"], dtype=self.dtype)
+            repo = m["layout"] == "repo"
+            folder = self._path(m["weights_dir"] if repo else m["base_dir"])
+            cls = self._component_class(folder, m["denoiser"]) if repo else getattr(diffusers, self.spec["denoiser_class"])
+
+            def empty():
+                with _meta_weights():
+                    return cls.from_config(cls.load_config(folder, subfolder=m["denoiser"]))
+
+            model = streaming.from_cache(empty, self.stream_dir, self.dtype)  # the cache complete: nothing loaded whole
+            if model is None and repo:
+                extra = {"variant": registry.file_variant(m)} if registry.file_variant(m) else {}
+                model = cls.from_pretrained(folder, subfolder=m["denoiser"], dtype=self.dtype, **extra)
+            elif model is None:
+                model = cls.from_single_file(self._path(m["file"]), config=folder, subfolder=m["denoiser"], dtype=self.dtype)
         n, kept = streaming.enable(model, self.device, self.dtype, self.stream_dir, resident_share=self.stream_keep,
                                    report=self._stoppable("Preparing SSD streaming (one-time) %d%%"))
         protocol.log("[diffusers] streaming %d blocks of %s from %s, %d blocks (%.1f GB) kept in memory%s"
@@ -378,10 +423,13 @@ class LoadedModel:
         kwargs.update(self.spec.get("pipeline_kwargs", {}))  # e.g. SD 1.x without its safety checker
         if with_denoiser is not None:
             kwargs[m["denoiser"]] = with_denoiser
-        quant = {c: q for c, q in self.plan["quant"].items() if c not in skip and c not in kwargs}
+        quant = {c: q for c, q in self.plan["quant"].items() if c not in skip and c not in kwargs and q in ("q8", "q4")}
         variant = registry.file_variant(m)
-        for comp, cfg in _quanto_configs(quant, m["denoiser"]).items():
+        text = {c: q for c, q in quant.items() if self._library(folder, c) == "transformers"}
+        for comp, cfg in _quanto_configs(text).items():
             kwargs[comp] = self._load_component(folder, comp, cfg, quant[comp], variant, dtype)
+        for comp in quant.keys() - text.keys():
+            kwargs[comp] = self._quantized_denoiser(os.path.join(folder, comp), folder, comp, quant[comp], variant)
         if variant:
             kwargs["variant"] = variant
         pipe = self._pipeline_class().from_pretrained(folder, dtype=dtype, **kwargs)
@@ -402,6 +450,40 @@ class LoadedModel:
             lib, cls = json.load(f)[comp]
         return getattr(diffusers if lib == "diffusers" else transformers, cls)
 
+    @staticmethod
+    def _library(folder, comp):
+        with open(os.path.join(folder, "model_index.json")) as f:
+            return json.load(f)[comp][0]
+
+    def _quantized_denoiser(self, src, config, subfolder, level, variant=None):
+        """The denoiser (or a second one) in 8 or 4 bit: its GGUF copy, written once in a process of its own
+        (gguf_cache.py). src: the component's folder or the single file; config: the folder with its config."""
+        import diffusers
+        comp = subfolder if os.path.isdir(src) else None
+        gguf = gguf_cache.ready(self.model_dir, src, comp, level)
+        if gguf is None:
+            short = gguf_cache.short_of_room(self.model_dir, src, subfolder, level, variant)
+            if short:
+                raise OSError(short)  # said in the job, not only in the log of the process that writes it
+            protocol.status("Quantizing %s (one-time)" % subfolder)
+            ok = quantize_once.run({"kind": "gguf", "source": src, "comp": comp, "variant": variant,
+                                    "model_dir": self.model_dir, "level": level, "dtype": "bfloat16"},
+                                   getattr(self, "stop", None))
+            if getattr(self, "stop", None) is not None and self.stop():
+                raise StopRequested()
+            gguf = gguf_cache.ready(self.model_dir, src, comp, level) if ok else None
+            if gguf is None:
+                raise RuntimeError("Could not write the %s bit copy of %s (the log says why)" % (level[1:], subfolder))
+        protocol.status("Loading %s" % subfolder)
+        cls = self._component_class(config, subfolder) if comp else getattr(diffusers, self.spec["denoiser_class"])
+        # its tensors as views of the mapped file: diffusers' copy of every tensor stayed with the process (FLUX.2 [klein]
+        # 9B: 8.8 instead of 5.75 GB after loading, swap at each new prompt, MEASUREMENTS 7bv)
+        with streaming._gguf_mapped():
+            model = cls.from_single_file(gguf, config=config, subfolder=subfolder, dtype=self.dtype,
+                                         quantization_config=diffusers.GGUFQuantizationConfig(compute_dtype=self.dtype))
+        _dequantize_gguf_outside_linear(model, self.dtype)
+        return model
+
     def _load_component(self, folder, comp, quant_config, level, variant=None, dtype=None):
         cls = self._component_class(folder, comp)
         dtype = dtype or self.dtype
@@ -419,8 +501,18 @@ class LoadedModel:
         # quantizing layer by layer on the CPU keeps the peak low (loading onto the GPU first
         # materializes the full 16 bit weights there)
         protocol.status("Quantizing %s (one-time)" % comp)
+        # in a process of its own, which gives its memory back when it ends (quantize_once.py)
+        if quant_cache.enabled() and quantize_once.run({"kind": "component", "folder": folder, "comp": comp,
+                                                        "variant": variant, "model_dir": self.model_dir, "level": level,
+                                                        "dtype": str(dtype).split(".")[-1]}, getattr(self, "stop", None)):
+            model = quant_cache.load(self.model_dir, folder, comp, level, dtype, make_empty)
+            if model is not None:
+                return model
+        if getattr(self, "stop", None) is not None and self.stop():
+            raise StopRequested()
         extra = {"variant": variant} if variant else {}
         model = cls.from_pretrained(folder, subfolder=comp, dtype=dtype, quantization_config=quant_config, **extra)
+        quant_cache.quantize_kept_fp32(model, dtype)
         quant_cache.save(self.model_dir, folder, comp, level, dtype, model)
         return model
 
@@ -430,30 +522,20 @@ class LoadedModel:
         cls = getattr(diffusers, self.spec["denoiser_class"])
         kwargs = {}
         q = self.plan["quant"].get(m["denoiser"])
-        cached = q in ("q8", "q4") and m["file_format"] != "gguf"
+        if q in ("q8", "q4") and m["file_format"] != "gguf":
+            return self._quantized_denoiser(self._path(m["file"]), self._path(m["base_dir"]), m["denoiser"], q)
         if m["file_format"] == "gguf":
             kwargs["quantization_config"] = diffusers.GGUFQuantizationConfig(compute_dtype=self.dtype)
-        elif cached:
-            kwargs["quantization_config"] = _quanto_configs({m["denoiser"]: q}, m["denoiser"])[m["denoiser"]]
-
-            def make_empty():
-                with _meta_weights():
-                    return cls.from_config(cls.load_config(self._path(m["base_dir"]), subfolder=m["denoiser"]))
-
-            model = quant_cache.load(self.model_dir, self._path(m["file"]), None, q, self.dtype, make_empty)
-            if model is not None:
-                return model
-            protocol.status("Quantizing %s (one-time)" % m["denoiser"])
         model = cls.from_single_file(self._path(m["file"]), config=self._path(m["base_dir"]),
                                      subfolder=m["denoiser"], dtype=self.dtype, **kwargs)
         if m["file_format"] == "gguf":
             _dequantize_gguf_outside_linear(model, self.dtype)
-        if cached:
-            quant_cache.save(self.model_dir, self._path(m["file"]), None, q, self.dtype, model)
         return model
 
     def load(self):
         m = self.m
+        if self.spec["family"] == "chroma":
+            _chroma_bool_masks()
         skip = self.text_components if self.separate_text else []
         if self.release_denoiser:
             # loaded once the prompt is encoded (ensure_denoiser)
@@ -494,14 +576,15 @@ class LoadedModel:
         else:
             folder = self._path(m["weights_dir"])
             q = self.plan["quant"].get(m["denoiser"], "none")
-            cfg = _quanto_configs({m["denoiser"]: q}, m["denoiser"]).get(m["denoiser"])
-            if cfg is not None:
-                model = self._load_component(folder, m["denoiser"], cfg, q, registry.file_variant(m))
+            if q in ("q8", "q4"):
+                model = self._quantized_denoiser(os.path.join(folder, m["denoiser"]), folder, m["denoiser"], q,
+                                                 registry.file_variant(m))
             else:
                 protocol.status("Loading %s" % m["denoiser"])
                 model = self._component_class(folder, m["denoiser"]).from_pretrained(
                     folder, subfolder=m["denoiser"], dtype=self.dtype, variant=registry.file_variant(m))
         self.pipe.register_modules(**{m["denoiser"]: model.to(self.device)})
+        _free_memory("%s loaded" % m["denoiser"])
         self.lora_key = ()  # the LoRAs go onto the new denoiser
         level = step_cache.threshold()
         if level is not None:
@@ -741,11 +824,17 @@ class LoadedModel:
         return True
 
     def controlnet_room(self, width=1024, height=1024):
-        """GB left for the ControlNet's weights next to this model at a picture size (activations as memory.peak_at
-        counts them); the ControlNet runs a copy of the first blocks at every step: about twice the activations on top."""
-        planned, act = memory.activations_at(self.plan, width, height)
-        denoise = self.plan["denoise_peak_gb"] - planned + act
-        return self.plan["budget_gb"] - denoise - 2 * act
+        """GB left for the ControlNet's weights next to this model at a picture size: next to the denoising peak with
+        the ControlNet's activations on top (memory.CONTROLNET_ACTIVATIONS of the model's) and, in stages, next to the
+        encoding peak, through which the ControlNet stays loaded."""
+        act = memory.activations_at(self.plan, width, height)[1]
+        return self.plan["budget_gb"] - memory.peak_at(self.plan, width, height, memory.CONTROLNET_ACTIVATIONS * act)
+
+    def controlnet_gb(self, width=1024, height=1024):
+        """What the loaded ControlNet adds to the job's peak: its weights and its activations at the picture size."""
+        if not self.controlnet:
+            return 0.0
+        return self.controlnet[2] + memory.CONTROLNET_ACTIVATIONS * memory.activations_at(self.plan, width, height)[1]
 
     def ensure_controlnet(self, cn_spec, width=1024, height=1024):
         """Loads the family's ControlNet (downloading it once); in 8 bit if 16 bit does not fit."""
@@ -760,10 +849,12 @@ class LoadedModel:
             # make room: text encoders are then only loaded to encode a new prompt
             free += self.drop_text_encoders()
         cls = getattr(diffusers, cn_spec["class"])
-        if cn_spec["params_b"] * memory.BYTES_PER_PARAM["none"] <= free:
+        gb = cn_spec["params_b"] * memory.BYTES_PER_PARAM["none"]
+        if gb <= free:
             protocol.status("Loading ControlNet")
             model = cls.from_pretrained(str(folder), dtype=self.dtype)
         elif cn_spec["params_b"] * memory.BYTES_PER_PARAM["q8"] <= free:
+            gb = cn_spec["params_b"] * memory.BYTES_PER_PARAM["q8"]
             def make_empty():
                 with _meta_weights():
                     return cls.from_config(cls.load_config(str(folder)))
@@ -771,15 +862,21 @@ class LoadedModel:
             model = quant_cache.load(str(folder), str(folder), None, "q8", self.dtype, make_empty)
             if model is None:
                 protocol.status("Quantizing ControlNet (one-time)")
-                model = cls.from_pretrained(str(folder), dtype=self.dtype, quantization_config=_quanto_configs(
-                    {"controlnet": "q8"}, "controlnet")["controlnet"])
-                quant_cache.save(str(folder), str(folder), None, "q8", self.dtype, model)
+                # with optimum-quanto itself, in a process of its own (quantize_once.py)
+                quantize_once.run({"kind": "controlnet", "folder": str(folder), "cls": cn_spec["class"],
+                                   "model_dir": str(folder), "level": "q8", "dtype": str(self.dtype).split(".")[-1]},
+                                  getattr(self, "stop", None))
+                if getattr(self, "stop", None) is not None and self.stop():
+                    raise StopRequested()
+                model = quant_cache.load(str(folder), str(folder), None, "q8", self.dtype, make_empty)
+                if model is None:
+                    raise RuntimeError("Could not quantize the ControlNet to 8 bit (the log says why)")
         else:
             raise MemoryError("Not enough RAM for the ControlNet (%.1f GB, %.1f GB in 8 bit) next to %s at %d × %d: "
                               "a smaller picture leaves more room." % (cn_spec["size_gb"], cn_spec["size_gb"] / 2,
                                                                       self.spec["label"], width, height))
         model = model.to(self.device)
-        self.controlnet = (cn_spec["id"], model)
+        self.controlnet = (cn_spec["id"], model, gb)
         return model
 
     def drop_text_encoders(self):
@@ -828,13 +925,19 @@ class LoadedModel:
             streaming.release_kept(self.stream_model)
             _free_memory()
         try:
-            text_pipe = self.text_pipe or self._from_pretrained(skip=[self.m["denoiser"], "vae"], dtype=self.text_dtype)
+            if self.text_pipe is None:
+                with self.interruptible():
+                    self.text_pipe = self._from_pretrained(skip=[self.m["denoiser"], "vae"], dtype=self.text_dtype)
+            text_pipe = self.text_pipe
             try:
                 kwargs = _encode(text_pipe, self.spec, prompt, negative, guidance, self.device)
             finally:
                 if self.staged:
+                    # the pipeline's own reference too: it kept the text encoder (Qwen-Image 2.1's 9.2 GB) next to
+                    # the transformer, 18.7 GB on a 16 GB Mac against 11.9 planned (MEASUREMENTS 7bd)
+                    self.text_pipe = None
                     del text_pipe
-                    _free_memory()
+                    _free_memory("text encoder freed")
                 else:
                     self.text_pipe = text_pipe
         finally:
@@ -895,10 +998,12 @@ class _plain_weight_names:
             sd = original(t, *args, **kwargs)
             if args or kwargs:
                 return sd
+            # 8 bit: `x.weight._data`; 4 bit: deeper (`x.weight._data._data`, `._scale`, `._shift`), so by the prefix
+            quantized = {k[:k.index(".weight.") + 7] for k in sd if ".weight." in k}
             for mod_name, module in t.named_modules():
                 w = getattr(module, "weight", None)
                 key = mod_name + ".weight"
-                if w is not None and key not in sd and key + "._data" in sd:
+                if w is not None and key not in sd and key in quantized:
                     sd[key] = w
             return sd
 
@@ -932,6 +1037,10 @@ def _dequantize_gguf_outside_linear(model, dtype):
         for name, param in list(module.named_parameters(recurse=False)):
             if hasattr(param, "quant_type"):
                 setattr(module, name, torch.nn.Parameter(dequantize_gguf_tensor(param).to(dtype), requires_grad=False))
+        # buffers too: SD 3.5's position table (pos_embed) came out of a GGUF copy as raw Q8_0 bytes, 1632 wide for 1536
+        for name, buf in list(module.named_buffers(recurse=False)):
+            if hasattr(buf, "quant_type"):
+                module._buffers[name] = dequantize_gguf_tensor(buf).to(dtype)
 
 
 def _encode(pipe, spec, prompt, negative, guidance, device):
@@ -1069,6 +1178,30 @@ def _derive_pipeline(cls, base, **extra):
     return pipe
 
 
+# inpainting without a prompt removes: the model refines LaMa's filling this much (MEASUREMENTS 7bf)
+REMOVE_STRENGTH = 0.4
+
+
+def keep_picture_loras(d, manifest, picture, report=None):
+    """Image to image with "Keep the picture": the consistency LoRA at half strength (FLUX.2 [klein] 4B, MEASUREMENTS 7bi)."""
+    if not (d.get("keep_picture") and picture and not d.get("mask_image")):
+        return []
+    import restore as rs
+    if registry.model_variant(manifest) != rs.CONSISTENCY_VARIANT:
+        protocol.note("Keep the picture uses a LoRA made for FLUX.2 [klein] 4B; this model edits without it")
+        return []
+    return [rs.consistency_lora(scale=rs.KEEP_PICTURE_SCALE, report=report)]
+
+
+def reference_gb(spec, plan, width, height, picture, masked):
+    """What a picture taken along as reference tokens adds while denoising: FLUX.2 edits a picture that way, and so
+    does klein's inpainting pipeline; twice the image tokens, one more set of activations (klein 9B: inpainting
+    12.2-13.7 GB, Restore's repair 12.5-13.0, against a plan of 9.8; MEASUREMENTS 7bf, 7bh)."""
+    if not picture or not (spec.get("inpaint_reference") if masked else spec["family"] == "flux2"):
+        return 0.0
+    return memory.activations_at(plan, width, height)[1]
+
+
 def _prefill(image, mask):
     """Fills the masked (empty) part with the colours of the rest: every empty pixel takes the
     colour of the nearest picture pixel, then that is blurred strongly, so the model continues the
@@ -1112,24 +1245,6 @@ def _mask_crop(mask, width, height):
     return (x0, y0, x0 + cw_, y0 + ch_), (width // 8 * 8, height // 8 * 8)
 
 
-def _grow_mask(mask, fraction=16):
-    """The model also repaints a strip of the existing picture along the mask's edge (1/fraction
-    of the size), so new and old parts blend instead of meeting at a seam."""
-    from PIL import ImageFilter
-    r = max(4, min(mask.size) // fraction)
-    return mask.filter(ImageFilter.GaussianBlur(r)).point(lambda v: 255 if v > 8 else 0)
-
-
-def _blend_into(original, painted, mask):
-    """Only the masked area comes from the new picture (soft edge); the rest stays pixel-exact
-    (the VAE round trip of the pipeline would change it slightly)."""
-    from PIL import Image, ImageFilter
-    painted = painted.convert("RGB").resize(original.size)
-    # the soft edge spans the grown strip: the old picture fades into the new one
-    soft = mask.convert("L").filter(ImageFilter.GaussianBlur(max(2, min(original.size) // 24)))
-    return Image.composite(painted, original.convert("RGB"), soft)
-
-
 def _bf16_vae(vae):
     """SDXL's VAE on MPS in bfloat16 for good, encoding too: the img2img and inpaint pipelines would otherwise move it
     to float32 for every input picture and back (force_upcast), and the weights moved in the middle of a job land
@@ -1140,8 +1255,12 @@ def _bf16_vae(vae):
         vae.to(torch.bfloat16)
     if vae.config.get("force_upcast"):
         vae.register_to_config(force_upcast=False)
+    if not getattr(vae, "_bf16_encode", False):
+        # also without force_upcast: the SDXL inpainting VAE has none and got the pipeline's float16 picture
+        # ("Input type Half and bias type BFloat16")
         encode = vae.encode
         vae.encode = lambda x, *a, **k: encode(x.to(torch.bfloat16), *a, **k)
+        vae._bf16_encode = True
 
 
 def _blend_weights(n, like):
@@ -1165,11 +1284,38 @@ def _blend_h(self, a, b, extent):
     return b
 
 
-def _free_memory():
+def _chroma_bool_masks():
+    """diffusers 0.41 builds Chroma's prompt mask as 0/1 floats and hands it to scaled_dot_product_attention, which
+    adds a float mask instead of masking (huggingface/diffusers issue 12116; its fix 12263 was undone by PR 12508):
+    the padding is attended and drowns short prompts (two words gave noise). The pipelines' helper that extends the
+    mask over the image tokens returns it as booleans; patched on the classes, so derived (img2img, inpaint)
+    pipelines and cached embeddings are covered too."""
+    import diffusers
+    for name in ("ChromaPipeline", "ChromaImg2ImgPipeline", "ChromaInpaintPipeline"):
+        cls = getattr(diffusers, name)
+        orig = cls._prepare_attention_mask
+        if getattr(orig, "_vulkara_bool", False):
+            continue
+
+        def wrapped(self, *a, _orig=orig, **k):
+            m = _orig(self, *a, **k)
+            return None if m is None else m.bool()
+        wrapped._vulkara_bool = True
+        cls._prepare_attention_mask = wrapped
+
+
+def _free_memory(after=None):
+    """after: a line in the log with what is left, as the MLX engine writes (FLUX.2 [klein] 9B held 2-3 GB more while
+    generating after a new prompt's text encoder than with the same prompt, MEASUREMENTS 7bt)."""
     import torch
     gc.collect()
     if torch.backends.mps.is_available():
+        held = torch.mps.driver_allocated_memory()
         torch.mps.empty_cache()
+        if after:
+            protocol.log("[diffusers] after %s: %.1f GB in tensors, held by Metal %.1f GB, %.1f GB once its cache was emptied"
+                         % (after, torch.mps.current_allocated_memory() / 1e9, held / 1e9,
+                            torch.mps.driver_allocated_memory() / 1e9))
     elif torch.cuda.is_available():
         torch.cuda.empty_cache()
 
@@ -1236,13 +1382,17 @@ class DiffusersEngine:
             protocol.log("[diffusers] base parts of %s completed" % os.path.basename(model_dir))
         self._state("Loading model")
         model = LoadedModel(model_dir, self.device, self.ram_gb)
-        model.stop = self.reader.stop_requested if self.reader is not None else None
-        model.load()
+        if self.reader is not None:
+            model.stop = self.reader.stop_requested
+            model.interruptible = lambda: self.reader.interruptible(StopRequested)
+        with model.interruptible():
+            model.load()
         self.model = model
         return model
 
-    def generate(self, d):
-        """d is the job dict sent by the frontend. Returns the list of saved image paths."""
+    def generate(self, d, helper_loras=()):
+        """d is the job dict sent by the frontend; helper_loras: LoRAs a page adds itself, resolved (Restore's
+        consistency LoRA). Returns the list of saved image paths."""
         if d.get("restore"):
             return self.restore(d)
         if d.get("photo_tool"):
@@ -1272,11 +1422,6 @@ class DiffusersEngine:
         if d.get("input_image"):
             init_image = colour.open_rgb(d["input_image"])  # in sRGB, whatever profile it carries
         width, height = self._size(d, spec, defaults, init_image)
-        need = memory.peak_at(model.plan, width, height)
-        protocol.planned(need)
-        short = memory.short_of(need, protocol.footprint_gb())
-        if short:
-            protocol.note(short)
 
         call = {"num_inference_steps": steps, "guidance_scale": pipeline_guidance(spec, guidance), "width": width,
                 "height": height}
@@ -1286,7 +1431,8 @@ class DiffusersEngine:
             call[spec["guidance_param"]] = call.pop("guidance_scale")
             if guidance > 1 and not negative and spec.get("empty_negative"):
                 negative = spec["empty_negative"]  # these pipelines only guide with a negative prompt
-        loras = self._resolve_loras(d.get("loras") or [], spec, m)
+        loras = self._resolve_loras(d.get("loras") or [], spec, m) + list(helper_loras)
+        loras += keep_picture_loras(d, manifest, init_image is not None, report=self._state)
         # a model with LoRAs baked in (merge.py) takes their trigger words as the LoRAs would have brought them
         baked = (m.get("trigger_words") or []) if (m.get("source") or {}).get("type") == "merge" else []
         for words in [l["trigger_words"] for l in loras] + [baked]:
@@ -1298,7 +1444,8 @@ class DiffusersEngine:
             # below finds the prompt in the model's cache
             self._state("Encoding prompt")
             model.encode(prompt, negative, guidance)
-            model.ensure_denoiser()
+            with model.interruptible():
+                model.ensure_denoiser()
         if loras:
             self._state("Loading LoRA")
         model.apply_loras(loras)
@@ -1335,6 +1482,13 @@ class DiffusersEngine:
             pipe_class = cn_spec["img2img_pipeline" if init_image is not None else "pipeline"]
         else:
             model.release_controlnet()
+        extra = reference_gb(spec, model.plan, width, height, init_image is not None, bool(d.get("mask_image"))) \
+            + sum(l.get("plan_gb", 0.0) for l in loras)
+        need = memory.peak_at(model.plan, width, height, extra, resident_gb=model.controlnet_gb(width, height))
+        protocol.planned(need)
+        short = memory.short_of(need, protocol.footprint_gb())
+        if short:
+            protocol.note(short)
 
         mask, crop = None, None
         if spec.get("inpaint_only") and not (init_image is not None and d.get("mask_image")):
@@ -1349,10 +1503,19 @@ class DiffusersEngine:
             init_image = init_image.resize((width, height))
             raw_mask = Image.open(d["mask_image"]).convert("L").resize((width, height))
             # extending needs a wide transition (smooth skies), repainting a part a narrow one
-            mask = _grow_mask(raw_mask, 16 if d.get("prefill") else 48)
+            fraction = 16 if d.get("prefill") else 48
+            mask = _grow_mask(raw_mask, fraction)
+            strength = min(spec.get("max_strength", 1.0), max(0.05, float(d.get("inpaint_strength", 1.0))))
             if d.get("prefill"):
                 # outpainting: the empty part starts from the colours along the picture's edge
                 init_image = _prefill(init_image, raw_mask)
+            elif not (d.get("prompt") or "").strip():
+                # no prompt: remove what is masked. Asked for nothing, every model invented something there (a
+                # woman, a scaffold, the house again; MEASUREMENTS 7bf); LaMa fills it from the surroundings and the
+                # model only refines that
+                import restore
+                init_image = restore.prefill(init_image, raw_mask, report=protocol.status)
+                strength = min(strength, REMOVE_STRENGTH)
             full_image, full_mask = init_image, mask
             crop = None if d.get("prefill") else _mask_crop(mask, width, height)
             if crop:
@@ -1363,7 +1526,7 @@ class DiffusersEngine:
                 mask = full_mask.crop(box).resize((cw, ch))
                 call["width"], call["height"] = cw, ch
             call["image"], call["mask_image"] = init_image, mask
-            call["strength"] = min(1.0, max(0.05, float(d.get("inpaint_strength", 1.0))))
+            call["strength"] = strength
             pipe_class = spec["inpaint_pipeline"]
         elif init_image is not None:
             init_image = init_image.resize((width, height))
@@ -1416,9 +1579,9 @@ class DiffusersEngine:
                 patch = img.convert("RGB").resize((box[2] - box[0], box[3] - box[1]), Image.LANCZOS)
                 img = full_image.copy()
                 img.paste(patch, box[:2])
-                img = _blend_into(full_image, img, full_mask)
+                img = _blend_into(full_image, img, full_mask, raw_mask, fraction)
             elif mask is not None:
-                img = _blend_into(init_image, img, mask)
+                img = _blend_into(init_image, img, mask, raw_mask, fraction)
             path = self._save(img, prompt)
             paths.append(path)
             if not d.get("_quiet") and not d.get("_hold"):
@@ -1476,7 +1639,8 @@ class DiffusersEngine:
         out = work
         if repair:
             with open(os.path.join(d.get("model_dir") or "", MANIFEST)) as f:
-                family = json.load(f).get("family")
+                manifest = json.load(f)
+            family = manifest.get("family")
             if family != "flux2":
                 raise ValueError("The AI restoration needs a FLUX.2 model (it edits the photo, it does not paint anew)")
             source = self.images_dir / (".restore_%d.png" % random.randint(0, 100000000))
@@ -1487,7 +1651,13 @@ class DiffusersEngine:
                 job = {k: v for k, v in d.items() if k not in ("restore", "mask_image")}
                 job.update(input_image=str(source), count=1, _hold=True,
                            prompt=rs.guard_prompt(opts.get("rules"), d.get("prompt") or ""))
-                ai_path = self.generate(job)[0]
+                helper_loras = []
+                if opts.get("consistency"):
+                    if registry.model_variant(manifest) == rs.CONSISTENCY_VARIANT:
+                        helper_loras = [rs.consistency_lora(report=self._state)]
+                    else:
+                        protocol.note("The consistency LoRA is made for FLUX.2 [klein] 4B; this model repairs without it")
+                ai_path = self.generate(job, helper_loras)[0]
             finally:
                 source.unlink(missing_ok=True)
             ai = Image.open(ai_path).convert("RGB")
@@ -1616,6 +1786,8 @@ class DiffusersEngine:
                 protocol.progress(round(100.0 * (i + 1) / total, 1))
             if reader is not None and reader.stop_requested():
                 p._interrupt = True
+            if i + 1 >= total or getattr(p, "_interrupt", False):
+                streaming.drop_ahead(denoiser)  # before decoding, which needs the memory
             return kwargs
 
         generator = torch.Generator("cpu").manual_seed(seed)

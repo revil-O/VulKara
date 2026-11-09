@@ -18,6 +18,10 @@
     {"id": "codeformer", "name": "CodeFormer (faces)", "group": "Restore", "kind": "faces",
      "folder": "annotators/faces/codeformer", "size_mb": 360, "preview": "codeformer",
      "description": "Restores blurred faces of old photos, with YuNet finding them (Restore). Non-commercial licence."},
+    {"id": "klein4b_consistency", "name": "Consistency LoRA for FLUX.2 [klein] 4B (Restore)", "group": "Restore",
+     "kind": "lora", "repo": "lrzjason/Consistance_Edit_Lora", "folder": "loras/klein4b_consistency", "size_mb": 368,
+     "preview": "klein_consistency",
+     "description": "Keeps FLUX.2 [klein] 4B close to the photo while it repairs: scratches go more thoroughly (Restore, option Consistency LoRA). lrzjason's LoRA, Apache-2.0."},
     {"id": "dwpose", "name": "DWPose (pose detection)", "group": "Pose and depth", "kind": "preprocess", "name_in_engine": "dwpose",
      "repo": "yzd-v/DWPose", "folder": "annotators/dwpose", "size_mb": 350, "preview": "dwpose",
      "description": "Finds the pose of the people in a photo: for the Pose editor and pose control pictures."},
@@ -71,6 +75,12 @@
      "description": "Enlarges pictures two or four times with detail (Upscale page, ComfyUI runtime); rebuilds soft detail of old photos (Restore)."},
     {"id": "flux3_pup", "name": "FLUX 3 prompt upsampler (MLX, 4 bit)", "group": "Prompt", "kind": "pup",
      "repo": "VisualInference/FLUX-3-Image-Klein-pup-MLX-4bit", "folder": "prompt_upsamplers/flux3_pup_mlx_4bit", "size_mb": 5694, "preview": "flux3_pup",
-     "description": "Writes the full scene caption FLUX 3 Image Klein is trained on from a short prompt (Text to image, option Prompt upsampler, MLX runtime). Black Forest Labs' flux-3-image-klein-pup (Apache-2.0), quantized to 4 bit."}
+     "description": "Writes the full scene caption FLUX 3 Image Klein is trained on from a short prompt (Text to image, option Prompt upsampler, MLX runtime). Black Forest Labs' flux-3-image-klein-pup (Apache-2.0), quantized to 4 bit."},
+    {"id": "ernie_pe", "name": "ERNIE-Image prompt enhancer (MLX)", "group": "Prompt", "kind": "pup",
+     "repo": "baidu/ERNIE-Image-Turbo", "folder": "prompt_upsamplers/ernie_pe", "size_mb": 7324, "preview": "ernie_pe",
+     "description": "Rewrites a short prompt into a rich visual description before ERNIE-Image paints it (Text to image, option Prompt enhancer, MLX runtime): Baidu's own enhancer (pe/ of ERNIE-Image-Turbo, Ministral 3 3B, Apache-2.0), loaded only for the prompt and freed again."},
+    {"id": "qwen3_vl", "name": "Qwen3-VL 2B (prompt from a picture)", "group": "Prompt", "kind": "pup",
+     "repo": "Qwen/Qwen3-VL-2B-Instruct", "folder": "prompt_upsamplers/qwen3_vl_2b", "size_mb": 4070, "preview": "qwen3_vl",
+     "description": "Describes a picture as a prompt (Image to image, button Prompt from picture): subject, setting, light, colours, style and camera in one English paragraph. Qwen's Qwen3-VL 2B Instruct (Apache-2.0), loaded only for the picture and freed again."}
   ]
 }

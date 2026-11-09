@@ -5,6 +5,9 @@
 import { applyStyle } from './styles'
 import type { Job } from './types'
 
+/** further pictures beside the input picture an edit model takes at most (Fibo 2.0 edits four together) */
+export const MAX_REFERENCES = 3
+
 export function toEngineJob(job: Job): Record<string, unknown> {
   const styled = applyStyle(job.style, job.prompt, job.negativePrompt)
   const out: Record<string, unknown> = {
@@ -23,9 +26,11 @@ export function toEngineJob(job: Job): Record<string, unknown> {
     ['sigma_schedule', job.sigmaSchedule],
     ['input_image', job.inputImage],
     ['mask_image', job.maskImage],
+    ['reference_images', job.referenceImages?.length ? job.referenceImages : undefined],
     ['video_seconds', job.videoSeconds],
     ['upscale', job.upscale],
     ['upsample', job.upsample],
+    ['keep_picture', job.keepPicture],
   ]
   for (const [key, value] of optional) if (value !== undefined && value !== '') out[key] = value
   if (job.inputImage) {
@@ -45,7 +50,7 @@ export function toEngineJob(job: Job): Record<string, unknown> {
       correct_strength: r.correctStrength ?? 0.8, dust: !!r.dust, dust_sensitivity: r.dustSensitivity ?? 0.5, details: !!r.details, detail_level: r.detailLevel ?? 2,
       detail_strength: r.detailStrength ?? 1, faces: !!r.faces, face_fidelity: r.faceFidelity ?? 0.9,
       face_strength: r.faceStrength ?? 0.6, scale: r.scale === 2 ? 2 : 1, preview: r.preview,
-      face_points: r.facePoints,
+      face_points: r.facePoints, consistency: !!r.consistency,
     }
   }
   if (job.loras?.length) out.loras = job.loras.map((l) => ({ path: l.path, scale: l.scale }))

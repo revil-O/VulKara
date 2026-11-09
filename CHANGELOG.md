@@ -1,5 +1,253 @@
 # Changelog
 
+## 0.8.0 – 2026-11-09
+
+- **App menu, menu bar icon and Monitor.** VulKara has its own app menu in five languages (Settings… with ⌘, ,
+  Monitor). Closing the window no longer ends the jobs: VulKara keeps running with an icon in the menu bar that shows
+  the running job, its progress and how many wait; Quit (⌘Q or the icon's menu) ends it and its engines. With remote
+  access on, the remote web UI stays reachable until then, and the icon's menu says so. **Monitor**
+  shows the running job against its memory plan (memory with the GPU's share, peak, swap added) and, on the Mac mini
+  the measurements were made on, against the measured time and memory of its model; below it this Mac's CPU, GPU and
+  memory with the last minutes. The engines now report their plan when a job starts.
+- **NetaYume v4 and other ComfyUI models on 16 GB: the text encoder is freed before the picture model loads.** As the
+  memory plan counts it: ComfyUI had kept it while more than the memory kept free was left. NetaYume v4 on a Mac mini
+  M4 16 GB now 9.2 instead of 10.5 GB, swap at most 0.4 instead of 2.4 GB, the same picture (identical pixels at the
+  same seed), under 1 % slower (MEASUREMENTS 7bt). Not with LoRAs, AuraFlow/Pony V7 or Fibo 2.0.
+- **Z-Image, ERNIE-Image and FLUX.2 [klein] on MLX load faster after their first start.** The quantized model is saved
+  next to it once (`mlx_q8`/`mlx_q4`, Z-Image Turbo about 10 GB), as for Krea 2 and Ideogram 4: the first picture
+  of Z-Image Turbo 188 instead of 214 s (10 instead of 30 GB read), ERNIE 252 instead of 273 s, klein 4B 62 instead
+  of 76 s (MEASUREMENTS 7bt). A prompt encoded before does not read the text encoder at all: Z-Image Turbo's
+  first picture 180 s, 9.0 instead of 12.0 GB, no swap on a Mac mini M4 16 GB (MEASUREMENTS 7bu).
+- **Diffusers: 8 and 4 bit models hold less memory after loading.** Their GGUF copy is read as views of the file
+  instead of a copy of every tensor, which the process kept: FLUX.2 [klein] 9B about 3 GB less right after loading
+  and about 6 s faster per picture with a new prompt, SD 3.5 Medium's peak back inside its plan (MEASUREMENTS 7bv).
+  A new prompt still swaps on a 16 GB Mac while a large text encoder loads (klein 9B, SD 3.5).
+- **Icons from @lucide/vue.** lucide-vue-next is deprecated by its makers; the same icons now come from its successor
+  (@lucide/vue 1.70.0, ISC). One icon looks a little different: rotate-3d, redrawn by Lucide.
+- **User guide, Privacy: which services VulKara contacts and when** (Hugging Face, Civitai, GitHub, PyPI); no prompt,
+  picture or path is sent, and there is no telemetry.
+- **Fibo 2.0 edits (MLX) on 16 GB: about 2.5 GB less.** The transformer is read only after the prompt and the picture
+  to edit are encoded: 11.0 instead of 13.5 GB, swap 1.6–2.0 instead of 2.8–3.3 GB on a Mac mini M4, the same
+  pictures (MEASUREMENTS 7bx).
+- **Fixed:** Stop while a model loads no longer deletes its 8/4 bit text encoder copy (it was quantized again at the
+  next job). A disk without room for a model's 8/4 bit copy now says how many GB are missing. The old Quanto copies of
+  a model part (8 and 4 bit) go once its GGUF copy is written. Streaming files are written whole or not at all. With
+  Fast on (FLUX.1 [dev]), a third LoRA is no longer dropped silently for Turbo-Alpha: the page says so. Restore offers
+  the consistency LoRA only for FLUX.2 [klein] 4B. Prompt from picture waits while a runtime installs or a model
+  exports. Models that no longer stream on a 16 GB Mac (now a 4 bit copy in memory) leave their SSD streaming cache
+  behind (about twice the model's size, in the model's folder or in the folder set in Settings → Folders → SSD
+  streaming cache); it can be deleted by hand, the model writes it again if it ever streams.
+- **Benchmark: New prompt per picture.** Each picture gets a number added to its prompt, so every one encodes it as a
+  changed prompt does; before, the pictures after the first took the encoded prompt from the cache.
+- **Prompt from picture (Image to image).** A button next to the prompt writes a prompt for the chosen picture:
+  subject, setting, light, colours, style and camera in one English paragraph, to change before you create.
+  Qwen3-VL 2B Instruct (Qwen, Apache-2.0) does it on the Mac, downloaded once as a helper model (4.1 GB, pinned) and
+  freed again: about 15 s and 5.3–6.1 GB on a Mac mini M4 16 GB; the loaded picture model is freed for it, the
+  button waits while a job runs, and Cancel stops it. 8 bit was 5–6 times slower and saved no memory at the peak, so
+  it runs in 16 bit (MEASUREMENTS 7br). Not in the remote web UI.
+- **Inpainting with FLUX.1 [dev] or [schnell]: a note next to the model.** Neither was trained to paint into a mask,
+  so a faint outline of the painted part can stay (MEASUREMENTS 7bf); the page now says so and points to FLUX.1 Fill
+  [dev], which blends it in.
+- **FLUX.1 GGUF models that stream on 16 GB no longer swap while they are prepared.** Unpacking the GGUF file for
+  SSD streaming read the whole file into memory (14.2 GB for FLUX.1 [schnell] in 8 bit, up to 6.7 GB swap); it now
+  reads it mapped from the disk: 4.9 GB, the same blocks byte for byte. That unpacking also ran far more often than
+  once: the engine timed at every start whether bfloat16 is slow, the timing flipped on the M4, and every flip wrote
+  the stream cache (22 GB) and the 8 bit text encoder again in the other number format. The check now runs once per
+  Mac and is kept, so the caches stay and the same seed gives the same picture.
+- **Restore: a note for black-and-white and sepia photos with FLUX.2 [klein] 9B.** 9B tints such a photo when it
+  repairs the whole of it; the Restore page now says so next to the model and points to FLUX.2 [klein] 4B with the
+  consistency LoRA, which keeps the colour. The photo is recognised the way the engine does (spread of its LAB colour).
+- **Restore recognises black-and-white photos again.** The page could not read the photo's pixels (it was loaded
+  without CORS), so "This photo is black and white" never showed and colouring was not ticked for such a photo.
+- **Security updates (big change): Electron 44.10.2, Python 3.11.18, uv 0.13.7, Pillow 13, new certificates.**
+  - Electron 44.5.1 → 44.10.2 (Chromium 152.0.7977.169). It blocks the compromised eMudhra intermediate certificates
+    in Chromium and in Node's `tls`, `https` and `fetch` (GHSA-jr5w-w6x2-84p9, high): before, someone who could
+    intercept the network could pose as Hugging Face, Civitai or the update check.
+  - The Python runtimes (Diffusers, MLX, ComfyUI): certifi 2026.10.23 drops the emSign root certificates with
+    compromised intermediate keys (critical); Pillow 12.3.0 → 13.0.0 in Diffusers and ComfyUI fixes 41
+    advisories in its picture decoders (crafted TIFF, BMP, PDF and other files could hang or crash the engine; no
+    fix for 12.x); filelock 4.2.9 and setuptools 84.2.1 fix lower ones. The runtimes update themselves to the new
+    lock at the first start.
+  - uv 0.12.23 → 0.13.7: uv downloads every Python package and Python itself, and before 0.13.4 its own certificate
+    store still trusted the emSign root of the compromised keys (GHSA-hq85-5cpj-mr62, critical).
+  - Python 3.11.17 → 3.11.18 in every runtime: its ssl rejects the compromised eMudhra intermediate certificates, and
+    it fixes Expat and tarfile flaws. A runtime on an older Python is made again at the first start; its packages
+    come back from the local cache (same versions, nothing new).
+  - ComfyUI 0.43.0 → 0.44.0 (no security fix of its own; only its frontend, template and docs packages move).
+  - Building: Vite 7.3.7 (two dev server advisories), fast-uri, electron-builder 26.18.0. Left: minimatch inside
+    electron-builder (a slow build from crafted glob patterns; VulKara's patterns are its own, the fix needs
+    minimatch 11, which electron-builder does not take yet).
+- **Inpainting: nothing of the old picture shows through any more.** Inside the painted part 15 % of the old picture
+  stayed on average, up to 40 %: a removed house still showed half-transparent. The soft edge now lies outside the
+  painted part (all engines).
+- **Inpainting: no lighter disc around what was added.** Models not trained for masks (Z-Image, FLUX.1 [dev],
+  Juggernaut XL …) shift the tone of the whole repainted part, so an added seagull sat in a lighter or darker disc.
+  The tone offset is now measured along the edge and taken out inside (all engines); SDXL Inpainting runs at strength
+  0.99 at most, as its card says (a dark noisy disc at 1).
+- **FLUX.2 [klein] inpainting plans its memory right.** Its inpainting passes the picture along as reference tokens: the
+  plan counts them now (9B took 12–14 GB against a plan of 9.8).
+- **Every FLUX.2 edit with a picture plans its memory right.** Editing and Restore's repair take the picture along as
+  reference tokens too; the plan counted them only for inpainting (Restore with klein 9B took 12.5–13 GB against 9.8).
+- **Restore: consistency LoRA for FLUX.2 [klein] 4B.** A new option, on by default: lrzjason's LoRA (Apache-2.0,
+  0.4 GB, downloaded once as a helper model) keeps the repair closer to the photo; scratches the repair left as light
+  streaks are gone. About 1.7 GB more memory while the model works (11.7 GB on a 16 GB Mac mini).
+- **Quantized models no longer depend on Diffusers' Quanto backend**, which Diffusers drops with version 1.0. A model
+  in 8 or 4 bit on the Diffusers runtime is written once as a GGUF copy next to it (in a process of its own, tensor
+  by tensor) and loaded from there: about as fast per step, 0.4–1.3 GB less in a probe, loaded in seconds. Its old
+  copy is removed on the way; the first use of each model writes the new one once (FLUX.2 [klein] 9B in 4 bit about
+  2 minutes on a Mac mini). ControlNets in 8 bit are quantized by optimum-quanto itself, text encoders stay as they are.
+- **Image to image: keep the picture with FLUX.2 [klein] 4B.** A new option, off at first: the consistency LoRA of
+  Restore at half strength changes only what the prompt asks for (a snowy night on the same coast, a red coat with
+  nothing else changed); without it klein paints the picture anew. A strong change of style comes out lighter. About
+  0.3 GB more memory (10.1 GB on a 16 GB Mac mini).
+- **LoRAs that mix two layer namings load.** Some files name part of their layers `lora.down/up` and the rest
+  `lora_A/B`; only the second part loaded and the LoRA was refused ("only 77 % of its layers found their place").
+- **Fibo 2.0 edits on MLX plan their memory right.** An edit (masked or not) took 13.2–13.4 GB on a 16 GB Mac mini
+  against 11.5 planned: the picture goes along through every step. The plan counts it, so a shortage is noted.
+- **FLUX.1 Fill [dev] in the recommended models.** The 4 bit GGUF (needs a Hugging Face token); on a 16 GB Mac its
+  transformer makes room while a new prompt is encoded (a new prompt took 13.6 GB before, now 11 GB).
+- **FLUX.1 Fill [dev] paints.** It computed in float16 on Macs where bfloat16 is slow and overflowed at 1024 px:
+  the painted part came out black or flat brown. It computes in bfloat16 now.
+- **T5 in 4 or 8 bit really is smaller.** The quantized T5 of FLUX.1, Chroma and SD 3.5 left its wo layers (a fifth of
+  its weights) in 16 bit: the 4 bit one took 5.2 GB, now 4.0. They are quantized in 8 bit (the
+  embeddings stay as close as before); a cached T5 is made again once (a few minutes). FLUX.1 Fill on a 16 GB Mac
+  with a new prompt: 12 instead of 13.6 GB.
+- **A gated model without a token says so.** Importing a model whose base is gated on Hugging Face (FLUX.1 Fill [dev])
+  without a saved token asked to accept the licence, also when it was accepted; it now asks for the token in Settings
+  → Access tokens.
+- **Inpainting with an empty prompt removes.** Asked for nothing, every model invented something where the painted
+  part was (a woman, a scaffold, the house again). LaMa now fills it from its surroundings first and the model only
+  refines that; the prompt field says so.
+- **Models trained for inpainting.** SDXL inpainting checkpoints (*SDXL Inpainting* is in the recommended models, 6.5
+  GB, about 1½ minutes per picture on a 16 GB Mac mini) and FLUX.1 Fill [dev] are recognised, and FLUX.2 [klein] 4B /
+  9B can inpaint now (installed ones learn it at the next start).
+- **Fast (8 steps) for FLUX.1 [dev].** FLUX.1 [dev] and its fine-tunes have an option *Fast (8 steps)* below Steps:
+  alimama's Turbo-Alpha LoRA makes the picture in 8 instead of 20–50 steps (guidance 3.5, as its card says). On a 16 GB
+  Mac mini a 1024 px picture took 4:18 instead of 11:04 min with 28 steps, the quality held. The LoRA is downloaded once
+  into the LoRAs with the button next to the option (694 MB, FLUX.1 [dev] non-commercial licence).
+- **LoRAs on a model kept in 4 bit.** A LoRA on a model compressed to 4 bit (FLUX.1 dev on 16 GB since this version)
+  stopped with "does not fit this model": the names of 4 bit weights were not recognised. Fixed.
+- **FLUX.1 dev and FLUX.2 [klein] 9B on a 16 GB Mac: in 4 bit instead of streamed.** When a model fits neither in 16
+  nor in 8 bit, it now keeps its denoiser in memory in 4 bit (compressed once and cached) before it streams 16 bit from
+  the SSD. Streamed, each step read 16–28 GB from the SSD and waited for it: on the Mac mini FLUX.1 dev now takes 18.9
+  s per step at 768 px instead of 34.4, FLUX.2 [klein] 9B 17.0 instead of 22.3; at 1024 px as fast as before, with
+  nothing read from the SSD. *Always* under Settings → Engine still streams in 16 bit.
+- **A model folder from another Mac is refused at once.** Importing a model's own folder in place took a folder that
+  had been imported on another Mac as it was, reported it done, and the model could then not be used. The import now
+  says why and what to do: import it again from its source, or import its weights folder.
+- **History names the Enhance and Restore pages.** Their pictures showed the page's internal name.
+- **Krea 2 on a 16 GB Mac: 3 GB less at the end of each picture.** Decoding the picture was its peak (14.3 GB, 6.6 GB
+  above the model); it now decodes in smaller tiles on Macs with 16 GB: 11.3 GB, no visible seam.
+- **Qwen-Image 2.1 on a 16 GB Mac without 7 GB too many.** On Macs that load the text encoder only to encode a new
+  prompt, the pipeline still held it afterwards: Qwen-Image 2.1 kept its 9.2 GB text encoder next to the transformer,
+  18.7 GB instead of the planned 11.9, with 11 GB moved to the swap. It is now let go after encoding: 9.9 GB while
+  denoising. The one-time quantization of a model runs in a short-lived process of its own, so the 16 bit weights it
+  loads go back to macOS when it ends.
+- **The run time in History in its parts.** A picture's run time now shows, one below the other, what it spent
+  loading the model and the prompt, its steps with the time per step, and decoding and saving, e.g. *2:48 min*,
+  *loading and prompt 1:58 min*, *8 steps 39 s (4.93 s/step)*, *decoding and saving 11 s*. Before, only the whole time
+  and the time per step were shown, which did not add up when the model was loaded first.
+- **MLX models load part by part: Z-Image on a 16 GB Mac 7 times as fast.** mflux leaves the weights unread after
+  loading, and the first step then read and quantized all parts at once: Z-Image Turbo peaked at 25 GB on a 16 GB
+  Mac mini and took 2 minutes per step. The MLX engine now reads them one part after another right after loading:
+  18 s per step at 12 GB, FLUX.2 [klein] 4B 11 s instead of 17 s at 7 GB instead of 11. The Mac stays usable while a
+  picture runs (typing in Settings had stalled while it swapped).
+- **16 bit only with room to spare.** The memory plan keeps a model in 16 bit only when 2 GB stay free under its
+  budget, otherwise it takes 8 bit. AuraFlow on a 24 GB Mac had planned 16 bit 0.5 GB under the budget, and macOS read
+  its weights from the disk again in every step: 78–81 s per step, now 46 s in 8 bit. Streamed models and a precision
+  chosen by hand are not affected.
+- **Chroma: short prompts no longer come out as noise.** diffusers 0.41 builds Chroma's prompt mask as 0/1 floats and
+  hands it to the attention, which adds a float mask instead of applying it (huggingface/diffusers issue 12116; the
+  fix was undone by a later rework), so the padding was attended and a two-word prompt gave a grid of noise on
+  Chroma1-Flash. The engine now gives the pipelines' mask helper boolean masks, for the pipeline's own encoding,
+  the staged one, cached embeddings, image to image and masked edits alike. Longer prompts keep their composition and
+  move a little in detail.
+- **Tips & tricks for ERNIE-Image, MOSS-Image, Fibo 2.0, FLUX 3 Image Klein, Anima, Lumina 2 and AuraFlow**, and a
+  picture pair for every model type. Seven new groups from the makers' cards and guides: ERNIE's 8 steps, its prompt
+  enhancer, dense text and its sizes; MOSS's 50 steps with CFG 3 against the 8-step version, line breaks in text, a layout as the prompt, the Destripe LoRA
+  against stripes; Fibo's 4-step edits by instruction, masked edits, up to four pictures, caption-like prompts, sizes
+  and LoRAs. Every model type now shows a plain prompt against the tip's prompt with the same seed (SD 1.5 keywords
+  and negative prompt, SDXL at 512 and 1024 px, SD 3.5 sentences, FLUX.1 prose, FLUX.2 hex colors and quoted text,
+  Chroma, Qwen-Image posters, Z-Image paragraphs, Krea 2 art direction, Ideogram typography, Wan motion as three
+  frames of the five-second clip, ERNIE with and without the enhancer, MOSS words against a layout, Fibo before and
+  after an edit). From the makers' cards for the later four: FLUX 3's 16 steps, its prompt upsampler and seeds;
+  Anima's Turbo settings, lowercase Danbooru tags with the safety tag, artists with @; the Neta models' system prompt,
+  40-50 steps and three languages; AuraFlow's 50 steps and Pony V7's tag template and character pattern. The helpers
+  group shows a skin LoRA and an expanded prompt.
+- **The memory note in two grades.** When less memory is free than a picture's plan needs, the job's note now says
+  what to expect: up to 10 GB short, *macOS moves other programs to the swap, the picture is usually as fast* (measured:
+  as fast up to 9.6 GB short, idle apps go to the swap); above that, *this picture may take many times longer* (14 times
+  at 11.1 GB short). On a Mac with 16 GB or less the strong note comes from 4 GB short: what the other programs hold
+  there is largely macOS itself and cannot move (the Mac mini M4 swapped at 6.3 GB short). A shortage within 2 GB, the
+  noise of the free figure, gets no note.
+- **LoRAs for Fibo 2.0.** A LoRA trained for Fibo 2.0 is recognised at import (its 3584-wide layers, the metadata, the
+  Hugging Face bases briaai/Fibo-2.0 and Comfy-Org/Fibo-2.0) and loads on both runtimes: ComfyUI's repacked files fuse
+  q, k and v and the feed-forward's w1 and w3, so a LoRA in diffusers' layout (ai-toolkit, peft) is fused once for them
+  (the rank stacked, the hidden width padded as in the files), and one in ComfyUI's layout is split once for the MLX
+  runtime (mflux maps diffusers' names). Fibo 2.0 on MLX takes LoRAs now too.
+- **ERNIE-Image's prompt enhancer.** Baidu's own enhancer (the pe/ model of ERNIE-Image-Turbo, Ministral 3 3B,
+  Apache-2.0) is a helper model now: with the option *Prompt enhancer* next to Generate it rewrites a short prompt into
+  a rich description before the picture is made, the description becomes the picture's note, and the prompt and seed
+  give the same description again. Downloaded once (7.7 GB) with the button next to the option or on the Models page;
+  on a 16 GB Mac the image model is unloaded while it writes (about a minute on an M2; the description is written in
+  English, Baidu's own instruction to the enhancer translated). Off, the prompt goes as written.
+- **MOSS-Image: layouts, image to image and LoRAs.** A layout is the JSON that ComfyUI's *MOSS-Image Layout Prompt*
+  node writes, pasted as the prompt (the guide shows the format with a poster); Image to image is offered for MOSS-Image
+  (the picture is denoised from the chosen strength, as ComfyUI's documentation describes); and LoRAs made for
+  MOSS-Image are recognised at import (ComfyUI's layer names, kohya's, the metadata, the Hugging Face bases) and
+  loaded by ComfyUI onto the fused model files (MEASUREMENTS 7av).
+- **Streamed models load from their cache alone.** A model streamed from the SSD was first loaded whole to check its
+  cache; on an M1 or M2, which compute FLUX.1 in float16, that converted the whole transformer into memory (FLUX.1
+  [dev]: 24 GB before the first step, swapping on a 16 GB Mac). The cache now also holds the weights outside the blocks,
+  and a later load reads only those: FLUX.1 [dev] on a 16 GB budget prepares in 8 instead of 100 s and stays at 11 GB
+  (MEASUREMENTS 7at). The first use of a model still loads it whole once.
+- **ControlNets count in the memory plan.** A job with a ControlNet reported the plan without it (Juggernaut XL: 9.4 GB
+  planned, 12.0 used), and the room for the ControlNet was judged with twice the model's activations where it takes a
+  third: a 16 GB Mac refused SDXL with ControlNet Union at 1024 px although it fits in 8 bit. The plan now counts the
+  ControlNet's weights and half the activations, through the encoding of a staged model too; the 16 GB Mac runs the
+  job (planned 11.5 GB, used 11.6; MEASUREMENTS 7as).
+- **Cancel ends a model load at once.** A picture cancelled while its model was loading on the Diffusers runtime went
+  on until the load was done (Chroma1 Flash on a 16 GB plan: 62 s). The load now stops within a second, and the engine
+  goes on with the next job (MEASUREMENTS 7ar). A stop while a step runs still ends with that step.
+- **Streamed models hold less after the last step.** While a model is streamed from the SSD, the next blocks are read
+  ahead; after the last step the two read ahead for a further pass stayed in memory until the next picture (0.85 GB
+  on Qwen-Image 2.1). They are dropped now, before decoding: FLUX.2 [klein] 9B on a 16 GB plan reads 1.2 GB less per
+  picture and holds 1 GB less afterwards (MEASUREMENTS 7ap).
+- **New model: Fibo 2.0 Edit Turbo** (Bria AI, CC BY-NC 4.0) on the ComfyUI runtime: an 8B model that edits a picture
+  by instruction (Image to image: *make it a snowy night*), only inside a mask (Inpainting, AI Canvas: the masked part
+  is repainted, the rest stays pixel for pixel), and paints new pictures from text, with Qwen3-VL 4B reading the
+  prompt and the picture. Up to four pictures in one edit: Image to image takes up to three more under **More
+  pictures** (<image_2> to <image_4> in the prompt); the memory plan counts each further picture (2.2 GB on ComfyUI,
+  0.5 GB on MLX), and with four pictures a step takes 3.5 to 4 times as long. 4 steps without guidance: about 6
+  minutes per edit and 3 per new picture at 1024 px on an M2 with 24 GB. In Models → Recommended (13.6 GB download,
+  transformer and text encoder in 8 bit, from Comfy-Org's files, no Hugging Face form needed). Computed in float16, 69
+  instead of 111 s per step. An edit needs about 14.5 GB, so it is listed for 20 GB Macs and up; a 16 GB Mac is told
+  before it starts. Fibo 2.0 Dev files are recognised as well (the maker's 50 steps with guidance 5): two passes per
+  step, 72 s, about an hour per new picture and two per edit at 1024 px on an M2 with 24 GB. The Diffusers runtime's diffusers 0.41 only knew FIBO-Edit 1.5 (with SmolLM3), not Fibo 2.0. No LoRAs yet.
+- **Fibo 2.0 on 16 GB Macs: *Fibo 2.0 Edit Turbo (MLX, 8 bit)*** in Models → Recommended (13.4 GB download,
+  mflux-community's files): the same edits, masked edits and new pictures on the MLX runtime, at most about 11 GB (the
+  text encoder only for the prompt), about 7 minutes per edit at 1024 px on an M2 with 24 GB.
+- **MLX runtime on mflux 0.24.0** (was 0.23.0) with Pillow 13.0.0: needed for Fibo 2.0. The runtime updates itself at
+  the first start; FLUX.1, FLUX.2 [klein], Z-Image, Krea 2, ERNIE-Image and FLUX 3 run as before.
+- **New model: MOSS-Image** (OpenMOSS, Apache 2.0) on the ComfyUI runtime: a 5B model for text in pictures (English
+  and Chinese), posters and layouts, photographs and anime, with Qwen 3.5 9B reading the prompt. In Models →
+  Recommended as *MOSS-Image* (the maker's 50 steps with guidance 3, about 40 minutes per picture at 1024 px on an M2
+  with 24 GB) and *MOSS-Image 8-step (DMD)* (lodestones' distillation merged in: 8 steps without guidance, about 4½
+  minutes). Both download 13 GB (transformer in 8 bit, text encoder in 4 bit) and run on 16 GB Macs (8.4 GB at
+  most; on a Mac mini M4: 37 s per step, 9.1 GB). Computed in float16, 48 instead of 73 s per step. Text to image for
+  now; no LoRAs yet.
+- **ComfyUI 0.43.0** (was 0.38.0): needed for MOSS-Image. The runtime updates itself at the first start; Anima,
+  Lumina 2, Pony V7, Wan 2.2 and upscaling run as before.
+- **ComfyUI models are planned with less memory on small Macs.** ComfyUI loads the text encoder and the model one
+  after the other when memory is short, so the plan no longer counts both together: NetaYume v4 on 16 GB 8.9 instead
+  of 11.6 GB (measured 8.7); MOSS-Image would otherwise have been refused on 16 GB.
+- The benchmark names the bit size of files ComfyUI quantized itself (8 bit int8, 4 bit W4A8) and counts them by their
+  size.
+- **ComfyUI pictures say when memory is short**, as MLX pictures do: before each picture the engine compares the plan
+  with the memory free at that moment (what ComfyUI's server already holds counts as free), and the job says how much
+  was free and that the picture may be slow while macOS swaps. Checked with Fibo 2.0 and four pictures while 8 GB were
+  held elsewhere: 7.0 GB free for 21.2 GB planned, 77 instead of 6 minutes.
+
 ## 0.7.11 – 2026-10-30
 
 - **FLUX.2 [klein] 9B streamed on a 16 GB Mac stays within its memory plan.** The plan counts the model's large

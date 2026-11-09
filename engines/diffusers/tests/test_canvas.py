@@ -41,3 +41,26 @@ def test_blend_keeps_everything_outside_the_mask():
     out = np.asarray(engine._blend_into(original, painted, mask))
     assert (out[0, 0] == [10, 20, 30]).all() and (out[128, 128] == [250, 250, 250]).all()
     assert engine._grow_mask(rect_mask((256, 256), [96, 96, 160, 160]), 16).getbbox()[0] < 96  # grown
+
+
+def test_nothing_of_the_old_picture_shows_inside_the_mask():
+    # the removed house showed through at 15-40 % (MEASUREMENTS 7bf)
+    original = Image.new("RGB", (1024, 1024), (0, 0, 0))
+    painted = Image.new("RGB", (1024, 1024), (255, 255, 255))
+    raw = rect_mask((1024, 1024), [330, 425, 462, 542])
+    out = np.asarray(engine._blend_into(original, painted, engine._grow_mask(raw, 48), raw, 48))
+    assert out[np.asarray(raw) > 127].min() == 255
+    assert (out[100, 100] == 0).all()
+
+
+def test_the_step_at_the_grown_mask_edge_is_hidden():
+    # pipelines not trained for masks keep the old picture outside the mask and shift the tone inside: a lighter disc
+    # around an added seagull (MEASUREMENTS 7bf); the offset along the edge is taken out, what was drawn stays
+    raw = rect_mask((1024, 1024), [400, 400, 600, 600])
+    grown = engine._grow_mask(raw, 48)
+    original = Image.new("RGB", (1024, 1024), (100, 100, 100))
+    painted = Image.composite(Image.new("RGB", (1024, 1024), (125, 125, 125)), original, grown)  # the step
+    ImageDraw.Draw(painted).rectangle([450, 450, 550, 550], fill=(250, 250, 250))  # the seagull
+    out = np.asarray(engine._blend_into(original, painted, grown, raw, 48), dtype=float)[:, :, 0]
+    assert np.abs(out[500, 300:450] - 100).max() <= 1  # no disc
+    assert out[500, 460:540].min() >= 220

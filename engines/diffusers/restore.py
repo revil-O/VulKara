@@ -41,6 +41,14 @@ LAMA_SIZE = 512
 DETAIL_HELPER = "realesrgan"
 DETAIL_TOOL = {"runtime": "torch", "model": "RealESRGAN_x4plus.safetensors", "scale": 4, "range": "0-1", "multiple": 4,
                "half": True, "tile": 384, "tile_metal_gb": {"256": 1.3, "384": 2.4, "512": 3.0}}
+# lrzjason's consistency LoRA for FLUX.2 [klein] 4B (Apache-2.0): the repair stays closer to the photo, scratches go
+# more thoroughly; made for 4B only. It adds 1.1-2.2 GB while denoising (11.7 GB on the Mac mini, MEASUREMENTS 7bh)
+CONSISTENCY_HELPER = "klein4b_consistency"
+CONSISTENCY_FILE = "f2k_4B_consist_20260314.safetensors"
+CONSISTENCY_VARIANT = "klein4b"
+CONSISTENCY_GB = 1.7
+# image to image: at full strength the LoRA held the edit back, at half it kept the picture and made the edit (7bi)
+KEEP_PICTURE_SCALE = 0.5
 # CodeFormer (S-Lab License 1.0, non-commercial) restores faces; YuNet (MIT, OpenCV Zoo) finds them with 5 landmarks
 FACE_HELPER = "codeformer"
 FACE_MODEL, FACE_DETECTOR = "codeformer.pth", "face_detection_yunet_2023mar.onnx"
@@ -428,6 +436,15 @@ def faces_main(argv):
     except Exception as e:
         print("__error__ " + json.dumps({"error": str(e)}), flush=True)
         return 1
+
+
+def consistency_lora(scale=1.0, report=None):
+    """The consistency LoRA as the generation takes a resolved LoRA (downloaded on first use)."""
+    import helpers
+    file = os.path.join(helper_folder(CONSISTENCY_HELPER), CONSISTENCY_FILE)
+    if not os.path.isfile(file):
+        helpers.install(CONSISTENCY_HELPER, report=report)
+    return {"file": file, "scale": scale, "name": "Consistency LoRA", "trigger_words": [], "plan_gb": CONSISTENCY_GB}
 
 
 def _face_files(report=None):

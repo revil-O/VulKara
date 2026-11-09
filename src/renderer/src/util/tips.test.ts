@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { LANGS } from '@shared/i18n'
 import { TIPS_BY_LANG, TIP_GROUPS, TIP_SOURCES, TOPICS, groupForFamily, searchTips } from './tips'
 
-const FAMILIES = ['sd1', 'sdxl', 'sd3', 'flux1', 'flux2', 'chroma', 'qwen_image', 'z_image', 'krea2', 'ideogram4', 'wan']
+const FAMILIES = ['sd1', 'sdxl', 'sd3', 'flux1', 'flux2', 'chroma', 'qwen_image', 'z_image', 'krea2', 'ideogram4', 'wan', 'ernie', 'moss_image', 'fibo2', 'flux3', 'anima', 'lumina', 'auraflow']
 
 describe('tips & tricks', () => {
   it('has complete groups with unique ids and sources as links', () => {
@@ -19,7 +19,7 @@ describe('tips & tricks', () => {
 
   it("finds the group of the chosen model's family", () => {
     expect(groupForFamily('flux1')?.id).toBe('flux1')
-    expect(groupForFamily('anima')).toBeUndefined()
+    expect(groupForFamily('nope')).toBeUndefined()
     expect(groupForFamily(undefined)).toBeUndefined()
     for (const t of TOPICS) expect(groupForFamily(t)).toBeUndefined()
   })

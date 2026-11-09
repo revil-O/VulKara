@@ -5,6 +5,7 @@
 //   node tools/build_site_pages.mjs && node tools/build_site.mjs
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { benchmarksPage } from './build_site_benchmarks.mjs'
+import { resultsPage, resultsMarkdown } from './build_site_results.mjs'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 
@@ -69,6 +70,7 @@ const T = {
     nav: ['Features', 'Why VulKara', 'Screenshots', 'Get started'],
     changesNav: 'Changes',
     language: 'Language',
+    menu: 'Menu',
     theme: 'Appearance',
     themes: ["Like the system", "Light", "Dark"],
     copy: 'Copy the command',
@@ -178,6 +180,7 @@ const T = {
     nav: ['Funktionen', 'Warum VulKara', 'Screenshots', 'Loslegen'],
     changesNav: 'Änderungen',
     language: 'Sprache',
+    menu: 'Menü',
     theme: 'Darstellung',
     themes: ["Wie das System", "Hell", "Dunkel"],
     copy: 'Befehl kopieren',
@@ -288,6 +291,7 @@ const T = {
     changesNav: 'Cambios',
     language: 'Idioma',
     theme: 'Apariencia',
+    menu: 'Menú',
     themes: ["Como el sistema", "Claro", "Oscuro"],
     copy: 'Copiar el comando',
     copied: 'Copiado',
@@ -397,6 +401,7 @@ const T = {
     changesNav: 'Novidades',
     language: 'Idioma',
     theme: 'Aparência',
+    menu: 'Menu',
     themes: ["Como o sistema", "Claro", "Escuro"],
     copy: 'Copiar o comando',
     copied: 'Copiado',
@@ -506,6 +511,7 @@ const T = {
     changesNav: 'Novidades',
     language: 'Idioma',
     theme: 'Aspeto',
+    menu: 'Menu',
     themes: ["Como o sistema", "Claro", "Escuro"],
     copy: 'Copiar o comando',
     copied: 'Copiado',
@@ -683,6 +689,20 @@ ${ogAlts}
         <a href="#start">${t.nav[3]}</a>
       </nav>
       <span class="spacer"></span>
+      <details class="menu">
+        <summary aria-label="${t.menu}">${icon(up, 'menu')}${icon(up, 'x', 'ico close')}</summary>
+        <div class="panel">
+          <a href="#features">${t.nav[0]}</a>
+          <a href="#models">${t.models.nav}</a>
+          <a href="#why">${t.nav[1]}</a>
+          <a href="#screenshots">${t.nav[2]}</a>
+          <a href="#start">${t.nav[3]}</a>
+          <a class="phone" href="${DISCORD}" rel="noopener">${icon(up, 'messages-square')}Discord</a>
+          <div class="theme phone" role="group" aria-label="${t.theme}">
+${[['system', 'sun-moon'], ['light', 'sun'], ['dark', 'moon']].map(([v, ic], i) => `            <button type="button" data-set-theme="${v}" aria-pressed="${v === 'system'}" aria-label="${t.theme}: ${t.themes[i]}">${icon(up, ic)}</button>`).join('\n')}
+          </div>
+        </div>
+      </details>
       <details class="lang">
         <summary aria-label="${t.language}: ${lang.name}">${icon(up, 'languages')}<span>${lang.name}</span></summary>
         <ul>
@@ -929,7 +949,7 @@ ${t.links.map(([ic, h, s, href]) => `          <li>${ext(href, `${icon(up, ic)}<
       <p>${t.foot}</p>
       <p>${t.footPrivate}</p>
       <p>${t.footTm}</p>
-      <p class="legal"><a href="${up}impressum/">${t.legal[0]}</a> · <a href="${up}datenschutz/">${t.legal[1]}</a> · <a href="${up}changes/">${t.changesNav}</a> · <a href="${up}benchmarks/">Benchmarks</a> · <a href="${DISCORD}" rel="noopener">Discord</a></p>
+      <p class="legal"><a href="${up}impressum/">${t.legal[0]}</a> · <a href="${up}datenschutz/">${t.legal[1]}</a> · <a href="${up}changes/">${t.changesNav}</a> · <a href="${up}benchmarks/">Benchmarks</a> · <a href="${up}results/">Results</a> · <a href="${DISCORD}" rel="noopener">Discord</a></p>
     </div>
   </footer>
 </body>
@@ -1118,6 +1138,7 @@ ${items.map(entry).join('\n')}
       <span class="path">~/vulkara <b>$</b> changelog --releases</span>
       <span class="spacer"></span>
       <a class="gh" href="../benchmarks/">benchmarks</a>
+      <a class="gh" href="../results/">results</a>
       <a class="gh" href="${BLOB}/CHANGELOG.md" rel="noopener">CHANGELOG.md ↗</a>
     </div>
   </header>
@@ -1140,7 +1161,7 @@ ${list.map(section).join('\n')}
   </main>
   <footer>
     <div class="wrap">
-      <p class="legal"><a href="../">VulKara</a> · <a href="../impressum/">Impressum</a> · <a href="../datenschutz/">Datenschutz</a> · <a href="../benchmarks/">Benchmarks</a> · <a href="${GH}" rel="noopener">GitHub</a></p>
+      <p class="legal"><a href="../">VulKara</a> · <a href="../impressum/">Impressum</a> · <a href="../datenschutz/">Datenschutz</a> · <a href="../benchmarks/">Benchmarks</a> · <a href="../results/">Results</a> · <a href="${GH}" rel="noopener">GitHub</a></p>
     </div>
   </footer>
 </body>
@@ -1166,4 +1187,12 @@ ${list.map(section).join('\n')}
   writeFileSync(join(SITE, 'benchmarks', 'index.html'), html)
   writeFileSync(join(SITE, 'benchmarks', 'charts.css'), css)
   console.log('benchmarks page written')
+}
+
+// ---------------------------------------------------------------- results: pictures at full size, also docs/RESULTS.md
+{
+  mkdirSync(join(SITE, 'results'), { recursive: true })
+  writeFileSync(join(SITE, 'results', 'index.html'), resultsPage({ BASE, BLOB, VERSION, CSS_V, JS_V }))
+  writeFileSync(join(ROOT, 'docs', 'RESULTS.md'), resultsMarkdown({ BASE }))
+  console.log('results page written')
 }

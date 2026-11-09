@@ -5,7 +5,8 @@
 A job of the app (prompt, size, steps, seed, input image, LoRAs) becomes a graph of ComfyUI nodes.
 Models whose parts are separate files (diffusion model, text encoder, VAE: Anima and most new
 architectures) use UNETLoader / CLIPLoader / VAELoader, exactly like the reference workflows of their
-authors. Only standard ComfyUI nodes are used.
+authors. Only standard ComfyUI nodes are used, and VulKara's VulKaraEncodeAndFree (custom_nodes/vulkara_memory), which
+frees the text encoder before the sampler on a Mac short of memory.
 """
 
 # the app's sampler names (utils/samplers.js) -> ComfyUI (sampler_name, scheduler)
@@ -134,20 +135,48 @@ def build_video(job, files, comfy, loras=(), input_image=None):
     return _video_out(g, ["sample", 0], job["fps"])
 
 
-def build(job, files, comfy, loras=(), input_image=None):
+def build(job, files, comfy, loras=(), input_image=None, references=(), free_text_encoder=False):
     """job: {prompt, negative_prompt, width, height, steps, cfg, seed, strength, sampler, sigma_schedule}
     files: {"diffusion_model", "text_encoder", "vae"}: file names as ComfyUI sees them
     comfy: the model type's ComfyUI settings (registry "comfy": clip_type, sampler, scheduler)
-    loras: [(file name, strength)]; input_image: file name in ComfyUI's input folder (image to image).
+    loras: [(file name, strength)]; input_image: file name in ComfyUI's input folder (image to image); references:
+    further pictures there that Fibo 2.0 edits with it (<image_2> ...); free_text_encoder: encode with
+    VulKaraEncodeAndFree, so the text encoder is gone before the model loads (not with LoRAs, prompt padding or Fibo).
     Returns the API-format graph; the node "save" holds the result."""
     sampler, scheduler = _sampler_names(job, comfy)
     g, model, clip = _loaders(files, comfy, loras)
+    if comfy.get("skip_layers"):  # MOSS-Image: the negative branch skips these layers (its maker's guidance)
+        g["slg"] = {"class_type": "SkipLayerGuidanceDiTSimple", "inputs": {
+            "model": model, "double_layers": "", "single_layers": comfy["skip_layers"], "start_percent": 0.0, "end_percent": 1.0}}
+        model = ["slg", 0]
 
-    g["pos"] = {"class_type": "CLIPTextEncode", "inputs": {"text": job.get("prompt") or "", "clip": clip}}
-    g["neg"] = {"class_type": "CLIPTextEncode", "inputs": {"text": job.get("negative_prompt") or "", "clip": clip}}
+    fibo = comfy.get("encode") == "fibo2"
+    free = free_text_encoder and not fibo and not loras and not comfy.get("t5_min_padding")
+    if free:
+        del g["clip"]
+        g["enc"] = {"class_type": "VulKaraEncodeAndFree", "inputs": {
+            "clip_name": files["text_encoder"], "type": comfy.get("clip_type", "stable_diffusion"),
+            "text": job.get("prompt") or "", "negative": job.get("negative_prompt") or ""}}
+    elif not fibo:
+        g["pos"] = {"class_type": "CLIPTextEncode", "inputs": {"text": job.get("prompt") or "", "clip": clip}}
+        g["neg"] = {"class_type": "CLIPTextEncode", "inputs": {"text": job.get("negative_prompt") or "", "clip": clip}}
 
     denoise = 1.0
-    if input_image:
+    positive, negative, latent = ["pos", 0], ["neg", 0], ["latent", 0]
+    if free:
+        positive, negative = ["enc", 0], ["enc", 1]
+    if fibo:
+        # Fibo 2.0: one node encodes the prompt with the picture to edit (Qwen3-VL sees it, the VAE makes it the
+        # reference latent) and gives the empty latent of the result; the picture itself is not noised (denoise 1)
+        enc = {"clip": clip, "prompt": job.get("prompt") or "", "negative_prompt": job.get("negative_prompt") or "",
+               "vae": ["vae", 0], "width": int(job["width"]), "height": int(job["height"]), "batch_size": 1}
+        for i, name in enumerate([input_image, *references] if input_image else []):
+            node = "image" if i == 0 else "image%d" % (i + 1)
+            g[node] = {"class_type": "LoadImage", "inputs": {"image": name}}
+            enc["images.image_%d" % (i + 1)] = [node, 0]
+        g["enc"] = {"class_type": "TextEncodeFibo2", "inputs": enc}
+        positive, negative, latent = ["enc", 0], ["enc", 1], ["enc", 2]
+    elif input_image:
         g["image"] = {"class_type": "LoadImage", "inputs": {"image": input_image}}
         g["scaled"] = {"class_type": "ImageScale", "inputs": {"image": ["image", 0], "upscale_method": "lanczos",
                                                               "width": int(job["width"]), "height": int(job["height"]),
@@ -155,12 +184,14 @@ def build(job, files, comfy, loras=(), input_image=None):
         g["latent"] = {"class_type": "VAEEncode", "inputs": {"pixels": ["scaled", 0], "vae": ["vae", 0]}}
         denoise = min(1.0, max(0.05, float(job.get("strength", 0.5))))
     else:
-        g["latent"] = {"class_type": "EmptyLatentImage", "inputs": {"width": int(job["width"]), "height": int(job["height"]),
-                                                                    "batch_size": 1}}
+        # FLUX.2's VAE (MOSS-Image): 128 channels at 1/16 of the size
+        empty = "EmptyFlux2LatentImage" if comfy.get("latent") == "flux2" else "EmptyLatentImage"
+        g["latent"] = {"class_type": empty, "inputs": {"width": int(job["width"]), "height": int(job["height"]),
+                                                       "batch_size": 1}}
     g["sample"] = {"class_type": "KSampler", "inputs": {
         "seed": int(job["seed"]), "steps": int(job["steps"]), "cfg": float(job["cfg"]), "sampler_name": sampler,
-        "scheduler": scheduler, "denoise": denoise, "model": model, "positive": ["pos", 0], "negative": ["neg", 0],
-        "latent_image": ["latent", 0]}}
+        "scheduler": scheduler, "denoise": denoise, "model": model, "positive": positive, "negative": negative,
+        "latent_image": latent}}
     g["decode"] = {"class_type": "VAEDecode", "inputs": {"samples": ["sample", 0], "vae": ["vae", 0]}}
     g["save"] = {"class_type": "SaveImage", "inputs": {"filename_prefix": "vulkara", "images": ["decode", 0]}}
     return g

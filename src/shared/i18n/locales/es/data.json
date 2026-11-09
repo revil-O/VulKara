@@ -3,15 +3,20 @@
   "SD-1.5": "El modelo clásico de 512 px: rápido, funciona en cualquier Mac, miles de LoRAs.",
   "FLUX.2-klein-4B": "La generación más reciente de FLUX, destilada a 4 pasos. La mejor calidad por GB de RAM.",
   "SD-1.5-Inpainting": "SD 1.5 entrenado para repintar las zonas enmascaradas (página Inpainting, Lienzo IA).",
+  "SDXL-Inpainting": "SDXL entrenado para repintar las zonas enmascaradas (página Inpainting, Lienzo IA): continúa la imagen donde los modelos SDXL normales inventan. 1024 px.",
   "FLUX.2-klein-9B": "Modelo klein más grande; funciona en 8/4 bits en Macs de 16-24 GB.",
   "FLUX.1-schnell-Q4": "FLUX.1 de 4 pasos con transformer GGUF precuantizado. Los codificadores de texto y el VAE vienen del repositorio oficial.",
   "FLUX.1-schnell-Q8": "FLUX.1 de 4 pasos con transformer GGUF de 8 bits, casi con la calidad completa.",
   "FLUX.1-dev": "FLUX.1 [dev] completo. En Macs con menos de 24 GB, su transformer se carga por streaming desde el SSD: más lento, pero funciona con 16 GB.",
   "FLUX.1-dev-Q4": "FLUX.1 con guidance destilada para el máximo detalle, transformer GGUF precuantizado.",
+  "FLUX.1-Fill-Q4": "FLUX.1 [dev] entrenado para repintar zonas enmascaradas (páginas Inpainting y Lienzo IA): continúa la imagen sin costura y pintó el mejor conejo de nuestras pruebas. Transformer GGUF precuantizado; los codificadores de texto y el VAE vienen del repositorio oficial (acepta su licencia en Hugging Face, hace falta un token de acceso). Unos 13–14 minutos por imagen a 1024 px en un Mac mini con 16 GB (50 pasos).",
   "Chroma1-HD": "Modelo Apache 2.0 basado en FLUX.1 [schnell] (8.9B): guidance real con prompt negativo, sin censura. Su transformer se cuantiza a 8 bits al cargarse en Macs con menos de 32 GB y se carga por streaming desde el SSD con menos de 20 GB.",
   "Chroma1-Flash": "El Chroma rápido: destilado a 12 pasos sin guidance (una pasada por paso en lugar de dos) – unos 7 minutos por imagen a 1024 px en un M2 con 24 GB, siete veces más rápido que Chroma con guidance. Apache 2.0, sin censura. Cuantizado a 8 bits con menos de 32 GB, streaming desde el SSD con menos de 20 GB.",
   "Z-Image-Turbo": "Modelo de 6B de Tongyi-MAI destilado a 8–9 pasos sin guidance: imágenes fotorrealistas y texto legible (inglés y chino) en pocos pasos. Apache 2.0. Unos 5½ minutos por imagen a 1024 px en un M2 con 24 GB con el runtime MLX (8 bits; 4 bits con 16 GB), unos 6½ con Diffusers; imagen a imagen e inpainting funcionan con Diffusers. Funcionan las LoRAs con nombres de ai-toolkit, ComfyUI y kohya. El repositorio oficial guarda el transformer en 32 bits (24.6 GB de la descarga); se calcula en 8 o 16 bits.",
   "ERNIE-Image-Turbo": "El modelo de 8B de Baidu destilado a 8 pasos: fuerte con texto en imágenes, pósteres, cómics y composiciones de varios paneles. Funciona con el runtime MLX (4 u 8 bits, codificador de texto incluido).",
+  "MOSS-Image": "El modelo de 5B de OpenMOSS para texto en imágenes (inglés y chino), pósteres y composiciones, fotos y anime; Qwen 3.5 9B lee el prompt. 50 pasos con guía, unos 40 minutos por imagen a 1024 px en un M2 con 24 GB (MOSS-Image 8-step: unos 4½). Funciona con el runtime ComfyUI (Ajustes → Runtimes): el transformer en 8 bits, el codificador de texto en 4 bits. Apache 2.0.",
+  "Fibo-2.0-Edit-Turbo": "El modelo de 8B de Bria AI edita una imagen siguiendo una instrucción («conviértela en una noche nevada»), también solo dentro de una máscara (Inpainting, AI Canvas), y pinta imágenes nuevas a partir de texto; Qwen3-VL 4B lee el prompt y la imagen. 4 pasos sin guidance: unos 6 minutos por edición y 3 por imagen nueva a 1024 px en un M2 con 24 GB; una edición necesita unos 14,5 GB, demasiado para un Mac con 16 GB (allí funciona la versión MLX). Funciona con el runtime de ComfyUI (Ajustes → Runtimes), el transformer y el codificador de texto en 8 bits. Licencia no comercial (CC BY-NC 4.0).",
+  "Fibo-2.0-Edit-Turbo-MLX": "Fibo 2.0 Edit Turbo para el runtime de MLX, en 8 bits (mflux-community): las mismas ediciones siguiendo una instrucción, dentro de una máscara e imágenes nuevas, y funciona en Macs con 16 GB (unos 11 GB, el codificador de texto solo para el prompt). Unos 7 minutos por edición y 3 por imagen nueva a 1024 px en un M2 con 24 GB. Licencia no comercial (CC BY-NC 4.0).",
   "SD3.5-Medium": "Modelo MMDiT de 2.5B que sigue bien el prompt.",
   "SD3.5-Large": "Modelo MMDiT de 8B, cuantizado automáticamente para que quepa en tu Mac.",
   "SDXL-Base-1.0": "El modelo base clásico de SDXL a 1024x1024.",
@@ -30,6 +35,7 @@
   "Anima-Turbo": "Modelo de anime / ilustración de CircleStone Labs (2B, codificador de texto Qwen3), 10 pasos. Funciona con el runtime ComfyUI (Ajustes → Runtimes). Licencia no comercial.",
   "MiaoMiao-RealSkin-Anima": "Ajuste fino de Anima para piel realista, con su propio codificador de texto y VAE. Funciona con el runtime ComfyUI (Ajustes → Runtimes).",
   "NetaYume-Lumina-v4": "Modelo de anime basado en Lumina Image 2.0 (2,6B, codificador de texto Gemma 2), etiquetas de Danbooru o frases. Funciona con el runtime de ComfyUI (Ajustes → Runtimes).",
+  "MOSS-Image-8step-DMD": "MOSS-Image con la destilación de 8 pasos de lodestones integrada y en 8 bits (Spectrallic): 8 pasos sin guía, unos 4½ minutos por imagen a 1024 px en un M2 con 24 GB en lugar de unos 40 con los 50 pasos de MOSS-Image. Funciona con el runtime ComfyUI (Ajustes → Runtimes). Apache 2.0.",
   "CyberRealistic-Final": "Modelo SD 1.5 fotorrealista.",
   "GhostMix-v2": "Anime / ilustración semirrealista (SD 1.5).",
   "DreamShaper-XL-v2-Turbo": "Ajuste fino versátil de SDXL destilado a pocos pasos.",
@@ -66,6 +72,10 @@
   "codeformer": {
    "name": "CodeFormer (caras)",
    "description": "Restaura caras borrosas de fotos antiguas; YuNet las localiza (Restaurar). Licencia no comercial."
+  },
+  "klein4b_consistency": {
+   "name": "LoRA de consistencia para FLUX.2 [klein] 4B (Restaurar)",
+   "description": "Mantiene FLUX.2 [klein] 4B cerca de la foto al reparar: los arañazos desaparecen mejor (Restaurar, opción LoRA de consistencia). LoRA de lrzjason, Apache-2.0."
   },
   "dwpose": {
    "name": "DWPose (detección de pose)",
@@ -138,6 +148,14 @@
   "flux3_pup": {
    "name": "Ampliador de prompts de FLUX 3 (MLX, 4 bits)",
    "description": "Escribe a partir de un prompt corto la descripción completa de la escena con la que se entrenó FLUX 3 Image Klein (Texto a imagen, opción Ampliador de prompts, runtime MLX). flux-3-image-klein-pup de Black Forest Labs (Apache-2.0), cuantizado a 4 bits."
+  },
+  "ernie_pe": {
+   "name": "Mejorador de prompts de ERNIE-Image (MLX)",
+   "description": "Reescribe un prompt corto como una descripción visual rica antes de que ERNIE-Image pinte (Texto a imagen, opción Mejorador de prompts, runtime MLX): el mejorador propio de Baidu (pe/ de ERNIE-Image-Turbo, Ministral 3 3B, Apache-2.0), cargado solo para el prompt y liberado después."
+  },
+  "qwen3_vl": {
+   "name": "Qwen3-VL 2B (prompt desde imagen)",
+   "description": "Describe una imagen como prompt (Imagen a imagen, botón Prompt desde imagen): motivo, entorno, luz, colores, estilo y cámara en un párrafo en inglés. Qwen3-VL 2B Instruct de Qwen (Apache-2.0), cargado solo para la imagen y liberado después."
   }
  },
  "groups": {
@@ -205,6 +223,8 @@
   "Recommended: Wan": "Recomendados: Wan",
   "Recommended: Anima": "Recomendados: Anima",
   "Recommended: ERNIE-Image": "Recomendados: ERNIE-Image",
+  "Recommended: MOSS-Image": "Recomendados: MOSS-Image",
+  "Recommended: Fibo 2.0": "Recomendado: Fibo 2.0",
   "Recommended: Lumina 2": "Recomendados: Lumina 2",
   "The model only for non-commercial purposes; generated pictures may be used for any purpose.": "El modelo, solo con fines no comerciales; las imágenes generadas pueden usarse para cualquier fin.",
   "Civitai permissions: RentCivit. Selling generated pictures: not allowed. Sharing merges / derivatives: not allowed. The license of the base model applies as well.": "Permisos de Civitai: RentCivit. Vender imágenes generadas: no permitido. Compartir mezclas / derivados: no permitido. También se aplica la licencia del modelo base.",
@@ -220,6 +240,9 @@
   "Video": "Vídeo",
   "ControlNet": "ControlNet",
   "Use-based restrictions apply.": "Se aplican restricciones de uso.",
+  "lodestones' 8-step DMD LoRA (Apache 2.0) merged into MOSS-Image SFT.": "El LoRA DMD de 8 pasos de lodestones (Apache 2.0), integrado en MOSS-Image SFT.",
+  "Model and pictures for non-commercial use only; commercial use needs an agreement with Bria AI. ComfyUI files repackaged by Comfy-Org.": "El modelo y las imágenes solo para uso no comercial; el uso comercial requiere un acuerdo con Bria AI. Archivos de ComfyUI reempaquetados por Comfy-Org.",
+  "Model and pictures for non-commercial use only; commercial use needs an agreement with Bria AI. Saved in 8 bit for mflux by mflux-community.": "El modelo y las imágenes solo para uso no comercial; el uso comercial requiere un acuerdo con Bria AI. Guardado en 8 bits para mflux por mflux-community.",
   "Helper models": "Modelos auxiliares",
   "Photo tools": "Herramientas de fotos",
   "The ONNX export (onnx-community) carries no licence statement of its own; the weights are Meta's SAM 2.1, released under Apache-2.0.": "La exportación ONNX (onnx-community) no incluye una declaración de licencia propia; los pesos son SAM 2.1 de Meta, publicado bajo Apache-2.0.",

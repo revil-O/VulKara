@@ -63,6 +63,8 @@ export default {
     size: 'Size',
     ownSize: 'Its own size',
     pictures: 'Pictures',
+    freshPrompt: 'New prompt per picture',
+    freshPromptHint: 'Adds a number to the prompt of each picture, so each one encodes it again, as when you change the prompt. Without it the pictures after the first reuse the encoded prompt and show only the model\'s steps.',
     start: 'Measure',
     stop: 'Stop',
     how: 'The first picture also loads the model; the next ones show the speed with it loaded. The pictures are kept in the history.',

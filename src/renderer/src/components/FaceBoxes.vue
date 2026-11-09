@@ -4,7 +4,7 @@
 // is dragged to where the face really is, or taken away with its ×. Positions are in the photo's pixels; the
 // frames lie in the zoomed surface, so they follow zooming, and they measure the surface as it is shown.
 import { ref } from 'vue'
-import { X } from 'lucide-vue-next'
+import { X } from '@lucide/vue'
 import { t } from '../i18n'
 
 export interface Face {

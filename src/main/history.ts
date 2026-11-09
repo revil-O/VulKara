@@ -58,14 +58,14 @@ export class History {
     return out
   }
 
-  add(job: Job, files: string[], createdAt = Date.now(), timing: { seconds?: number; secondsPerStep?: number } = {}): HistoryEntry {
+  add(job: Job, files: string[], createdAt = Date.now(), timing: { seconds?: number; secondsPerStep?: number; loadSeconds?: number } = {}): HistoryEntry {
     const { consent: _consent, ...kept } = job
     const entry: HistoryEntry = {
       id: job.id, createdAt, job: kept, modelName: basename(job.modelDir) || (job.upscale ? 'Real-ESRGAN' : ''), files,
       kind: files.some((f) => VIDEO.has(extname(f).toLowerCase())) ? 'video' : 'image', ...timing,
     }
     this.load().push(entry)
-    for (const f of [...files, job.inputImage, job.maskImage, job.controlnet?.image]) if (typeof f === 'string' && f) this.files?.add(f)
+    for (const f of [...files, job.inputImage, ...(job.referenceImages ?? []), job.maskImage, job.controlnet?.image]) if (typeof f === 'string' && f) this.files?.add(f)
     mkdirSync(this.dir(), { recursive: true })
     appendFileSync(this.file, (this.endsOpen() ? '\n' : '') + JSON.stringify(entry) + '\n')
     this.changed()
@@ -126,7 +126,7 @@ export class History {
   hasFile(path: string): boolean {
     if (!this.files) {
       this.files = new Set(this.load().flatMap((e) => [
-        ...e.files, e.job.inputImage, e.job.maskImage, e.job.controlnet?.image,
+        ...e.files, e.job.inputImage, ...(e.job.referenceImages ?? []), e.job.maskImage, e.job.controlnet?.image,
       ].filter((f): f is string => typeof f === 'string' && !!f)))
     }
     return this.files.has(path)

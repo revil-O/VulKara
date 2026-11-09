@@ -21,7 +21,10 @@ ACTIVATIONS_GB = {"sd1": 1.9, "sd2": 1.0, "sdxl": 1.5, "sd3": 2.0, "flux1": 2.5,
                   "wan": 4.0,  # wan (video): decoding all frames dominates
                   # Qwen-Image at its native 1328 px (6900 image tokens); 2.1 at 1024 px with its text cache
                   # 2.1: 10.5 GB with its transformer in 8 bit in stages (7z), 12.1 GB streamed (7w)
-                  "qwen_image": 3.5, "qwen_image21": 2.8}
+                  "qwen_image": 3.5, "qwen_image21": 2.8,
+                  # Fibo 2.0 (ComfyUI, int8): an edit at 1024² runs the picture's tokens beside the new ones, 5.2 GB
+                  # over the loaded model (MEASUREMENTS 7ai)
+                  "fibo2": 5.0}
 # families made for a smaller picture: whether they fit is judged at their own size, not at 1024²
 NATIVE_SIDE = {"sd1": 512, "sd2": 768}
 # further denoisers that run next to the main one and get its precision (Ideogram 4 denoises with a
@@ -45,6 +48,9 @@ AUTO_ORDER = ["none", "q8"]
 
 # components smaller than this stay in 16 bit, quantizing them saves nothing
 MIN_QUANT_PARAMS_B = 1.0
+# "auto" keeps a 16 bit denoiser only with this much room under the budget: AuraFlow planned 0.5 GB under it on 24 GB
+# and macOS read its weights again every step, 78-81 s per step against 46 in 8 bit (MEASUREMENTS 7bb)
+FULL_PRECISION_MARGIN_GB = 2.0
 
 
 def total_ram_gb():
@@ -84,11 +90,18 @@ def activations_at(plan, width, height):
     return act, act / _scale(side * side) * _scale(width * height)
 
 
-def peak_at(plan, width, height):
-    """A plan's peak for a picture size; a staged plan's encoding peak does not change with the size."""
+# what a ControlNet's activations add while denoising, as a share of the model's: 0.3 measured on SDXL's Union at 1024²
+# (0.7 of 2.5 GB, MEASUREMENTS 7as), 0.5 kept as the margin
+CONTROLNET_ACTIVATIONS = 0.5
+
+
+def peak_at(plan, width, height, extra_gb=0.0, resident_gb=0.0):
+    """A plan's peak for a picture size; a staged plan's encoding peak does not change with the size. extra_gb: what
+    the job adds while denoising (further pictures an edit takes along); resident_gb: what stays loaded through the
+    whole job, the encoding included (a ControlNet)."""
     act, at = activations_at(plan, width, height)
-    denoise = plan["denoise_peak_gb"] - act + at
-    encoding = plan["est_peak_gb"] if plan["est_peak_gb"] > plan["denoise_peak_gb"] else 0
+    denoise = plan["denoise_peak_gb"] - act + at + extra_gb + resident_gb
+    encoding = plan["est_peak_gb"] + resident_gb if plan["est_peak_gb"] > plan["denoise_peak_gb"] else 0
     return max(encoding, denoise)
 
 
@@ -98,15 +111,30 @@ def free_gb(held_gb=0.0):
     return psutil.virtual_memory().available / 1024 ** 3 + held_gb
 
 
+# a shortage of free memory the note leaves out (the noise of the free figure, ±2 GB with the file cache) and the
+# largest one that left the picture as fast: macOS moved idle programs to the swap up to 9.6 GB short, at 11.1 GB short a
+# picture took 14 times as long (MEASUREMENTS 7az, 7am)
+SHORT_NOISE_GB = 2.0
+SHORT_IDLE_GB = 10.0
+# on a Mac with 16 GB or less what the others hold is largely macOS itself and cannot move: the Mac mini M4 swapped the
+# engine at 6.3 GB short (7ba) and was fine at 1.6 GB (7af)
+SHORT_IDLE_SMALL_GB = 4.0
+SMALL_MAC_GB = 16
+
+
 def short_of(need_gb, held_gb, total_gb=None):
-    """None when a job's planned peak fits into the memory free now, else a note for the job: other programs (or
-    another engine) hold what is missing, and the picture will swap."""
+    """None when a job's planned peak fits into the memory free now (or misses it by the noise), else a note for the
+    job: other programs (or another engine) hold what is missing; a small shortage moves idle programs to the swap, a
+    large one the picture itself."""
     free = free_gb(held_gb)
-    if need_gb <= free:
+    short = need_gb - free
+    if short <= SHORT_NOISE_GB:
         return None
-    others = (total_gb or total_ram_gb()) - free
-    return ("Only %.1f GB of memory free for the planned %.1f GB (other programs or engines hold %.1f GB): this picture may be "
-            "slow, macOS moves memory to the swap" % (free, need_gb, others))
+    total = total_gb or total_ram_gb()
+    head = "Only %.1f GB of memory free for the planned %.1f GB (other programs or engines hold %.1f GB): " % (free, need_gb, total - free)
+    if short <= (SHORT_IDLE_SMALL_GB if total <= SMALL_MAC_GB else SHORT_IDLE_GB):
+        return head + "macOS moves other programs to the swap, the picture is usually as fast"
+    return head + "this picture may take many times longer, close other programs or wait for the other engine's job"
 
 
 def _is_text_encoder(name):
@@ -118,7 +146,8 @@ def _gb(params_b, quant):
 
 
 def plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=None, allow_staging=True,
-         activations_gb=None, text_quant_opts=None, staging_frees_denoiser=False):
+         activations_gb=None, text_quant_opts=None, staging_frees_denoiser=False,
+         full_precision_margin_gb=FULL_PRECISION_MARGIN_GB, denoiser_q4=False, encode_extra_gb=0.0):
     """
     components:  {component_name: params_in_billion}
     denoiser:    name of the denoiser component ("unet" / "transformer")
@@ -129,6 +158,10 @@ def plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=N
                      also allows 4 bit)
     staging_frees_denoiser: staged, the prompt is encoded while the denoiser is not loaded (FLUX 3 on MLX), so the
                      text encoder and the denoiser are never in memory together
+    full_precision_margin_gb: room "auto" leaves under the budget before it keeps the denoiser in 16 bit (0 for a
+                     streamed denoiser, whose blocks are read from the SSD anyway)
+    denoiser_q4:     "auto" may also take a 4 bit denoiser (fitting_plan's last step before SSD streaming)
+    encode_extra_gb: what a model measurably takes above its plan while a new prompt is encoded in stages
 
     Returns a dict with quant per component, staged flag, peak estimate, fit and min RAM.
     """
@@ -146,7 +179,7 @@ def plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=N
     if denoiser_fixed_gb is not None:
         denoiser_opts = ["gguf"]
     elif quant == "auto":
-        denoiser_opts = AUTO_ORDER
+        denoiser_opts = AUTO_ORDER + (["q4"] if denoiser_q4 else [])
     else:
         denoiser_opts = [quant]
     te_opts = (text_quant_opts or AUTO_ORDER) if quant == "auto" else [quant]
@@ -170,6 +203,7 @@ def plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=N
             # freeing the denoiser leaves a second one (Ideogram 4's unconditional transformer) loaded
             encoding = te_gb + seconds_gb(dq) + other_gb + RUNTIME_OVERHEAD_GB if staging_frees_denoiser else \
                 te_gb + den_gb + other_gb + RUNTIME_OVERHEAD_GB
+            encoding += encode_extra_gb
             return max(encoding, denoise_peak(dq, tq, staged))
         return denoise_peak(dq, tq, staged)
 
@@ -186,7 +220,8 @@ def plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=N
     best = None
     for _, _, staged, dq, tq in candidates:
         peak = evaluate(dq, tq, staged)
-        if peak <= budget:
+        room = full_precision_margin_gb if quant == "auto" and dq == "none" else 0.0
+        if peak <= budget - room:
             best = (dq, tq, staged, peak)
             break
 
@@ -222,18 +257,32 @@ def plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=N
     }
 
 
-def fitting_plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=None, activations_gb=None):
+def fitting_plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=None, activations_gb=None,
+                 encode_extra_gb=0.0):
     """The plan without SSD streaming: plan(), and where that does not fit, a big text encoder may go to 4 bit, then
     the denoiser may make room while a new prompt is encoded ("releases_denoiser": it is loaded again afterwards, a
     prompt from the prompt cache needs neither). Streaming the denoiser is the engine's last resort."""
     p = plan(components, denoiser, family, ram_gb, quant=quant, denoiser_fixed_gb=denoiser_fixed_gb,
-             activations_gb=activations_gb)
+             activations_gb=activations_gb, encode_extra_gb=encode_extra_gb)
     if p["fits"]:
         return p
     for frees in (False, True):
         q = plan(components, denoiser, family, ram_gb, quant=quant, denoiser_fixed_gb=denoiser_fixed_gb,
-                 activations_gb=activations_gb, text_quant_opts=QUANT_ORDER, staging_frees_denoiser=frees)
+                 activations_gb=activations_gb, text_quant_opts=QUANT_ORDER, staging_frees_denoiser=frees,
+                 encode_extra_gb=encode_extra_gb)
         if q["fits"]:
             q["releases_denoiser"] = frees and q["staged_text_encoder"]
             return q
+    if quant == "auto" and denoiser_fixed_gb is None:
+        # a 4 bit denoiser kept in memory before streaming 16 bit from the SSD: streamed, FLUX.1 dev and FLUX.2 [klein]
+        # 9B read 16-28 GB per step on a 16 GB Mac mini and took the SSD's time (MEASUREMENTS 7be); quantized once in
+        # a process of its own (quantize_once.py) and cached
+        # the text encoder in 8 bit if any way allows (a 4 bit one hurts most), the denoiser making room if needed
+        for te_opts, frees in ((None, False), (None, True), (QUANT_ORDER, False), (QUANT_ORDER, True)):
+            q = plan(components, denoiser, family, ram_gb, quant=quant, activations_gb=activations_gb,
+                     text_quant_opts=te_opts, staging_frees_denoiser=frees, denoiser_q4=True,
+                     encode_extra_gb=encode_extra_gb)
+            if q["fits"]:
+                q["releases_denoiser"] = frees and q["staged_text_encoder"]
+                return q
     return p

@@ -4,23 +4,33 @@ import type { QueuedJob } from '@shared/api'
 import { numLocale, t, type PlainKey } from '../i18n'
 import { styleLabel } from './labels'
 
-/** 75 -> "1:15 min", 40 -> "40 s", 3700 -> "1:01 h" */
-export function formatDuration(seconds: number): string {
-  const s = Math.max(0, Math.round(seconds))
-  if (s < 60) return `${s} s`
-  const pad = (n: number): string => String(n).padStart(2, '0')
-  if (s < 3600) return `${Math.floor(s / 60)}:${pad(s % 60)} min`
-  return `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))} h`
-}
+import { formatDuration } from '@shared/duration'
+export { formatDuration }
 
 /** 2.345 -> "2.35 s/step" (in the number format of the language) */
 export const perStep = (seconds: number): string =>
   t('jobs.perStep', { seconds: seconds.toLocaleString(numLocale(), { maximumFractionDigits: 2, useGrouping: false }) })
 
+/**
+ * A picture's run time with its parts, one per line: "2:48 min", "loading and prompt 1:58 min", "8 steps 39 s (4.93 s/step)",
+ * "decoding and saving 11 s". Older entries without the loading time keep "2:48 min · 4.93 s/step".
+ */
+export function durationText(e: { seconds?: number; secondsPerStep?: number; loadSeconds?: number; job: { steps?: number } }): string {
+  if (e.seconds === undefined) return ''
+  const total = formatDuration(e.seconds)
+  if (!e.secondsPerStep) return total
+  if (e.loadSeconds === undefined || !e.job.steps) return `${total} · ${perStep(e.secondsPerStep)}`
+  const steps = e.job.steps * e.secondsPerStep
+  const rest = Math.max(0, e.seconds - e.loadSeconds - steps)
+  return [total, t('library.facts.loadTime', { time: formatDuration(e.loadSeconds) }),
+    t('library.facts.stepsTime', { n: e.job.steps, time: formatDuration(steps), pace: perStep(e.secondsPerStep) }),
+    t('library.facts.finishTime', { time: formatDuration(rest) })].join('\n')
+}
+
 const PAGE_NAMES: Record<string, PlainKey> = {
   text: 'jobs.pages.text', image: 'jobs.pages.image', inpaint: 'jobs.pages.inpaint', canvas: 'jobs.pages.canvas', video: 'jobs.pages.video',
   upscale: 'jobs.pages.upscale', illusion: 'jobs.pages.illusion', lora: 'jobs.pages.lora', start: 'jobs.pages.start',
-  benchmark: 'jobs.pages.benchmark',
+  benchmark: 'jobs.pages.benchmark', enhance: 'jobs.pages.enhance', restore: 'jobs.pages.restore',
 }
 
 export const pageName = (page: string): string => (PAGE_NAMES[page] ? t(PAGE_NAMES[page]) : page)

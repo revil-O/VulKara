@@ -79,7 +79,9 @@
    "illusion": "Illusion",
    "lora": "LoRA-Vergleich",
    "start": "Startseite",
-   "benchmark": "Benchmark"
+   "benchmark": "Benchmark",
+   "enhance": "Verbessern",
+   "restore": "Restaurieren"
   },
   "upscaleTo": "{from} auf {to}",
   "steps": "{n} Schritte",
@@ -132,7 +134,7 @@
    "inpaint": {
     "title": "Inpainting",
     "subtitle": "Einen Teil eines Bildes neu malen",
-    "prompt": "Beschreibe, was im bemalten Teil erscheinen soll"
+    "prompt": "Beschreibe, was im bemalten Teil erscheinen soll; leer entfernt das Bemalte"
    },
    "video": {
     "title": "Bild zu Video",
@@ -152,12 +154,33 @@
    "noModel": "Für diese Seite ist noch kein Modell installiert.",
    "noModelLink": "Hol dir eines auf der Seite „Modelle“."
   },
+  "caption": {
+   "button": "Prompt aus Bild",
+   "hint": "Qwen3-VL 2B (Qwen, Apache-2.0) sieht sich das Bild an und schreibt einen Prompt dafür: Motiv, Umgebung, Licht, Farben, Stil und Kamera in einem englischen Absatz, den du vor dem Erstellen ändern kannst. Es läuft auf diesem Mac in etwa 20 s und wird einmal geladen (4,1 GB); das geladene Bildmodell wird dafür freigegeben. Farben von Schwarzweißfotos sind geraten.",
+   "replace": "Den Prompt durch eine Beschreibung des Bildes ersetzen?",
+   "replaceYes": "Ersetzen",
+   "starting": "Wird gestartet …"
+  },
   "upsample": {
    "label": "Prompt-Upsampler",
    "hint": "FLUX 3 Image Klein ist auf ausführliche Szenenbeschreibungen trainiert. Der Upsampler (von Black Forest Labs, 4 Bit) schreibt vor dem Bild eine solche aus deinem Prompt: Motiv, Umgebung, Licht, Kamera, Farben. Ein Prompt, der schon alles beschreibt, geht unverändert. Er wird einmal geladen (5,7 GB, mit dem Button neben der Option oder auf der Seite Modelle); er belegt den Speicher nur für den Prompt und wird danach wieder freigegeben. Die Beschreibung, die er geschrieben hat, steht beim Bild.",
    "download": "Laden (5,7 GB)",
    "downloading": "Wird geladen …",
-   "missing": "Der Prompt-Upsampler ist noch nicht geladen: Lade ihn mit dem Button neben der Option, oder schalte die Option aus."
+   "missing": "Der Prompt-Upsampler ist noch nicht geladen: Lade ihn mit dem Button neben der Option, oder schalte die Option aus.",
+   "labelErnie": "Prompt-Enhancer",
+   "hintErnie": "Der eigene Prompt-Enhancer von ERNIE-Image (von Baidu, Ministral 3 3B, 16 Bit) schreibt einen kurzen Prompt vor dem Bild zu einer ausführlichen Bildbeschreibung um; die Beschreibung wird zur Notiz des Bildes. Ausgeschaltet geht der Prompt, wie er geschrieben ist.",
+   "downloadErnie": "Laden (7,7 GB)",
+   "missingErnie": "Der Prompt-Enhancer ist noch nicht geladen: Lade ihn mit dem Button neben der Option, oder schalte die Option aus."
+  },
+  "keepPicture": {
+   "label": "Bild beibehalten (FLUX.2 [klein] 4B)",
+   "hint": "Ändert nur, was der Prompt verlangt, und behält den Rest des Bildes: derselbe Ort, dieselben Menschen, derselbe Ausschnitt. Ein starker Stilwechsel (ein Gemälde aus einem Foto) fällt schwächer aus. Die Konsistenz-LoRA von lrzjason mit halber Stärke (Apache-2.0, 0,4 GB, einmal geladen), gemacht für FLUX.2 [klein] 4B: andere Modelle bearbeiten ohne sie. Etwa 0,3 GB mehr Speicher, während das Modell rechnet."
+  },
+  "fast": {
+   "label": "Schnell (8 Schritte)",
+   "hint": "FLUX.1 [dev] und seine Finetunes in 8 statt 20–50 Schritten, mit alimamas Turbo-Alpha-LoRA (Schritte und Guidance wie auf seiner Karte: 8 und 3,5). Auf einem Mac mini mit 16 GB dauerte ein Bild mit 1024 px 4:18 statt 11:04 min mit 28 Schritten; die Bildaufteilung ändert sich, die Qualität bleibt. Der LoRA wird einmal in deine LoRAs geladen (694 MB, die nicht-kommerzielle Lizenz von FLUX.1 [dev]).",
+   "download": "Turbo-LoRA laden (694 MB)",
+   "missing": "Der Turbo-LoRA ist noch nicht geladen: lade ihn mit dem Knopf neben der Option oder schalte die Option aus."
   },
   "aiLabel": {
    "label": "EU-KI-Kennzeichnung",
@@ -190,7 +213,10 @@
    "height": "Höhe",
    "change": "Veränderung",
    "changeInpaintHint": "Wie weit sich der bemalte Teil vom Vorhandenen entfernt.",
+   "flux1MaskHint": "FLUX.1 wurde nicht für das Malen in eine Maske trainiert: Ein schwacher Umriss des bemalten Teils kann bleiben. FLUX.1 Fill [dev] (Modelle → Empfohlen) fügt ihn nahtlos ein.",
    "changeHint": "Wie weit sich das Ergebnis vom Bild entfernt.",
+   "references": "Weitere Bilder",
+   "referencesHint": "Fibo 2.0 bearbeitet bis zu vier Bilder zusammen. Im Prompt ist das Bild oben <image_1>, diese sind <image_2> bis <image_4>: „zieh der Person in <image_1> das Kleid aus <image_2> an“.",
    "modelDefaults": "Modellvorgaben",
    "suggestsHint": "Dieses Modell empfiehlt {steps} Schritte und Guidance {guidance}. „Modellvorgaben“ stellt das ein; ein Modellwechsel behält deine Einstellungen.",
    "suggestsSizeHint": "Dieses Modell empfiehlt {steps} Schritte und Guidance {guidance}, {width}×{height}. „Modellvorgaben“ stellt das ein; ein Modellwechsel behält deine Einstellungen.",
@@ -228,7 +254,8 @@
    "choosePicture": "Wähle ein Bild.",
    "paintMask": "Male über den Teil des Bildes, der sich ändern soll.",
    "describe": "Beschreibe das Bild.",
-   "chooseControl": "Wähle das Steuerbild oder stelle „Steuerung“ auf „Keine“."
+   "chooseControl": "Wähle das Steuerbild oder stelle „Steuerung“ auf „Keine“.",
+   "tooManyForFast": "„Schnell“ fügt den LoRA Turbo-Alpha hinzu: Entferne einen LoRA (höchstens {n} eigene) oder schalte „Schnell“ aus."
   },
   "fit": {
    "steps": "Gemacht für {n} Schritte: Mehr dauern länger, ohne das Bild zu verbessern.",
@@ -535,6 +562,9 @@
   "needsModel": "Braucht ein FLUX.2-Modell:",
   "needsModelLink": "Modelle → Empfohlen",
   "modelSteps": "Schritte des Modells",
+  "consistency": "Konsistenz-LoRA (FLUX.2 [klein] 4B)",
+  "consistencyHint": "Hält die Reparatur näher am Foto; Kratzer verschwinden gründlicher. LoRA von lrzjason (Apache-2.0, 0,4 GB, einmal geladen), gemacht für FLUX.2 [klein] 4B: andere Modelle reparieren ohne sie. Braucht beim Rechnen etwa 1,7 GB mehr Speicher.",
+  "klein9bTint": "FLUX.2 [klein] 9B färbt Schwarzweiß- und Sepiafotos bei der Reparatur ein. FLUX.2 [klein] 4B mit der Konsistenz-LoRA behält ihre Farbe.",
   "guardRails": "Leitplanken",
   "lock": "Original außerhalb der bemalten Schäden beibehalten",
   "checkFaces": "Ergebnisse mit veränderten Gesichtern ablehnen",
@@ -1211,6 +1241,9 @@
    "strength": "Stärke",
    "length": "Länge",
    "duration": "Laufzeit",
+   "loadTime": "Laden und Prompt {time}",
+   "stepsTime": "{n} Schritte {time} ({pace})",
+   "finishTime": "Dekodieren und Speichern {time}",
    "loras": "LoRAs",
    "controlnet": "ControlNet",
    "label": "Kennzeichnung",
@@ -1441,6 +1474,8 @@
    "size": "Größe",
    "ownSize": "Seine eigene Größe",
    "pictures": "Bilder",
+   "freshPrompt": "Neuer Prompt je Bild",
+   "freshPromptHint": "Hängt an den Prompt jedes Bildes eine Zahl an, damit jedes ihn neu kodiert, wie wenn du den Prompt änderst. Ohne das nutzen die Bilder nach dem ersten den schon kodierten Prompt und zeigen nur die Schritte des Modells.",
    "start": "Messen",
    "stop": "Stoppen",
    "how": "Das erste Bild lädt auch das Modell; die nächsten zeigen die Geschwindigkeit mit geladenem Modell. Die Bilder bleiben im Verlauf.",
@@ -1471,6 +1506,45 @@
   }
  },
  "app": {
+  "menu": {
+   "about": "Über VulKara",
+   "settings": "Einstellungen …",
+   "monitor": "Monitor",
+   "services": "Dienste",
+   "hide": "VulKara ausblenden",
+   "hideOthers": "Andere ausblenden",
+   "showAll": "Alle einblenden",
+   "quit": "VulKara beenden",
+   "open": "VulKara öffnen",
+   "noJob": "Kein Auftrag läuft",
+   "running": "{model} · {progress} %",
+   "runningEta": "{model} · {progress} % · noch {eta}",
+   "waiting": "{n} wartend",
+   "remoteOn": "Fernzugriff an: Beenden schaltet ihn ab"
+  },
+  "monitor": {
+   "title": "Monitor",
+   "hint": "Der laufende Auftrag gegen das Erwartete: der Speicher gegen den Plan des Auftrags selbst und auf dem Mac, auf dem gemessen wurde (Mac mini M4, 16 GB, docs/MEASUREMENTS.md), Zeit und Speicher des Modells mit seinen Standardeinstellungen. Grün liegt darunter, Orange mehr als 10 % darüber, Rot mehr als 25 %. Zwischen den Aufträgen wird nichts verglichen.",
+   "idle": "Kein Auftrag läuft.",
+   "job": "Laufender Auftrag",
+   "progress": "Fortschritt",
+   "perStep": "Pro Schritt",
+   "left": "Noch",
+   "memory": "VulKara mit seinen Engines",
+   "plan": "Plan",
+   "measured": "Gemessen ({ref})",
+   "perPicture": "Pro Bild",
+   "peak": "Spitze",
+   "thisMac": "Dieser Mac",
+   "cpu": "CPU",
+   "gpu": "GPU",
+   "used": "Belegter Speicher",
+   "swap": "Swap",
+   "swapAdded": "Swap dazu",
+   "streamCache": "SSD-Streaming-Cache",
+   "waiting": "{n} wartend",
+   "notMeasured": "Auf diesem Mac mit diesen Einstellungen nicht gemessen"
+  },
   "about": {
    "title": "Über VulKara",
    "subtitle": "Version {version} · {mac} · {os} · Electron {electron}",
@@ -1851,6 +1925,7 @@
    "training": "Eine LoRA wird trainiert: Erstelle Bilder, wenn das Training fertig oder gestoppt ist.",
    "installing": "Eine Runtime wird installiert: Erstelle Bilder, wenn sie fertig ist.",
    "exporting": "Ein Modell wird exportiert: Erstelle Bilder, wenn es fertig ist.",
+   "captioning": "Ein Prompt wird aus einem Bild geschrieben: Erstelle Bilder, wenn er fertig ist oder abgebrochen wurde.",
    "incomplete": "Dieser Auftrag ist unvollständig.",
    "needsFilter": "Der Inhaltsfilter braucht die Diffusers-Runtime: Installiere sie unter Einstellungen → Runtimes.",
    "notPassed": "Das Ergebnis hat den Inhaltsfilter nicht bestanden.",
@@ -1961,6 +2036,10 @@
    "needsDiffusers": "Posen werden mit der Diffusers-Runtime erkannt: Installiere sie unter Einstellungen → Runtimes",
    "facesNeedDiffusers": "Gesichter werden mit der Diffusers-Runtime gefunden: Installiere sie unter Einstellungen → Runtimes"
   },
+  "caption": {
+   "needsDiffusers": "Aus dem Bild wird ein Prompt geschrieben mit der Diffusers-Runtime: Installiere sie unter Einstellungen → Runtimes",
+   "busy": "Ein Auftrag läuft: Ein Prompt aus dem Bild geht, wenn die Warteschlange leer ist."
+  },
   "logs": {
    "noLogFile": "In dieser Sitzung gibt es keine Protokolldatei.",
    "noSession": "Diese Protokollsitzung gibt es nicht."
@@ -1986,6 +2065,7 @@
   "preparingControl": "Steuerbild ({type}) wird vorbereitet",
   "encodingPrompt": "Prompt wird codiert",
   "generating": "Wird erstellt",
+  "describingPicture": "Bild wird beschrieben",
   "decoding": "Wird decodiert",
   "workingOnPicture": "Bild wird bearbeitet",
   "correcting": "Farben und Kontrast werden korrigiert",

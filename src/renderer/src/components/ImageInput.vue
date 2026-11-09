@@ -2,7 +2,7 @@
 <script setup lang="ts">
 // The picture a job starts from: chosen from the history or from disk (pickImage), or dropped onto the field.
 import { ref } from 'vue'
-import { ImagePlus, X } from 'lucide-vue-next'
+import { ImagePlus, X } from '@lucide/vue'
 import ZoomPan from './ZoomPan.vue'
 import { pickImage } from '../util/pick_image'
 import { t } from '../i18n'

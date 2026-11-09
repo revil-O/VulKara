@@ -4,7 +4,7 @@
 import { jobLabel } from '../util/labels'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronUp, Cpu, Gpu, HardDrive, MemoryStick, Square, Trash2, X } from 'lucide-vue-next'
+import { ChevronUp, Cpu, Gpu, HardDrive, MemoryStick, Square, Trash2, X } from '@lucide/vue'
 import { useAssetsStore } from '../stores/assets'
 import { useQueueStore } from '../stores/queue'
 import LevelMeter from './LevelMeter.vue'

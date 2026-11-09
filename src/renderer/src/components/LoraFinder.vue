@@ -2,7 +2,7 @@
 <script setup lang="ts">
 // LoRAs that fit a model, or models made from a base, from Civitai or Hugging Face, installed through the import queue.
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { Check, Download, ExternalLink, Search, Square, X } from 'lucide-vue-next'
+import { Check, Download, ExternalLink, Search, Square, X } from '@lucide/vue'
 import HintBadge from './HintBadge.vue'
 import { useAssetsStore } from '../stores/assets'
 import { useImportsStore } from '../stores/imports'
