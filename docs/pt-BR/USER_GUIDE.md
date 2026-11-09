@@ -1215,6 +1215,8 @@ Todos os ajustes são mantidos entre reinicializações.
   10 % acima, vermelho mais de 25 %; entre trabalhos nada é comparado. Abaixo: CPU e GPU deste Mac com os últimos
   minutos, memória, swap e o cache de streaming do SSD.
 
+  ![Monitor](../screenshots/pt-BR/monitor.jpg)
+
 - **Registros**: o que os motores e instaladores informam, cada linha com data e hora. Downloads concluídos mostram
   tamanho e velocidade. **Copiar tudo** copia as linhas desta sessão como estão. Cada início do VulKara grava um arquivo
   de registro próprio (`~/Library/Application Support/VulKara/logs/session-2026-10-11_14-02-37.log`, com a data e a

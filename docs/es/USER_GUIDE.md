@@ -1237,6 +1237,8 @@ Todos los ajustes se conservan entre reinicios.
   naranja más de un 10 % por encima, rojo más de un 25 %; entre trabajos no se compara nada. Debajo: CPU y GPU de este
   Mac con los últimos minutos, memoria, swap y la caché de streaming SSD.
 
+  ![Monitor](../screenshots/es/monitor.jpg)
+
 - **Registros**: lo que informan los motores y los instaladores, cada línea con fecha y hora. Las descargas terminadas
   muestran su tamaño y su velocidad. **Copiar todo** copia las líneas de esta sesión tal como están. Cada inicio de
   VulKara escribe un archivo de registro propio

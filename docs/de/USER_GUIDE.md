@@ -1259,6 +1259,8 @@ Alle Einstellungen bleiben über Neustarts hinweg erhalten.
   als 10 % darüber, Rot mehr als 25 %; zwischen den Aufträgen wird nichts verglichen. Darunter CPU und GPU dieses Macs
   mit den letzten Minuten, Speicher, Swap und SSD-Streaming-Cache.
 
+  ![Monitor](../screenshots/de/monitor.jpg)
+
 - **Protokolle**: was die Engines und Installationsprogramme melden, jede Zeile mit Datum und Uhrzeit. Fertige
   Downloads zeigen ihre Größe und Geschwindigkeit. **Alles kopieren** kopiert die Zeilen dieser Sitzung, wie sie sind.
   Jeder Start von VulKara schreibt eine eigene Protokolldatei

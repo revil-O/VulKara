@@ -208,7 +208,7 @@ Twenty styles in four groups (Photo, Illustration, Stylized, 3D & Craft), each w
 <td width="50%"><img src="docs/screenshots/inpaint.jpg" alt="Inpainting"></td>
 </tr>
 <tr>
-<td><b>Image to image</b>: the same motif, a new scene. <b>Change</b> sets how far the result may move away from the picture; FLUX.2 and Qwen-Image 2.1 take the picture as a reference instead.</td>
+<td><b>Image to image</b>: the same motif, a new scene. <b>Change</b> sets how far the result may move away from the picture; FLUX.2 and Qwen-Image 2.1 take the picture as a reference instead. <b>Prompt from picture</b> describes the chosen picture in one paragraph to start from (Qwen3-VL 2B, on the Mac, about 15 s on a Mac mini M4 with 16 GB).</td>
 <td><b>Inpainting</b>: paint over the part that is to change, with brush, eraser and undo; the rest stays untouched.</td>
 </tr>
 </table>
@@ -359,6 +359,19 @@ download or share finished pictures in the history. Only the Mac computes, and n
 - The pages fit a phone screen, and each device keeps its own language.
 
 <img src="docs/screenshots/settings_remote.jpg" alt="Settings → Remote access: the switch, HTTPS, the links with the access token and the QR code" width="720">
+
+### Menu bar and Monitor
+
+<table>
+<tr>
+<td width="35%"><img src="docs/screenshots/monitor.jpg" alt="Monitor"></td>
+<td>Closing the window does not stop the jobs: VulKara keeps running with its icon in the menu bar, which shows the
+running job, its progress and how many wait (and says when remote access is on); <b>Quit</b> ends it. <b>Monitor</b>
+(app menu or menu bar) shows the running job against its own memory plan, with its peak and the swap it added, and on
+the Mac mini the measurements were made on, against the measured time and memory of its model; below it this Mac's CPU,
+GPU and memory with the last minutes.</td>
+</tr>
+</table>
 
 ### Light or dark
 

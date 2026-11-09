@@ -1178,6 +1178,8 @@ All settings are kept across restarts.
   more than 25 %; between jobs nothing is compared. Below: this Mac's CPU and GPU with the last minutes, memory, swap
   and the SSD streaming cache.
 
+  ![Monitor](screenshots/monitor.jpg)
+
 - **Logs**: what the engines and installers report, each line with date and time. Finished downloads show their size
   and speed. **Copy all** copies the lines of this session as they are. Every start of VulKara writes a log file
   of its own (`~/Library/Application Support/VulKara/logs/session-2026-10-11_14-02-37.log`, the date and time of the
