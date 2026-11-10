@@ -4,7 +4,8 @@
 is_chroma): a LoRA filed under the wrong family (a kohya FLUX.1 LoRA taken for SDXL, a Qwen-Image 2.1 LoRA for
 Qwen-Image …), a missing sub-base (FLUX.2 [klein] 4B / 9B), a Chroma checkpoint filed as FLUX.1 [schnell] or marked
 as not runnable before Chroma was supported (it becomes a Chroma model; its base takes FLUX.1's T5 and VAE over), the
-label of a LoRA whose family became runnable (Z-Image) that still says no model can use it.
+label of a LoRA whose family became runnable (Z-Image) that still says no model can use it, a maker's advice kept as
+the negative prompt (Juggernaut XL).
 
     python main.py recheck_loras            prints what would change (one JSON line each)
     python main.py recheck_loras --apply    changes it; each changed manifest is kept as <manifest>.bak
@@ -18,6 +19,7 @@ import os
 import shutil
 import sys
 
+import maker_settings
 import paths
 import registry
 
@@ -105,9 +107,23 @@ def chroma_manifest(folder, m, ram_gb=None):
             "img2img": True, "inpaint": True, "inpaint_only": False, "runtime": "diffusers", "kind": "image"}
 
 
+def _advice_negative(m):
+    """A negative prompt read before maker_settings knew advice from a prompt (Juggernaut XL's "Start with no
+    negative, …"): out of the maker's settings, and out of the defaults while it is still the maker's."""
+    maker = m.get("maker") or {}
+    neg = maker.get("negative_prompt")
+    if not isinstance(neg, str) or not maker_settings.is_advice(neg):
+        return {}
+    out = {"maker": (maker, {k: v for k, v in maker.items() if k != "negative_prompt"})}
+    defaults = m.get("defaults") or {}
+    if defaults.get("negative_prompt") == neg:
+        out["defaults"] = (defaults, {k: v for k, v in defaults.items() if k != "negative_prompt"})
+    return out
+
+
 def model_changes(folder, m, ram_gb=None):
     """{field: (old, new)} for a model."""
-    out = {}
+    out = _advice_negative(m)
     arch = m.get("arch")
     single = m.get("layout") == "single_denoiser" and m.get("file")
     # a Chroma checkpoint imported as FLUX.1, or marked as not runnable when Chroma was not supported yet
@@ -220,6 +236,11 @@ def recheck(models_dir, loras_dir, apply=False, ram_gb=None):
     return report
 
 
+def _volume_missing(path):
+    parts = os.path.abspath(path).split(os.sep)
+    return len(parts) > 2 and parts[1] == "Volumes" and not os.path.isdir(os.sep.join(parts[:3]))
+
+
 def main(argv):
     p = argparse.ArgumentParser(prog="recheck_loras")
     p.add_argument("--apply", action="store_true", help="write the changes (each manifest kept as .bak)")
@@ -228,6 +249,11 @@ def main(argv):
     a = p.parse_args(argv)
     models = a.models or str(paths.models_dir())
     loras = a.loras or str(paths.loras_dir())
+    # a folder on a drive that is not connected: try again at the next start (the app writes its flag only after exit 0)
+    unplugged = [d for d in (models, loras) if not os.path.isdir(d) and _volume_missing(d)]
+    if unplugged:
+        print("not connected: %s" % ", ".join(unplugged), file=sys.stderr)
+        return 3
     report = recheck(models, loras, apply=a.apply)
     for item in report:
         print(json.dumps(item, ensure_ascii=False))

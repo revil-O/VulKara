@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.1 – 2026-11-10
+
+- **Fixed:** a model card that only gives advice after "Negative:" no longer becomes the negative prompt (Juggernaut
+  XL: "Start with no negative, and add afterwards the Stuff you don´t wanna see"); Model defaults left it in the field.
+  Installed models lose it once at the first start after the update, while it is still the maker's (the manifest
+  before is kept as `model.json.bak`; models on a drive that is not connected are cleaned at a later start). A
+  negative prompt already in the field stays until Model defaults is clicked again. On Text to image and the other pages the Generate
+  button stays on the right when the row under the prompt wraps (longer languages).
+- **The Edit, View and Window menus in the app's language.** Electron's own labels for them are English only; the
+  entries keep their roles, so copy, paste and the shortcuts work as before. The View menu of the released app no
+  longer offers Reload (it dropped what was typed or painted) and the developer tools; zoom and full screen stay.
+
 ## 0.8.0 – 2026-11-09
 
 - **App menu, menu bar icon and Monitor.** VulKara has its own app menu in five languages (Settings… with ⌘, ,

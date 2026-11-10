@@ -732,6 +732,11 @@ input[type='range'] {
   flex: 1;
 }
 
+/* wrapped onto a line of its own (longer languages), the button still stands on the right */
+.send > .btn.primary {
+  margin-left: auto;
+}
+
 .ai-label {
   display: flex;
   flex-wrap: wrap;

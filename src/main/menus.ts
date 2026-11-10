@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
 // The app menu beside the Apple menu (About, Settings…, Monitor) and the icon in the menu bar with its own menu. Edit,
-// View and Window come from Electron's roles: without the Edit menu ⌘C and ⌘V stop working in every field.
-// Shared with okAI-helper (LmAI-Studio src/main/menus.ts): the app's own parts come in through MenuHooks; keep both
-// copies of this file the same.
+// View and Window are Electron's role menus written out: without the Edit menu ⌘C and ⌘V stop working in every field.
+// Electron's labels for them are English only; on macOS a role item takes only label and accelerator from us
+// (electronjs.org/docs/latest/tutorial/menus), so the roles keep working under translated labels.
+// okAI-helper has the same menus (LmAI-Studio src/main/menus.ts, texts through its translate() there): change both alike.
 import { app, Menu, nativeImage, Tray, type MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 
@@ -18,6 +19,13 @@ export interface MenuTexts {
   showAll: string
   quit: string
   open: string
+  /** Edit, View and Window and their entries by role (undo, copy, zoomIn …); missing ones keep Electron's English */
+  edit?: string
+  view?: string
+  window?: string
+  substitutions?: string
+  speech?: string
+  roles?: Partial<Record<string, string>>
 }
 
 export interface MenuHooks {
@@ -28,10 +36,15 @@ export interface MenuHooks {
   openMonitor: () => void
   /** the app's own lines of the menu bar menu (what runs now), built anew at each click */
   status: () => MenuItemConstructorOptions[]
+  /** Reload and the developer tools in the View menu (development only: a reload drops what is typed or painted) */
+  devTools?: boolean
 }
 
 export function appMenuTemplate(h: MenuHooks): MenuItemConstructorOptions[] {
   const t = h.texts()
+  type Role = NonNullable<MenuItemConstructorOptions['role']>
+  const r = (role: Role): MenuItemConstructorOptions => (t.roles?.[role] ? { role, label: t.roles[role] } : { role })
+  const sep: MenuItemConstructorOptions = { type: 'separator' }
   return [
     {
       label: h.name,
@@ -50,9 +63,22 @@ export function appMenuTemplate(h: MenuHooks): MenuItemConstructorOptions[] {
         { label: t.quit, role: 'quit' },
       ],
     },
-    { role: 'editMenu' },
-    { role: 'viewMenu' },
-    { role: 'windowMenu' },
+    // the same entries as Electron's editMenu, viewMenu and windowMenu (lib/browser/api/menu-item-roles.ts, macOS)
+    {
+      role: 'editMenu', label: t.edit ?? 'Edit', submenu: [
+        r('undo'), r('redo'), sep, r('cut'), r('copy'), r('paste'), r('pasteAndMatchStyle'), r('delete'), r('selectAll'), sep,
+        { label: t.substitutions ?? 'Substitutions', submenu: [r('showSubstitutions'), sep, r('toggleSmartQuotes'), r('toggleSmartDashes'), r('toggleTextReplacement')] },
+        { label: t.speech ?? 'Speech', submenu: [r('startSpeaking'), r('stopSpeaking')] },
+      ],
+    },
+    {
+      role: 'viewMenu', label: t.view ?? 'View', submenu: [
+        ...(h.devTools ? [r('reload'), r('forceReload'), r('toggleDevTools'), sep] : []),
+        r('resetZoom'), r('zoomIn'), r('zoomOut'), sep, r('togglefullscreen'),
+      ],
+    },
+    // the role keeps it the Window menu macOS lists the open windows in
+    { role: 'windowMenu', label: t.window ?? 'Window', submenu: [r('minimize'), r('zoom'), sep, r('front')] },
   ]
 }
 

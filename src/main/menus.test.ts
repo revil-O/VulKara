@@ -25,6 +25,28 @@ describe('menus', () => {
     expect(menu.slice(1).map((m) => m.role)).toEqual(['editMenu', 'viewMenu', 'windowMenu'])
   })
 
+  type Item = { label?: string; role?: string; submenu?: Item[] }
+  const all = (items: Item[]): Item[] => items.flatMap((i) => [i, ...all(i.submenu ?? [])])
+
+  it('labels Edit, View and Window in the app language and keeps their roles (copy and paste stay macOS\'s)', () => {
+    const h = { ...hooks(), texts: () => ({ ...texts, edit: 'Bearbeiten', window: 'Fenster', roles: { copy: 'Kopieren', paste: 'Einsetzen' } }) }
+    const [, edit, , win] = appMenuTemplate(h) as Item[]
+    expect(edit.label).toBe('Bearbeiten')
+    expect(win).toMatchObject({ role: 'windowMenu', label: 'Fenster' })
+    expect(edit.submenu!.find((i) => i.role === 'copy')!.label).toBe('Kopieren')
+    expect(edit.submenu!.find((i) => i.role === 'paste')!.label).toBe('Einsetzen')
+    // a role without a text keeps Electron's own label
+    expect(edit.submenu!.find((i) => i.role === 'undo')!.label).toBeUndefined()
+  })
+
+  it('shows reload and the developer tools only in development', () => {
+    const roles = (devTools: boolean): string[] => all(appMenuTemplate({ ...hooks(), devTools }) as Item[]).map((i) => i.role ?? '')
+    expect(roles(false)).not.toContain('reload')
+    expect(roles(false)).not.toContain('toggleDevTools')
+    expect(roles(false)).toContain('zoomIn')
+    expect(roles(true)).toEqual(expect.arrayContaining(['reload', 'forceReload', 'toggleDevTools']))
+  })
+
   it('opens the settings with ⌘, and the monitor from the app menu, in the app language', () => {
     const h = hooks()
     const items = appMenuTemplate(h)[0].submenu as { label?: string; accelerator?: string; click?: () => void; role?: string }[]

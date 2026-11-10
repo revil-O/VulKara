@@ -13,14 +13,15 @@ import { processEnv } from './env'
  * now that Chroma runs, for the Chroma checkpoints the first check marked as not runnable; -3: once more, now that
  * Z-Image runs, for the labels of Z-Image LoRAs that said no model can use them.
  */
-export const RECHECK_FLAG = 'loras-rechecked-5'  // 4: sub-bases out of model.json "variant"; 5: FLUX.2 [klein] inpaints
+export const RECHECK_FLAG = 'loras-rechecked-6'  // 4: sub-bases out of model.json "variant"; 5: FLUX.2 [klein] inpaints; 6: advice as negative prompt
 
 /**
  * Once: the installed LoRAs and models are checked again with the current detection (engines/diffusers/recheck.py,
  * run with the Diffusers runtime): a LoRA filed under the wrong family or without its sub-base (FLUX.2 [klein]
  * 4B / 9B), a Chroma checkpoint filed as FLUX.1 (it becomes a Chroma model, its base takes FLUX.1's T5 and VAE over).
  * Each changed manifest is kept as .bak. Without the runtime it
- * waits for a later start; the flag is written only after a run that ended well. Resolves true when it ran.
+ * waits for a later start, as it does for a models or LoRA folder on a drive that is not connected (exit 3); the flag
+ * is written only after a run that ended well. Resolves true when it ran.
  */
 export function recheckLibrary(command: { command: string; args: string[]; env?: Record<string, string> } | undefined,
   env: Record<string, string>, dataDir: string, changed: () => void): Promise<boolean> {

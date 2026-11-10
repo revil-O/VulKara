@@ -418,7 +418,8 @@ what would change.
   `HF_HUB_DISABLE_IMPLICIT_TOKEN`, `DO_NOT_TRACK`, …). Never spread `process.env` into a spawn.
 - Compiled Python goes to `<data>/pycache` (`PYTHONPYCACHEPREFIX`), never into the signed app.
 - Development overrides (`ELECTRON_RENDERER_URL`, `VK_ENGINES_DIR`, `VK_DEV_PYTHON`) count only when
-  `!app.isPackaged`. The packaged app has no developer tools, the fuses of `electron-builder.config.cjs` (no
+  `!app.isPackaged`. The packaged app has no developer tools (nor Reload and Toggle Developer Tools in the View menu,
+  `devTools` of `src/main/menus.ts`), the fuses of `electron-builder.config.cjs` (no
   RunAsNode, no `NODE_OPTIONS`, no inspector, asar integrity) and a CSP without `ws://` (the vite plugin `vk-csp`).
 - Helper models from third-party repositories are pinned: commit and SHA-256 in `content_check.PINNED`,
   `restore.LAMA_PIN` / `COLOR_PIN`, `photo_tools.json` and `helper_pins.json` (ControlNets, DWPose, Depth Anything,

@@ -116,11 +116,23 @@ def _sampler(t):
     return sampler, (None if sampler in NO_SCHEDULE else schedule), allowed
 
 
+# advice, not a prompt: "Start with no negative, and add afterwards the Stuff you don't wanna see" (Juggernaut XL).
+# Whole phrases only: a real negative prompt may hold "you", "dont" or "start with" and must stay
+ADVICE = re.compile(r"(?i)^\s*(?:none|n/?a|-)\s*\.?\s*$|\bno negative|\bstart with(?:out| no)\b|\bnot needed\b"
+                    r"|\bleave (?:it )?empty\b|\bdon[\u2019\u00b4'`]t (?:wan(?:na|t)|need|use)\b")
+
+
+def is_advice(text):
+    return bool(ADVICE.search(text or ""))
+
+
 def _negative(t):
     m = re.search(r"(?i)negative(?: prompt)?\s*[:=]\s*\n?\s*([^\n]{3,600})", t)
     if not m:
         return None
     neg = m.group(1).strip().strip('"\u201c\u201d\'')
+    if is_advice(neg):
+        return None
     # A1111 weights "(word:1.3)" and brackets mean nothing to the engines: the words stay
     neg = re.sub(r"\(([^():]+):\s*\d+(?:\.\d+)?\)", r"\1", neg)
     neg = re.sub(r"[()\[\]]", "", neg)

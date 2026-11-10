@@ -16,6 +16,7 @@ import { setMenus } from './menus'
 import { openMonitor } from './monitor_window'
 import { formatDuration } from '@shared/duration'
 import { LOCALES, resolveLang } from '@shared/i18n'
+import { en } from '@shared/i18n/en'
 import { recheckLibrary } from './migrate'
 import { engineCommand } from './runtimes'
 import { handleSchemes, registerSchemes } from './protocols'
@@ -84,9 +85,13 @@ function applyMenus(): void {
       about: t('app.menu.about'), settings: t('app.menu.settings'), monitor: t('app.menu.monitor'),
       services: t('app.menu.services'), hide: t('app.menu.hide'), hideOthers: t('app.menu.hideOthers'),
       showAll: t('app.menu.showAll'), quit: t('app.menu.quit'), open: t('app.menu.open'),
+      edit: t('app.menu.edit'), view: t('app.menu.view'), window: t('app.menu.window'),
+      substitutions: t('app.menu.substitutions'), speech: t('app.menu.speech'),
+      roles: Object.fromEntries(Object.keys(en.app.menu.roles).map((r) => [r, t(`app.menu.roles.${r as keyof typeof en.app.menu.roles}`)])),
     }),
     showMain,
     openMonitor,
+    devTools: !app.isPackaged,
     status: () => {
       const q = queueStatus()
       const run = q.running

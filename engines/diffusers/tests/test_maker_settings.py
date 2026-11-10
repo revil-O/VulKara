@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Copyright (C) 2026 Oliver Schmidt
 """The settings a model's maker recommends, read from the model card."""
+import json
+
 import maker_settings as ms
+import recheck
 
 REALVIS = """<b>Recommended Negative Prompt:</b><br>
 (octane render, render, drawing, anime, bad photo, bad photography:1.3), (worst quality, low quality, blurry:1.2), (bad teeth, deformed teeth, deformed lips), morbid<br>
@@ -70,6 +73,42 @@ def test_the_first_sampler_named_and_a_scheduler_line():
 def test_code_example_and_quoted_negative():
     card = 'Negative prompt: "worst quality, low quality"\n```py\nimage = pipe(prompt, num_inference_steps=50, guidance_scale=3.5).images[0]\n```'
     assert ms.parse(card) == {"negative_prompt": "worst quality, low quality", "num_steps": 50, "guidance_scale": 3.5}
+
+
+def test_advice_after_negative_is_no_prompt():
+    # Juggernaut XL's card (Civitai 133005), word for word: the maker says to start without one
+    card = "Sampler: DPM++ 2M SDE\nSteps: 30-40\nNegative: Start with no negative, and add afterwards the Stuff you don´t wanna see in that image."
+    assert "negative_prompt" not in ms.parse(card)
+    assert "negative_prompt" not in ms.parse("Negative prompt: none")
+    assert ms.parse("Negative: blurry, lowres, watermark")["negative_prompt"] == "blurry, lowres, watermark"
+    # words of a real negative prompt are no advice
+    for neg in ("bad hands, dont-care", "ugly, your face", "blurry, start with a frame", "none of the above, lowres"):
+        assert not ms.is_advice(neg), neg
+    assert ms.is_advice("None.") and ms.is_advice("Not needed") and ms.is_advice("I don't use one")
+
+
+def test_recheck_waits_for_a_drive_that_is_not_connected(tmp_path):
+    assert recheck.main(["--models", "/Volumes/vk-not-connected-drive/models", "--loras", str(tmp_path)]) == 3
+    # a folder that is simply not there (no models yet) is nothing to wait for
+    assert recheck.main(["--models", str(tmp_path / "none"), "--loras", str(tmp_path)]) == 0
+
+
+def test_recheck_takes_advice_read_before_out_of_an_installed_model(tmp_path):
+    advice = "Start with no negative, and add afterwards the Stuff you don\u00b4t wanna see in that image."
+    folder = tmp_path / "models" / "juggernaut"
+    folder.mkdir(parents=True)
+    (folder / "model.json").write_text(json.dumps({
+        "name": "Juggernaut-XL-v7", "maker": {"num_steps": 35, "negative_prompt": advice, "source": "civitai description"},
+        "defaults": {"num_steps": 35, "guidance_scale": 4.5, "negative_prompt": advice}}))
+    report = recheck.recheck(str(tmp_path / "models"), None, apply=True)
+    assert [r["name"] for r in report] == ["Juggernaut-XL-v7"]
+    m = json.loads((folder / "model.json").read_text())
+    assert m["maker"] == {"num_steps": 35, "source": "civitai description"}
+    assert m["defaults"] == {"num_steps": 35, "guidance_scale": 4.5}
+    assert (folder / "model.json.bak").exists()
+    assert recheck.recheck(str(tmp_path / "models"), None) == []  # once only
+    # a real negative prompt stays
+    assert recheck.model_changes(str(folder), {"maker": {"negative_prompt": "blurry, lowres"}}) == {}
 
 
 def test_the_samplers_the_maker_names_become_the_allow_list():
