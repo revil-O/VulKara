@@ -1255,7 +1255,7 @@ para uma issue no GitHub. Nada sai do Mac, a menos que você mesmo publique.
 <table>
 <tr>
 <td width="50%"><img src="../screenshots/pt-BR/report_sessions.jpg" alt="Escolhendo a sessão"></td>
-<td width="50%"><img src="../screenshots/pt-BR/report_log.jpg" alt="O registro com os dados pessoais ocultos"></td>
+<td width="50%"><img src="../screenshots/pt-BR/report_log.jpg" alt="O registro, verificado quanto a dados pessoais"></td>
 </tr>
 </table>
 

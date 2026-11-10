@@ -1280,7 +1280,7 @@ prepara un registro para un issue de GitHub. Nada sale del Mac a menos que lo pu
 <table>
 <tr>
 <td width="50%"><img src="../screenshots/es/report_sessions.jpg" alt="Elegir la sesión"></td>
-<td width="50%"><img src="../screenshots/es/report_log.jpg" alt="El registro con los datos personales ocultos"></td>
+<td width="50%"><img src="../screenshots/es/report_log.jpg" alt="El registro, revisado en busca de datos personales"></td>
 </tr>
 </table>
 

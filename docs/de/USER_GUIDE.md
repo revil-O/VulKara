@@ -1302,7 +1302,7 @@ bereitet ein Protokoll für ein GitHub-Issue vor. Nichts verlässt den Mac, auß
 <table>
 <tr>
 <td width="50%"><img src="../screenshots/de/report_sessions.jpg" alt="Die Sitzung auswählen"></td>
-<td width="50%"><img src="../screenshots/de/report_log.jpg" alt="Das Protokoll mit ausgeblendeten persönlichen Daten"></td>
+<td width="50%"><img src="../screenshots/de/report_log.jpg" alt="Das Protokoll, auf persönliche Daten geprüft"></td>
 </tr>
 </table>
 

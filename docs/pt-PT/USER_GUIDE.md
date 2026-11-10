@@ -1270,7 +1270,7 @@ registo para uma issue no GitHub. Nada sai do Mac, a menos que o publique.
 <table>
 <tr>
 <td width="50%"><img src="../screenshots/pt-PT/report_sessions.jpg" alt="A escolher a sessão"></td>
-<td width="50%"><img src="../screenshots/pt-PT/report_log.jpg" alt="O registo com os dados pessoais ocultos"></td>
+<td width="50%"><img src="../screenshots/pt-PT/report_log.jpg" alt="O registo, verificado quanto a dados pessoais"></td>
 </tr>
 </table>
 

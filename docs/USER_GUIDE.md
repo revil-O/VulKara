@@ -1218,7 +1218,7 @@ for a GitHub issue. Nothing leaves the Mac unless you post it yourself.
 <table>
 <tr>
 <td width="50%"><img src="screenshots/report_sessions.jpg" alt="Choosing the session"></td>
-<td width="50%"><img src="screenshots/report_log.jpg" alt="The log with personal data hidden"></td>
+<td width="50%"><img src="screenshots/report_log.jpg" alt="The log, checked for personal data"></td>
 </tr>
 </table>
 
