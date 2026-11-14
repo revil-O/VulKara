@@ -422,11 +422,12 @@ def apply(job, images_dir, report=None, stop=None, note=None):
     m = load_manifest(folder)
     if not job.get("input_image"):
         raise ValueError("Choose a picture")
-    src = Image.open(job["input_image"])
-    if src.width * src.height > MAX_PIXELS:
-        raise ValueError("The picture is too large (at most %d megapixels)" % (MAX_PIXELS // 1_000_000))
+    with Image.open(job["input_image"]) as head:  # the size from the header, before the pixels are read
+        if head.width * head.height > MAX_PIXELS:
+            raise ValueError("The picture is too large (at most %d megapixels)" % (MAX_PIXELS // 1_000_000))
     import colour
-    rgb = np.asarray(colour.to_srgb(src))  # in sRGB, whatever profile it carries (Display P3, HDR)
+    # upright as the app shows it (a selection's mask is too), in sRGB whatever profile it carries (Display P3, HDR)
+    rgb = np.asarray(colour.open_rgb(job["input_image"]))
     given = (rgb.shape[1], rgb.shape[0])  # the picture's own size, before it may be made smaller
     stem = "".join(filter(str.isalnum, os.path.splitext(os.path.basename(job["input_image"]))[0][:30])) or "photo"
     max_side = m.get("max_side")
@@ -444,6 +445,10 @@ def apply(job, images_dir, report=None, stop=None, note=None):
     if m["kind"] == "image":
         model = _variant_model(m, folder, opts.get("variant"), report)
         quality = opts.get("quality") if m.get("task") == "dejpeg" else None
+        # a variant with another architecture brings its own measured tile table (DAT2 needs more Metal than SwinIR)
+        own = (variants(m).get(opts.get("variant")) or {}) if model else {}
+        if own.get("tile_metal_gb"):
+            m = dict(m, tile_metal_gb=own["tile_metal_gb"])
         out = run_image(m, folder, rgb, report, stop, model=model, quality=quality)
         if out is None:
             return None
@@ -521,10 +526,11 @@ class Segmenter:
         self.embeddings = None
 
     def _encode(self, path):
-        from PIL import Image
+        from PIL import Image, ImageOps
         if self.image == path:
             return
-        src = Image.open(path).convert("RGB")
+        # upright as the app shows it: the clicks and the mask are in the upright picture's pixels
+        src = ImageOps.exif_transpose(Image.open(path)).convert("RGB")
         self.size = src.size
         side = int(self.m.get("size") or 1024)
         x = _to_input(np.asarray(src.resize((side, side), Image.BILINEAR)), "imagenet")
@@ -532,9 +538,11 @@ class Segmenter:
         self.embeddings = dict(zip(names, self.encoder.run(None, {self.encoder.get_inputs()[0].name: x})))
         self.image = path
 
-    def select(self, path, points, out_path):
-        """points: [[x, y, 1 | 0]] in picture pixels (1 = this belongs to it, 0 = not). Saves the mask as PNG;
-        returns {"mask": out_path, "score": iou}."""
+    def select(self, path, points, out_path, pick=None):
+        """points: [[x, y, 1 | 0]] in picture pixels (1 = this belongs to it, 0 = not). SAM gives a few candidates
+        (whole thing, part, detail); pick chooses one of them sorted by size, largest first, None the one SAM rates
+        best. Saves the mask as PNG; returns {"mask": out_path, "score": iou, "pick": its place by size,
+        "candidates": how many}."""
         from PIL import Image
         if not points:
             raise ValueError("Click on what to select")
@@ -559,15 +567,49 @@ class Segmenter:
         outs = dict(zip([o.name for o in self.decoder.get_outputs()], self.decoder.run(None, feeds)))
         scores = np.asarray(outs["iou_scores"], np.float32)[0, 0]
         masks = np.asarray(outs["pred_masks"], np.float32)[0, 0]
-        best = int(np.argmax(scores))
-        low = Image.fromarray(((masks[best] > 0) * 255).astype(np.uint8))
-        low.resize((w, h), Image.BILINEAR).point(lambda v: 255 if v >= 128 else 0).save(out_path)
-        return {"mask": out_path, "score": float(scores[best])}
+        # largest first; equal sizes keep the model's order. A candidate the same as a larger one is left out, so the
+        # next pick always changes the selection
+        shapes = [masks[i] > 0 for i in range(len(scores))]
+        order = []
+        for i in sorted(range(len(scores)), key=lambda i: -int(shapes[i].sum())):
+            if not any(np.array_equal(shapes[i], shapes[j]) for j in order):
+                order.append(i)
+        top = int(np.argmax(scores))
+        place = next(k for k, j in enumerate(order) if np.array_equal(shapes[j], shapes[top])) if pick is None else int(pick) % len(order)
+        best = order[place]
+        low = [(p[0] * masks.shape[2] / w, p[1] * masks.shape[1] / h, p[2]) for p in points]
+        logits = whole(masks[best], [p[:2] for p in low if p[2]], [p[:2] for p in low if not p[2]])
+        # the model's own values made big, then cut: a cut low mask made big came out dotted on glass (hand test)
+        big = Image.fromarray(logits.astype(np.float32), "F").resize((w, h), Image.BILINEAR)
+        Image.fromarray(((np.asarray(big) > 0) * 255).astype(np.uint8)).save(out_path)
+        return {"mask": out_path, "score": float(scores[best]), "pick": place, "candidates": len(order)}
+
+
+def whole(logits, clicks, out=()):
+    """SAM's low mask (logits, > 0 = selected) as one piece: only the parts at a click (x, y in its pixels; all
+    parts when no click lies on one) with their holes filled, except a hole with a "not this" click (out) in it, such
+    as the gap in a mug's handle. On a glass bottle SAM was unsure and its mask a pattern of dots that left most of
+    the bottle."""
+    import cv2
+    # one-pixel gaps closed first: the dots also lay along the outline, where filling holes does not reach
+    on = cv2.morphologyEx((logits > 0).astype(np.uint8), cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8))
+    _, parts = cv2.connectedComponents(on, connectivity=8)
+    def at(labels, x, y):  # a click just beside the picture counts at its edge
+        return int(labels[min(on.shape[0] - 1, max(0, int(y))), min(on.shape[1] - 1, max(0, int(x)))])
+    hit = {at(parts, x, y) for x, y in clicks} - {0}
+    keep = np.isin(parts, list(hit)) if hit else on > 0
+    # holes: the parts of the rest that do not touch the border
+    _, rest = cv2.connectedComponents((~keep).astype(np.uint8), connectivity=4)
+    border = np.unique(np.concatenate([rest[0], rest[-1], rest[:, 0], rest[:, -1], [at(rest, x, y) for x, y in out]]))
+    keep |= ~np.isin(rest, border)
+    # inside: at least a little above the cut; outside: below it
+    return np.where(keep, np.maximum(logits, 0.5), np.minimum(logits, -0.5))
 
 
 def segment_serve(stream=None):
-    """The selection process of the app (photo_tools segment): JSON lines {"id", "tool", "image", "points"} in,
-    {"id", "mask", "score"} or {"id", "error"} out. The tool stays loaded, the picture's encoding is kept."""
+    """The selection process of the app (photo_tools segment): JSON lines {"id", "tool", "image", "points", "pick"}
+    in, {"id", "mask", "score", "pick", "candidates"} or {"id", "error"} out. The tool stays loaded, the picture's encoding is
+    kept."""
     import sys
     import tempfile
     import uuid
@@ -593,7 +635,8 @@ def segment_serve(stream=None):
             if seg is None or seg.folder != folder:
                 seg = Segmenter(folder)
             out = os.path.join(work, "mask_%s.png" % uuid.uuid4().hex[:16])
-            ans = dict(seg.select(req["image"], req.get("points") or [], out), id=rid)
+            pick = req.get("pick")
+            ans = dict(seg.select(req["image"], req.get("points") or [], out, pick if isinstance(pick, int) else None), id=rid)
         except Exception as e:
             ans = {"id": rid, "error": str(e)[:300]}
         sys.stdout.write(json.dumps(ans) + "\n")

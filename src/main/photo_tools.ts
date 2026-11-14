@@ -9,7 +9,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import type { PhotoTool, RecommendedTool } from '@shared/api'
+import type { PhotoTool, RecommendedTool, Selected } from '@shared/api'
 import type { Command } from './runtimes'
 import { processEnv } from './env'
 import { lineSplitter } from './tool_process'
@@ -77,6 +77,8 @@ export function installedTools(toolsDir: string): PhotoTool[] {
 interface Answer {
   mask?: string
   score?: number
+  pick?: number
+  candidates?: number
   error?: string
 }
 
@@ -123,14 +125,15 @@ export class PhotoSelector {
     return proc
   }
 
-  /** points: [x, y, 1 = belongs to it | 0 = does not] in picture pixels. */
-  select(tool: string, image: string, points: [number, number, number][]): Promise<{ mask: string; score: number }> {
+  /** points: [x, y, 1 = belongs to it | 0 = does not] in picture pixels; pick: which of SAM's candidates by size
+   *  (0 = the largest), left out: the one SAM rates best. */
+  select(tool: string, image: string, points: [number, number, number][], pick?: number): Promise<Selected> {
     return new Promise((resolve, reject) => {
       try {
         const proc = this.proc ?? this.start()
         const id = this.nextId++
-        this.waiting.set(id, (a) => (a.error || !a.mask ? reject(new Error(a.error ?? t('main.tools.noSelection'))) : resolve({ mask: a.mask, score: a.score ?? 0 })))
-        proc.stdin.write(JSON.stringify({ id, tool, image, points }) + '\n')
+        this.waiting.set(id, (a) => (a.error || !a.mask ? reject(new Error(a.error ?? t('main.tools.noSelection'))) : resolve({ mask: a.mask, score: a.score ?? 0, pick: a.pick ?? 0, candidates: a.candidates ?? 1 })))
+        proc.stdin.write(JSON.stringify({ id, tool, image, points, pick }) + '\n')
       } catch (err) {
         reject(err as Error)
       }

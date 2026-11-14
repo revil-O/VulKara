@@ -1,5 +1,123 @@
 # Changelog
 
+## 0.9.0 – 2026-11-14
+
+- **Security update: Electron 44.11.3.** From 44.10.2: Electron's backported fixes from Chromium, V8, ANGLE, Dawn, Skia,
+  PDFium, FFmpeg and ICU (44.11.0–44.11.3, 2026-11-10 to 11-12).
+- **Refine faces keeps the picture when the face finder fails.** Offline before its first download (or with a damaged
+  file) the job failed and the finished picture was lost; it is now saved without refining, and the job's note says
+  why. The strength sent by the remote web UI is held within 20–60 %.
+- **Extending with FLUX.2 [klein] 9B offline.** When klein 4B would stand in but its outpaint LoRA can not be
+  downloaded, 9B extends itself (without the smeared edge) and the note says so, instead of failing.
+- **Remove: a very thin mask across a very wide picture** (a wire over a panorama) no longer ends the job after
+  ObjectClear ran.
+- **History repair while you work.** A favourite set or an entry deleted while the history looks for moved pictures is
+  kept, and the day's backup holds the paths from before the repair.
+- **"Check for Update…" in the app menu** is greyed out while an update installs, as in the menu bar menu; a failed
+  check from the menu no longer leaves an error in the log.
+- **Edition with commercially usable models only:** CodeFormer and ObjectClear are refused there whatever value a job
+  sends, also by the engine itself.
+- **History: no wait for a missing drive.** The search for pictures moved to another drive (found again by their
+  name) now runs after the history is shown, at most two checks at a time; a picture path on a network drive that does
+  not answer no longer holds the whole app at its start. The found paths appear a moment later, as before with a backup.
+- **Quit with the menu bar menu open.** The menu bar menu is closed first when VulKara quits (log out, `kill`): while it
+  is open, macOS's menu loop holds the app and the quit could wait for it.
+- **Remove with shadows: an object painted again is caught.** Now and then, mostly with a loosely painted mask,
+  ObjectClear painted the object again instead of removing it (in the hand test a blue bottle came back dark grey).
+  VulKara now compares the edges inside the painted part with the photo's: when they still follow the object, the part
+  is filled again as Auto does without ObjectClear (LaMa below 15 % of the picture, RORem above), and the job's note
+  says so. Over 131 earlier results no successful removal came near the limit (MEASUREMENTS 7ci). Compare still shows
+  ObjectClear's own picture.
+- **AI Canvas: extending with FLUX.2 [klein] 9B on its own.** With LoRAs of its own or without an installed klein 4B,
+  9B kept the smeared colours along the new edge in 7 of 10 test pictures: klein's inpainting pipeline (diffusers)
+  always shows the model the start picture too, smeared prefill included. The part to be painted is now left out of
+  that reference; landscape and street, both smeared before, extend cleanly, at the same time and memory
+  (MEASUREMENTS 7ch). The note "9B extends less well" is gone; with a klein 4B installed and no LoRAs of its own, 4B
+  with the outpaint LoRA still extends.
+- **Mask outline when zoomed and on soft edges.** The line around the mask in the mask brush stays one point thin and
+  smooth when zooming in (it grew thicker and blocky before) and lies where a soft edge counts for the model, at half
+  its strength, not at its faint end; with Select subject the subjects' own outlines lie on the same line.
+- **Helpers after a new version.** A helper such as RORem or ObjectClear counts as installed on the Models page only
+  when its files are the version VulKara expects; an older download is offered again.
+
+- **Job notes in the app's language.** The note on a result (such as *Faces refined* or which model extended the
+  picture) was always English in the row of jobs and results; it now follows the language setting.
+- **AI Canvas: extending with FLUX.2 [klein] 4B.** It now takes fal's outpaint LoRA (Apache-2.0, 73 MB, downloaded on
+  first use, pinned version): the empty part is filled pure green and the picture edited as the LoRA was trained, then
+  only the new part is kept and its tone matched along the edge, so the picture stays to the pixel. Before, the
+  smeared prefill stayed in 4 of 10 test pictures; now all ten go on with their lines, light and people, a person cut
+  by the edge included, in 105–125 s and 10 GB on a 16 GB Mac mini (MEASUREMENTS 7cg). Very wide borders can drift in
+  colour. With FLUX.2 [klein] 9B chosen, extending runs on an installed klein 4B with the LoRA (unless LoRAs of its
+  own are chosen), and the job's note says so: 9B left the smeared prefill in 7 of 10 test pictures and is about twice
+  as slow. Other models extend as before.
+- **Licences page.** It now names the two LoRAs VulKara downloads itself: the consistency LoRA of Restore and the
+  outpaint LoRA of the AI Canvas (both Apache-2.0).
+- **FLUX.2 LoRAs saved by peft.** A LoRA for FLUX.2 [klein] or [dev] whose layers carry peft's `base_model.model.`
+  prefix and FLUX.2's original names (such as fal's outpaint LoRA for klein 4B) was refused with "Target modules …
+  not found"; it now loads as it is.
+- **Refine faces (SD 1.5, SDXL).** A new switch on Text to image and Image to image paints each of the four largest
+  faces again after the picture, at the picture's full size with the same model, prompt and seed (strength 20–60 %,
+  default 40 %), and puts it back with a soft edge: small faces in full-body pictures, groups and streets come out
+  clean instead of smeared. Portraits stay as they are; the job's note says how many faces were refined. No new
+  model besides the 0.2 MB face finder, no new memory peak; each face takes about 10–25 s with SD 1.5 and 40–70 s
+  with SDXL on a 16 GB Mac mini (MEASUREMENTS 7cf). In a crowd a tiny face is painted with its head, so a blurred
+  passer-by may become someone else.
+- **Upscale ×4: Natural (slow).** A second character under Enhance → Upscale ×4 uses 4xBHI_dat2_real by Philip
+  Hofmann (CC BY 4.0, 140 MB, downloaded on first use): the most natural texture of the photo upscalers measured
+  (asphalt, brick, foliage) at about three times SwinIR's time; on very noisy pictures it can turn the noise into a
+  fine grid, so SwinIR stays the standard. It brings its own memory table, so a 16 GB Mac picks the tile size that
+  fits (MEASUREMENTS 7ce). The Licences page names it.
+- **Remove with shadows keeps people.** ObjectClear leaves every person Apple Vision finds and that is not painted
+  (up to four, mostly those in front) as it is beyond the painted part; a person right beside the object can still be
+  blurred, there Thorough or Compare is better (MEASUREMENTS 7cd).
+- **Select by click: whole objects.** On glass SAM was unsure and the selection a pattern of dots, so most of a
+  bottle stayed when removing it; the selection is now one piece at the click, its holes filled, its edge smooth.
+- **Remove: Compare.** A fifth choice under Inpainting → Remove makes one picture with each method on this Mac
+  (LaMa, and RORem and ObjectClear when downloaded) to keep the best: every method makes something up now and then,
+  more often on large areas, such as a table that goes on where it ended in the photo.
+- **Inpainting with Qwen-Image.** Qwen-Image models imported by an older version show on the Inpainting page again,
+  and a model that can not paint into a mask names all families that can (SD 1.5 and 2.x and Qwen-Image were missing).
+- **Remove objects (Inpainting → Remove).** Paint over an object and it is taken out, without a prompt or a picture
+  model: LaMa fills small areas in about a second, RORem (a model trained to remove objects, Apache-2.0, 6.5 GB,
+  downloaded once after a question) paints plausible background into large ones in about 25 s and 9 GB on a 16 GB Mac
+  mini; Auto switches at 15 % of the picture, Fast and Thorough choose one. The mask is grown a little, the colours
+  are matched to the surroundings locally and the outside stays as it was. **Remove again** works on the last result
+  with the same mask. Measured in MEASUREMENTS 7by and 7bz.
+- **Auto removes with shadows.** With ObjectClear downloaded, Auto under Inpainting → Remove takes it for every
+  mask: on 28 pictures of buildings and streets LaMa and RORem left the dark shadow under cars even when the car was
+  small (MEASUREMENTS 7cb). Without ObjectClear Auto stays LaMa below 15 % and RORem above.
+- **Remove with shadows keeps the neighbours.** Beyond the painted object ObjectClear now replaces only what it makes
+  lighter (a shadow, a darker reflection; paint a light reflection too), and not the face of another person when the
+  face detector of Restore is downloaded and finds it (a face whose eyes, nose or mouth are painted counts as painted);
+  in a group photo it had painted a neighbour a different face (MEASUREMENTS 7cc).
+- **Remove with shadows.** A fourth choice under Inpainting → Remove: **With shadows** runs ObjectClear, a model
+  trained to take an object away together with its shadow and reflection; the object is painted. VulKara runs it
+  with its own code on the whole picture (shorter side 512 px) and puts back only the object, its shadow and a soft
+  edge, so the rest of the photo stays to the pixel. About 1–1.5 min per picture including loading and 7–8.4 GB on a Mac mini M4 with
+  16 GB; 7.3 GB downloaded once after a question (pinned version, checked files). Its licence, S-Lab License 1.0,
+  allows non-commercial use only; Auto and Thorough stay as they were. Measured in MEASUREMENTS 7bz and 7ca.
+- **Select subject and Select by click in the mask brush (Inpainting, also Remove).** **Select subject** finds the
+  subject of the picture with Apple Vision on this Mac (a small helper built into the app, macOS 14 and later, nothing
+  to download) and adds it to the mask; a picture without a clear subject gets a message instead. **Select by click**
+  uses SAM 2.1, the selection tool of the Enhance page: a click adds, ⌥-click takes away. The selection becomes part of
+  the mask, paint and erase work on top of it, and undo takes back one selection or click at a time. Both work while a
+  job runs; not in the remote web UI. A click made while a selection is still being worked out follows once it is
+  done (the last one); Select subject twice in a row adds nothing. The mask now has a thin white-and-black outline
+  around its orange fill, so its edge shows on light and dark pictures alike. The mask brush keeps the finished steps
+  as one picture and draws only the stroke being painted on top. Selections in the data folder
+  (`inputs/selections`) older than 7 days are deleted at app start; a selection by click on a photo turned by its
+  EXIF data now matches the picture as shown. With several subjects (bottles, plates, people standing apart) each one
+  is outlined and a click takes it out of the selection or back in, one undo step per click; the helper writes which
+  pixel belongs to which subject next to the mask, and the app keeps one byte per pixel for it (not a picture per
+  subject). **Select by click takes the whole thing first**: SAM's largest candidate for the first click (a whole
+  person instead of only the face clicked on a group photo), a click on the same spot again the next smaller one
+  (whole → part → detail → whole); further clicks elsewhere and ⌥-clicks work as before. Also on the Enhance page.
+- **Check for Update… in the app menu and the menu bar menu.** It opens the Changelog page and looks for a newer
+  VulKara at once; a newer one brings the update card up again, also after Later. Greyed out while an update installs.
+- **History finds moved pictures again.** A picture no longer at its saved path (another drive, a moved folder) is
+  looked for by its name in the history's `pictures` folder and the pictures folder; the new path of a result or favourite
+  is kept, the file before as `entries.jsonl.before-repair-<date>`.
+
 ## 0.8.1 – 2026-11-10
 
 - **Fixed:** a model card that only gives advice after "Negative:" no longer becomes the negative prompt (Juggernaut

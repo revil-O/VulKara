@@ -166,5 +166,11 @@
    "vocab.json": null
   },
   "revision": "89644892e4d85e24eaac8bacfd4f463576704203"
+ },
+ "fal/flux-2-klein-4B-outpaint-lora": {
+  "files": {
+   "flux-outpaint-lora.safetensors": "9623927f2471613e0c9d7810da3c39f0b277a448193b223ea3cee67d5750974a"
+  },
+  "revision": "b11770ac6a3cf9325dcf81742c12b1c4e257880f"
  }
 }

@@ -31,6 +31,8 @@ export function toEngineJob(job: Job): Record<string, unknown> {
     ['upscale', job.upscale],
     ['upsample', job.upsample],
     ['keep_picture', job.keepPicture],
+    // the remote web UI may send anything: a number within the detailer's range (20–60 %), else no detailing
+    ['face_detail', Number.isFinite(job.faceDetail) && (job.faceDetail as number) > 0 ? Math.min(0.6, Math.max(0.2, job.faceDetail as number)) : undefined],
   ]
   for (const [key, value] of optional) if (value !== undefined && value !== '') out[key] = value
   if (job.inputImage) {
@@ -42,6 +44,7 @@ export function toEngineJob(job: Job): Record<string, unknown> {
     const t = job.photoTool
     out.photo_tool = { folder: t.folder, strength: t.strength ?? 1, factor: t.factor, variant: t.variant, quality: t.quality, output: t.output ?? 'cutout', mask: t.mask }
   }
+  if (job.removeObject) out.remove_object = { method: job.removeObject.method, objectclear: job.removeObject.objectclear === true }
   if (job.restore) {
     const r = job.restore
     out.restore = {

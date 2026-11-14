@@ -10,7 +10,7 @@ module.exports = {
   productName: 'VulKara',
   copyright: 'Copyright © 2026 Oliver Schmidt',
   directories: { output: 'dist', buildResources: 'build' },
-  files: ['out/**', 'package.json', '!**/*.map'],
+  files: ['out/**', 'package.json', '!**/*.map', '!out/native/**'],
   extraResources: [
     {
       from: 'engines',
@@ -18,6 +18,8 @@ module.exports = {
       // the tests, tools and caches of the engines are not part of the app
       filter: ['**/*', '!**/tests/**', '!**/tools/**', '!**/__pycache__/**', '!**/.pytest_cache/**', '!**/*.pyc'],
     },
+    // the Apple Vision helper for "Select subject" (native/subject_mask.swift, built by `npm run native`)
+    { from: 'out/native', to: 'native' },
     // the menu bar icon (index.ts: process.resourcesPath/tray)
     { from: 'build/tray', to: 'tray' },
     { from: 'LICENSE', to: 'LICENSE.txt' },

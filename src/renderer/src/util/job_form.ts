@@ -3,12 +3,13 @@
 // The form of the generate pages and how it becomes a job.
 
 import { controlTypesFor } from '@shared/controlnet'
+import { EDITION } from '@shared/edition'
 import { MAX_REFERENCES } from '@shared/engine_job'
 import { loraFits } from '@shared/lora_fit'
 import { SIGMA_SCHEDULES, samplersFor } from '@shared/samplers'
 import type { AiLabel, Asset, Job } from '@shared/types'
 import { DEFAULT_SIZES, sizeForRatio, videoSize, type VideoResolution } from './sizes'
-import { t } from '../i18n'
+import { t, type PlainKey } from '../i18n'
 
 export type Mode = 'text' | 'image' | 'inpaint' | 'video' | 'illusion'
 
@@ -53,8 +54,15 @@ export interface GenerateForm {
   upsample: boolean
   /** FLUX.2 [klein] 4B, image to image: the consistency LoRA keeps the picture while the prompt changes it */
   keepPicture: boolean
+  /** SD 1.5 / SDXL (Diffusers): refine the faces after the picture (K4), and how strongly */
+  faceDetail: boolean
+  faceDetailStrength: number
   /** FLUX.1 [dev]: the Turbo-Alpha LoRA with its 8 steps (TURBO) */
   fast: boolean
+  /** Inpainting: repaint the mask with a picture model, or remove the painted object (no model, no prompt) */
+  inpaintAction: 'repaint' | 'remove'
+  /** removing: Fast (LaMa), Thorough (RORem), Auto by the size of the mask, or With shadows (ObjectClear) */
+  removeMethod: RemoveMethod
   aiLabel: boolean
   aiLabelSize: AiLabel['size']
   /** auto: "AI GENERATED" from a prompt, "AI MODIFIED" from a picture; ai: the round icon */
@@ -62,6 +70,19 @@ export interface GenerateForm {
   aiLabelTone: AiLabel['tone']
   aiLabelSubtle: boolean
 }
+
+export type RemoveMethod = NonNullable<Job['removeObject']>['method']
+
+const REMOVE_METHODS: { id: RemoveMethod; title: PlainKey }[] = [
+  { id: 'lama', title: 'generate.remove.fast' }, { id: 'auto', title: 'generate.remove.auto' },
+  { id: 'rorem', title: 'generate.remove.thorough' }, { id: 'objectclear', title: 'generate.remove.shadows' },
+  { id: 'compare', title: 'generate.remove.compare' },
+]
+/** The remove methods this edition offers: ObjectClear is non-commercial (S-Lab License 1.0). */
+export const removeMethods = (): typeof REMOVE_METHODS => REMOVE_METHODS.filter((m) => m.id !== 'objectclear' || !EDITION.commercialModelsOnly)
+
+/** The helper model a remove method needs (engines/diffusers/helpers.json), '' for LaMa and Compare (it takes what is there). */
+export const removeHelper = (method: RemoveMethod): string => (method === 'lama' || method === 'compare' ? '' : method === 'objectclear' ? 'objectclear' : 'rorem')
 
 export const MAX_LORAS = 3
 /** SD 1.5 and its pattern ControlNet work up to about this size */
@@ -90,12 +111,13 @@ export function emptyForm(mode: Mode): GenerateForm {
     prompt: '', negativePrompt: '', style: '', modelId: '', width: 512, height: 512, steps: 25, guidance: 7, seed: null, count: 1,
     sampler: 'Default', sigmaSchedule: 'Default', loras: [], strength: mode === 'inpaint' ? 1 : 0.6, inputImage: '', references: [], customSize: false,
     videoSeconds: 2, videoResolution: '480p', patternStrength: 1.1,
-    controlType: '', controlImage: '', controlPreprocess: true, controlWeight: 1, upsample: true, keepPicture: false, fast: false, aiLabel: false, aiLabelSize: 'medium', aiLabelIcon: 'auto', aiLabelTone: 'auto', aiLabelSubtle: false,
+    controlType: '', controlImage: '', controlPreprocess: true, controlWeight: 1, upsample: true, keepPicture: false, faceDetail: false, faceDetailStrength: 0.4, fast: false,
+    inpaintAction: 'repaint', removeMethod: 'auto', aiLabel: false, aiLabelSize: 'medium', aiLabelIcon: 'auto', aiLabelTone: 'auto', aiLabelSubtle: false,
   }
 }
 
 // families whose pipelines can repaint a masked part (manifests of older imports do not say it)
-const INPAINT_FAMILIES = ['sd1', 'sd2', 'sdxl', 'sd3', 'flux1', 'chroma', 'z_image']
+const INPAINT_FAMILIES = ['sd1', 'sd2', 'sdxl', 'sd3', 'flux1', 'chroma', 'qwen_image', 'z_image']
 
 /** Can the model repaint a masked part? What its manifest says, else what its family can. */
 export const canInpaint = (m: Asset): boolean =>
@@ -178,8 +200,12 @@ export function applyModel(form: GenerateForm, model: Asset, loras: Asset[], pre
   if (!controlTypesFor(model.meta).some((ct) => ct.id === form.controlType)) form.controlType = ''
 }
 
+/** Inpainting in Remove: the painted object goes, filled from its surroundings; no model, prompt or steps. */
+export const removes = (mode: Mode, form: Pick<GenerateForm, 'inpaintAction'>): boolean => mode === 'inpaint' && form.inpaintAction === 'remove'
+
 /** Why the form can not be sent yet, or '' when it can. */
 export function formProblem(mode: Mode, form: GenerateForm, model: Asset | undefined, hasMask: boolean): string {
+  if (removes(mode, form)) return !form.inputImage ? t('generate.problem.choosePicture') : hasMask ? '' : t('generate.remove.paintObject')
   if (!model) return t('generate.problem.chooseModel')
   // a model the app recognised but can not run yet (manifest field unsupported) says so before anything is sent
   if (model.meta.unsupported) return model.meta.unsupported
@@ -215,6 +241,10 @@ export const turboLora = (loras: Asset[]): Asset | undefined => loras.find((l) =
 /** FLUX.2 [klein] edits keep closer to the picture with the consistency LoRA (made for 4B; 9B edits without it). */
 export const keepsPicture = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'flux2_klein'
 
+/** The face detailer paints small faces again with the model itself: SD 1.5 and SDXL on the Diffusers engine. */
+export const takesFaceDetail = (meta: Asset['meta'] | undefined): boolean =>
+  (meta?.family === 'sd1' || meta?.family === 'sdxl') && meta.runtime === 'diffusers'
+
 export const takesUpsampler = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'flux3_klein' || meta?.arch === 'ernie_image'
 
 /** The helper model that writes the caption for a model (Models → Helper models). */
@@ -247,6 +277,7 @@ export function buildJob(mode: Mode, form: GenerateForm, model: Asset, loras: As
   }
   if (form.aiLabel && mode !== 'video') job.aiLabel = aiLabelOf(form, mode)
   if (form.upsample && mode === 'text' && takesUpsampler(model.meta)) job.upsample = true
+  if (form.faceDetail && (mode === 'text' || mode === 'image') && takesFaceDetail(model.meta)) job.faceDetail = form.faceDetailStrength
 
   if (mode === 'video') {
     job.inputImage = form.inputImage
@@ -281,6 +312,18 @@ export function buildJob(mode: Mode, form: GenerateForm, model: Asset, loras: As
   return job
 }
 
+/** Removing the painted object (Inpainting → Remove): one picture of the input picture's size. */
+export function buildRemoveJob(form: GenerateForm, opts: JobExtras = {}): Omit<Job, 'id'> {
+  const [width, height] = opts.inputSize ?? [form.width, form.height]
+  const job: Omit<Job, 'id'> = {
+    page: 'inpaint', prompt: '', modelId: '', modelDir: '', width, height, seed: form.seed ?? -1,
+    inputImage: form.inputImage, maskImage: opts.maskImage, removeObject: { method: form.removeMethod },
+    label: 'Object removed', // i18n-ok: stored in English, shown by jobLabel()
+  }
+  if (form.aiLabel) job.aiLabel = aiLabelOf(form, 'inpaint')
+  return job
+}
+
 /** The installed model an earlier job used: by folder, by id, or by the folder's name when the models moved. */
 export function modelOfJob(job: Pick<Job, 'modelDir' | 'modelId'>, models: Asset[]): Asset | undefined {
   const name = job.modelDir.split('/').filter(Boolean).pop()
@@ -306,6 +349,11 @@ export function applyJob(form: GenerateForm, job: Job, models: Asset[], loras: A
   form.sigmaSchedule = job.sigmaSchedule ?? 'Default'
   if (job.strength !== undefined) form.strength = job.strength
   form.keepPicture = !!job.keepPicture
+  form.faceDetail = job.faceDetail !== undefined
+  if (job.faceDetail !== undefined) form.faceDetailStrength = job.faceDetail
+  form.inpaintAction = job.removeObject ? 'remove' : 'repaint'
+  // a method this build does not offer (ObjectClear in a build with commercially usable models only) falls back to Auto
+  if (job.removeObject) form.removeMethod = removeMethods().some((m) => m.id === job.removeObject!.method) ? job.removeObject.method : 'auto'
   if (job.videoSeconds) form.videoSeconds = job.videoSeconds
   if (job.controlnet?.type === 'Illusion') {
     form.patternStrength = job.controlnet.weight

@@ -110,7 +110,7 @@ uma tela ou uma pose. Cada página de geração também se lembra das suas defin
   *Reproduzir um som quando a fila terminar*.
 - Nenhuma tarefa começa enquanto uma LoRA está a ser treinada.
 - Fechar a janela não para as tarefas: o VulKara continua a correr com o seu ícone na barra de menus (a tarefa em
-  curso, o progresso e quantas esperam; **Abrir VulKara**, **Monitor**, **Definições**). **Sair do VulKara** (⌘Q, ou no
+  curso, o progresso e quantas esperam; **Abrir VulKara**, **Monitor**, **Verificar atualização…**, **Definições**). **Sair do VulKara** (⌘Q, ou no
   menu do ícone) termina a app e os seus motores; com o acesso remoto ligado, a interface web remota continua
   acessível até lá, e o menu do ícone avisa. **Definições…** no menu da app tem ⌘, .
 
@@ -176,6 +176,21 @@ fila. Clique numa miniatura para a abrir na [vista grande](#18-a-vista-grande).
 | **Imagens** | 1–20 | Quantas imagens são feitas, cada uma com a sua própria seed. |
 | **LoRAs** | até 3 | Complementos que ensinam ao modelo um estilo, uma pessoa ou um objeto, cada um com o seu próprio peso (−2 a 2; os botões − e + ao lado mudam em décimas, também no telemóvel). Só são oferecidas LoRAs da família do modelo. |
 | **Fora da imagem** | texto | O prompt negativo: o que não deve aparecer. Só aparece quando o modelo o suporta. |
+
+### Refinar rostos (SD 1.5, SDXL)
+
+O SD 1.5 e o SDXL pintam muitas vezes rostos pequenos desfocados ou distorcidos (imagens de corpo inteiro, grupos,
+ruas). Com **Refinar rostos**, depois da imagem cada um dos quatro maiores rostos é pintado de novo: a zona à volta em
+tamanho total, com o mesmo modelo, prompt e semente a uma **Intensidade** de 40 % (20–60 %), e reposto com uma margem
+suave. Um rosto que já ocupa grande parte da imagem (um retrato) fica como está; a nota do trabalho indica quantos
+rostos foram refinados. O detetor de rostos (YuNet, MIT, 0,2 MB) é transferido uma vez; não é preciso outro modelo e a
+memória fica como para a própria imagem.
+
+Num Mac mini de 16 GB cada rosto demorou cerca de 10–25 s com SD 1.5 e 40–70 s com SDXL (MEASUREMENTS 7cf). Numa
+multidão, um rosto minúsculo é pintado juntamente com a cabeça, pelo que um transeunte desfocado pode passar a ser
+outra pessoa. Só para modelos SD 1.5 e SDXL no motor Diffusers, em Texto para imagem e Imagem para imagem.
+
+![Refinar rostos](../screenshots/pt-PT/generate_face_detail.jpg)
 
 ### Mudar de modelo
 
@@ -331,9 +346,61 @@ Repinta uma parte de uma imagem e mantém o resto.
 
 1. Escolha a imagem.
 2. **Pintar** sobre a parte que deve mudar. **Apagar** retira a pintura. **Tamanho** define o pincel (1–30 % do lado
-   menor da imagem). O botão da seta desfaz o último traço, e o caixote do lixo remove toda a pintura.
+   menor da imagem). O botão da seta desfaz o último passo, e o caixote do lixo remove toda a pintura. Uma linha fina
+   branca e preta à volta do laranja mostra o limite da máscara em imagens claras e escuras.
 3. Descreva o que deve aparecer na parte pintada, ou deixe o prompt vazio para apenas remover algo.
 4. **Alteração** (predefinição 100 %): valores mais baixos mantêm mais do que já existe.
+
+![Selecionar motivo](../screenshots/pt-PT/inpaint_select.jpg)
+
+**Selecionar motivo** encontra o motivo da imagem (uma pessoa, um animal, um objeto em primeiro plano) com o Apple
+Vision neste Mac, sem descarregar nada, e adiciona-o à máscara: em menos de um segundo, alguns segundos na primeira vez
+após iniciar. **Selecionar com clique** seleciona o que clica com o SAM 2.1, a ferramenta de seleção da página
+Melhorar (instale-a lá primeiro): um clique adiciona, ⌥-clique retira, e a seleção é refeita com todos os cliques da
+série. Ambos somam-se ao que foi pintado; **Pintar** e **Apagar** funcionam por cima como habitualmente, e o botão da
+seta desfaz uma seleção ou um clique de cada vez. Uma imagem sem motivo claro (uma paisagem) mostra um aviso em vez
+disso; então pinte a máscara ou selecione com clique. Ambos funcionam enquanto um trabalho corre, e nenhum está na
+interface web remota.
+
+![Vários motivos, um retirado](../screenshots/pt-PT/inpaint_subjects.jpg)
+
+Com **vários motivos** (garrafas, pratos, pessoas afastadas) cada um recebe o seu próprio contorno e **Selecionar
+motivo** fica ligado: um clique num motivo retira-o da seleção, outro clique volta a adicioná-lo; um motivo retirado
+mantém um contorno pontilhado, e o botão da seta desfaz esses cliques um de cada vez. **Pintar**, **Apagar** ou
+**Selecionar com clique** terminam isso; **Selecionar motivo** volta a ligá-lo enquanto a seleção de motivos for o
+último passo. Pessoas sentadas muito juntas são muitas vezes detetadas como um só motivo; então selecione uma delas
+com clique. **Selecionar com clique** seleciona primeiro o objeto inteiro (a pessoa toda, não só a cara clicada); outro
+clique no mesmo sítio seleciona uma parte mais pequena (o tronco, depois a cara), e mais um volta ao todo. Na página
+Melhorar funciona da mesma forma.
+
+![Remover](../screenshots/pt-PT/inpaint_remove.jpg)
+
+**Repintar | Remover**: **Remover** tira o objeto pintado sem prompt nem modelo de imagem; o lugar é preenchido a partir
+do que o rodeia.
+
+- **Rápido**: LaMa, cerca de um segundo na CPU; melhor para objetos pequenos sobre um fundo calmo.
+- **Minucioso**: RORem, um modelo treinado para remover objetos (Apache-2.0, 6,5 GB, descarregado uma vez após uma
+  pergunta). Cerca de 25 s com o carregamento e 9 GB de memória num Mac mini com 16 GB; liberta antes o modelo de imagem
+  carregado. Pinta um fundo plausível em áreas grandes.
+- **Auto** (predefinição): com o ObjectClear transferido, sempre **Com sombras**: em 28 imagens com edifícios e ruas, o LaMa e o RORem deixaram a sombra escura debaixo dos carros, mesmo pequenos (MEASUREMENTS 7cb). Sem ObjectClear: LaMa abaixo de 15 % da imagem, RORem acima. Sem RORem, Auto também preenche áreas grandes com
+  LaMa.
+- **Com sombras**: ObjectClear, um modelo treinado para remover um objeto juntamente com a sua sombra e o seu reflexo
+  (7,3 GB, descarregado uma vez após uma pergunta). Pinte o objeto: uma sombra no chão ou um reflexo mais escuro que lhe
+  toque desaparece com ele; pinte também um reflexo claro. Fora da parte pintada só substitui o que fica mais claro,
+  como uma sombra. As pessoas que o Apple Vision encontra e que não pintou ficam como estão (até quatro, sobretudo as da frente). Uma pessoa mesmo ao lado do objeto ainda pode ficar desfocada: o ObjectClear pinta a margem suave da parte pintada a partir da sua própria imagem mais pequena; use Minucioso ou Comparar aí. De vez em quando, sobretudo com a parte pintada de forma grosseira, o ObjectClear volta a pintar o objeto em vez de o remover; o VulKara deteta isso e preenche a parte de novo como o Auto sem ObjectClear (a nota do trabalho indica-o). Os rostos de outras pessoas ficam como estão quando o detetor de rostos de Restaurar está
+  transferido e os encontra; um rosto cujos olhos, nariz ou boca pinte conta como pintado. Cerca de 1–1,5 min por imagem com o carregamento e cerca de 8 GB de memória num Mac mini com
+  16 GB; liberta antes o modelo de imagem carregado. Use-o quando com os outros métodos fica uma mancha escura ou um
+  reflexo; em imagens sem sombra não traz nada a mais do que o Minucioso. A sua licença (S-Lab License 1.0) só permite
+  uso não comercial.
+- **Comparar**: uma imagem com cada método deste Mac (Rápido, e Minucioso e Com sombras quando transferidos), lado a
+  lado nos resultados, para ficar com a melhor. Todos os métodos inventam algo de vez em quando, mais em áreas
+  grandes: uma mesa que continua onde acabava, um objeto que nunca existiu. Remover um objeto de cada vez também
+  ajuda. Depois de Comparar não aparece Remover outra vez: abra a imagem que fica e continue a partir dela.
+
+A parte pintada é ampliada em 1,5 % do lado maior da imagem, as suas cores são ajustadas ao que a rodeia e é misturada
+suavemente; fora dela a imagem fica como está. A sombra do objeto só desaparece se também for pintada, ou com **Com
+sombras**. **Remover outra vez** remove mais uma vez no último resultado com a mesma máscara, para restos. Na interface
+web remota, o RORem e o ObjectClear só podem ser descarregados no Mac.
 
 Os modelos que fazem inpainting são SD 1.x, SD 2.x, SDXL, SD 3.5, FLUX.1, Chroma, Qwen-Image, Z-Image, FLUX.2 [klein] e
 Fibo 2.0. O *SDXL Inpainting* (nos modelos recomendados) é treinado para isso e integra o novo de forma limpa, cerca de
@@ -379,6 +446,15 @@ O painel explica sempre qual destas opções vai acontecer.
 - **Quadro** define as proporções: 1:1, 3:4, 4:3, 16:9 ou 9:16, ou arraste os cantos do quadro para qualquer tamanho.
 - Prolongar precisa de um modelo SDXL, SD 3.5, FLUX.1, Chroma ou Z-Image, ou de um modelo de inpainting. Os outros modelos são marcados com *(só imagens
   novas)*.
+- **Prolongar com o FLUX.2 [klein] 4B** usa o LoRA de outpainting da fal (73 MB, descarregado na primeira vez): a
+  parte nova continua as linhas, a luz e as pessoas da imagem, também uma pessoa cortada pela margem. A própria imagem
+  fica igual píxel a píxel, só a parte nova é pintada; o prompt é opcional e é acrescentado ao do LoRA. Cerca de
+  105–125 s e 10 GB num Mac mini com 16 GB. Margens muito largas (um quarto da imagem em cada lado) podem desviar na
+  cor. Com o FLUX.2 [klein] 9B escolhido, o prolongamento sem LoRAs próprios corre num klein 4B instalado com o LoRA
+  (o 9B deixou a margem esborratada em 7 de 10 imagens de teste); a nota do trabalho indica-o. Com LoRAs
+  próprios ou sem um klein 4B, o 9B prolonga sozinho, sem a margem esborratada.
+
+  ![Prolongar com o FLUX.2 [klein] 4B](../screenshots/pt-PT/canvas_extend.jpg)
 - A tela, incluindo as suas imagens, vista, prompt e modelo, é mantida depois de reiniciar.
 
 ## 8. Imagem para vídeo
@@ -441,6 +517,13 @@ origem.
   detalhes finos), uma mais alta com mais suavidade.
 - **Carácter** (Reduzir ruído): *Natural* mantém a foto fiel; *Nítido* utiliza os pesos GAN do SCUNet, mais nítido, com
   textura fina inventada onde havia ruído. Nítido é transferido uma vez (72 MB) na primeira utilização.
+- **Carácter** (Ampliar ×4): *Padrão* é o SwinIR; *Natural (lento)* utiliza o 4xBHI_dat2_real de Philip Hofmann
+  (CC BY 4.0), que mantém a textura mais natural (asfalto, tijolo, folhagem), mas demora cerca de três vezes mais;
+  em imagens com muito ruído pode transformar o ruído numa grelha fina, aí o Padrão é melhor. É transferido uma vez
+  (140 MB) na primeira utilização. Num Mac mini de 16 GB uma foto de 512 px passou a 2048 px em cerca de 24 s,
+  incluindo a primeira transferência (MEASUREMENTS 7ce).
+
+  ![Ampliar ×4 com Natural (lento)](../screenshots/pt-PT/enhance_natural.jpg)
 - **Ampliar** (ferramentas que ampliam, como Ampliar ×4): os mesmos botões predefinidos e o mesmo nivelador da página
   Ampliar; o resultado tem esse número de vezes o tamanho da sua imagem.
 - **Remover fundo**: *Transparente* gera um PNG com fundo transparente, *Máscara* a máscara a preto e branco.
@@ -908,7 +991,10 @@ O que acontece na importação:
 
 ![Histórico](../screenshots/pt-PT/history.jpg)
 
-Todas as tarefas concluídas, as mais recentes primeiro, com todas as definições.
+Todas as tarefas concluídas, as mais recentes primeiro, com todas as definições. Uma imagem que já não está onde foi
+guardada (outro disco, uma pasta movida) é encontrada de novo pelo nome na pasta `pictures` do histórico ou na pasta
+de imagens; o histórico passa a guardar o novo caminho (resultados e favoritos; o ficheiro anterior fica como
+`entries.jsonl.before-repair-<data>`).
 
 - **Pesquisar** encontra palavras em prompts, nomes de modelos e etiquetas.
 - **Selecionar**: um clique seleciona um item, ⌘ + clique adiciona ou remove um, ⇧ + clique seleciona um intervalo, ⌘A
@@ -1027,7 +1113,7 @@ Não é enviado nenhum token, nem nada sobre os seus ficheiros; só são lidas a
 
 #### Atualizações da app
 
-Com a mesma verificação diária (e **Verificar atualização** na página Novidades) o VulKara pergunta ao GitHub pela sua
+Com a mesma verificação diária (e **Verificar atualização** na página Novidades, ou **Verificar atualização…** no menu da aplicação e no da barra de menus, que abre essa página e verifica de imediato) o VulKara pergunta ao GitHub pela sua
 versão mais recente. Se houver uma mais recente, um cartão no canto indica-o: **Atualizar e reiniciar** transfere-a,
 verifica-a (o checksum SHA-256 que o GitHub indica para o ficheiro, a versão que contém, a assinatura Developer ID das
 versões do VulKara e o Gatekeeper) e coloca-a no lugar da app quando o VulKara é encerrado; depois a nova versão

@@ -29,6 +29,7 @@ describe('photo tools', () => {
     const scunet = recommended.find((t) => t.id === 'scunet-real')
     expect(scunet).toMatchObject({ defaultLabel: 'Natural', quality: false })
     expect(scunet?.variants).toEqual([expect.objectContaining({ id: 'sharp', label: 'Sharp', sizeMb: 72 })])
+    expect(recommended.find((t) => t.id === 'swinir-real-x4')?.variants).toEqual([expect.objectContaining({ id: 'natural', label: 'Natural (slow)', sizeMb: 140 })])
     expect(installedTools(join(tools, 'missing'))).toEqual([])
   })
 })

@@ -40,8 +40,8 @@ export function jobFacts(q: QueuedJob): string {
   const j = q.job
   if (j.upscale) return t('jobs.upscaleTo', { from: `${j.width}×${j.height}`, to: `${j.width * j.upscale}×${j.height * j.upscale}` })
   const parts = [`${j.width}×${j.height}`]
-  // Restore without the AI repair uses no model: steps and seed mean nothing there
-  if (j.restore && !j.restore.repair) return parts[0]
+  // Restore without the AI repair and removing an object use no model: steps and seed mean nothing there
+  if ((j.restore && !j.restore.repair) || j.removeObject) return parts[0]
   if (j.videoSeconds) parts.push(`${j.videoSeconds} s`)
   if (j.steps) parts.push(t('jobs.steps', { n: j.steps }))
   if (j.style) parts.push(styleLabel(j.style))

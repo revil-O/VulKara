@@ -93,7 +93,26 @@
       "max_side": 2048,
       "licence": "Apache-2.0",
       "licence_url": "https://github.com/JingyunLiang/SwinIR/blob/main/LICENSE",
-      "source_url": "https://github.com/JingyunLiang/SwinIR/releases/tag/v0.0"
+      "source_url": "https://github.com/JingyunLiang/SwinIR/releases/tag/v0.0",
+      "variants": {
+        "natural": {
+          "label": "Natural (slow)",
+          "description": "4xBHI_dat2_real by Philip Hofmann (CC BY 4.0): the most natural texture (asphalt, brick, foliage), about three times slower than SwinIR; on very noisy pictures it can turn the noise into a fine grid.",
+          "file": "4xBHI_dat2_real.safetensors",
+          "url": "https://github.com/Phhofm/models/releases/download/4xBHI_dat2_real/4xBHI_dat2_real.safetensors",
+          "sha256": "1f651fe8e2b7ad978eee0db9c8de89b7bbfd9d2d671ffababb9baf6e2d5b38f6",
+          "size_mb": 140,
+          "tile_metal_gb": {
+            "256": 3.5,
+            "384": 6.2,
+            "512": 11.5
+          },
+          "licence": "CC-BY-4.0",
+          "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+          "licence_note": "By Philip Hofmann; VulKara downloads the weights unchanged from his release on first use.",
+          "source_url": "https://github.com/Phhofm/models/releases/tag/4xBHI_dat2_real"
+        }
+      }
     },
     {
       "id": "fbcnn-color",

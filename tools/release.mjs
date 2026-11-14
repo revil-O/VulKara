@@ -7,7 +7,8 @@
 // 0. the runtimes' Python packages are locked and the lock is the set tested on this Mac (tools/check_pins.py);
 //    runs also with --skip-checks
 // 1. type check, unit tests and the check that nothing of the earlier app is contained (tools/check_clean.py)
-// 2. the app (electron-vite), the notices of the bundled packages, the app bundle (electron-builder)
+// 2. the app (electron-vite), the notices of the bundled packages, the Swift helper (swiftc), the app bundle
+//    (electron-builder)
 // 3. signed with the "Developer ID Application" certificate (hardened runtime, build/entitlements.mac.plist)
 // 4. notarized and stapled, if the notarytool profile APPLE_KEYCHAIN_PROFILE (default "VulKara") exists;
 //    create it once with: xcrun notarytool store-credentials VulKara --apple-id <Apple ID> --team-id <Team ID>
@@ -62,6 +63,7 @@ if (!skipChecks) {
 }
 step('notices of the bundled packages', 'node', ['tools/gen_notices.mjs'])
 step('build', bin('electron-vite'), ['build'])
+step('Apple Vision helper (Select subject)', 'npm', ['run', 'native'])
 // only what a release made: dist/dev holds the bundle that `npm run start:app` runs from
 for (const f of existsSync(DIST) ? readdirSync(DIST) : []) if (f !== 'dev') rmSync(join(DIST, f), { recursive: true, force: true })
 step('app bundle', bin('electron-builder'), ['--config', 'electron-builder.config.cjs', '--mac', 'dir', '--arm64', '--publish', 'never'])
@@ -70,7 +72,12 @@ const id = identity()
 console.log(`\n▸ signing with ${id}`)
 await signAsync({
   app: APP, platform: 'darwin', type: 'distribution', identity: id, identityValidation: false,
-  optionsForFile: () => ({ hardenedRuntime: true, entitlements: ENTITLEMENTS }),
+  // the Apple Vision helper runs no JavaScript: hardened runtime without the JIT exception (entitlements: [] signs with
+  // an empty set; left out, osx-sign would give it its own defaults with camera, microphone and more); timestamped
+  // like every file (osx-sign adds --timestamp)
+  optionsForFile: (file) => file.endsWith(join('Resources', 'native', 'subject-mask'))
+    ? { hardenedRuntime: true, entitlements: [] }
+    : { hardenedRuntime: true, entitlements: ENTITLEMENTS },
 })
 step('verify the signature', 'codesign', ['--verify', '--deep', '--strict', APP])
 

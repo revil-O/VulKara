@@ -931,6 +931,50 @@
   {
    "group": "Helper models",
    "id": null,
+   "title": "Consistency LoRA for FLUX.2 [klein] 4B (Restore)",
+   "source": "https://huggingface.co/lrzjason/Consistance_Edit_Lora",
+   "license": "Apache License 2.0",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "model": "yes",
+   "outputs": "yes",
+   "note": ""
+  },
+  {
+   "group": "Helper models",
+   "id": null,
+   "title": "Outpaint LoRA for FLUX.2 [klein] 4B (AI Canvas)",
+   "source": "https://huggingface.co/fal/flux-2-klein-4B-outpaint-lora",
+   "license": "Apache License 2.0",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+   "model": "yes",
+   "outputs": "yes",
+   "note": ""
+  },
+  {
+   "group": "Helper models",
+   "id": null,
+   "title": "RORem (object removal, Inpainting)",
+   "source": "https://huggingface.co/LetsThink/RORem",
+   "license": "Apache License 2.0 (base: SDXL Inpainting 0.1, CreativeML Open RAIL++-M)",
+   "license_url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md",
+   "model": "yes",
+   "outputs": "yes",
+   "note": "Use-based restrictions (Attachment A) apply to the model and its outputs."
+  },
+  {
+   "group": "Helper models",
+   "id": null,
+   "title": "ObjectClear (object and shadow removal, Inpainting)",
+   "source": "https://huggingface.co/jixin0101/ObjectClear",
+   "license": "S-Lab License 1.0 (base: SDXL Inpainting 0.1, CreativeML Open RAIL++-M)",
+   "license_url": "https://github.com/zjx0101/ObjectClear/blob/main/LICENSE",
+   "model": "no",
+   "outputs": "no",
+   "note": "For non-commercial use only; the licence does not mention the pictures, so VulKara treats them as non-commercial too. The use-based restrictions of SDXL's licence (Attachment A) also apply. VulKara runs it with its own code and downloads the weights from the project once."
+  },
+  {
+   "group": "Helper models",
+   "id": null,
    "title": "NSFW image detection (content filter)",
    "source": "https://huggingface.co/Falconsai/nsfw_image_detection",
    "license": "Apache License 2.0",
@@ -982,6 +1026,17 @@
    "model": "yes",
    "outputs": "yes",
    "note": ""
+  },
+  {
+   "group": "Photo tools",
+   "id": null,
+   "title": "Upscale ×4 (SwinIR): Natural (slow) (4xBHI_dat2_real.safetensors)",
+   "source": "https://github.com/Phhofm/models/releases/tag/4xBHI_dat2_real",
+   "license": "Creative Commons Attribution 4.0",
+   "license_url": "https://creativecommons.org/licenses/by/4.0/",
+   "model": "yes",
+   "outputs": "yes",
+   "note": "By Philip Hofmann; VulKara downloads the weights unchanged from his release on first use."
   },
   {
    "group": "Photo tools",

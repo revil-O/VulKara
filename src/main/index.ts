@@ -6,13 +6,13 @@
 import { app, BrowserWindow, nativeTheme, screen, systemPreferences, session, shell, type Rectangle } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { bindWindow, fileAccess, navigate, queueStatus, registerIpc, repairRuntimes, sendToRemote, shutdown } from './ipc'
+import { appUpdateBusy, bindWindow, fileAccess, navigate, queueStatus, registerIpc, repairRuntimes, sendToRemote, shutdown } from './ipc'
 import { remoteRunning, startRemote, stopRemote } from './remote'
 import { logTo } from './log'
 import { PAGE_URL, PRELOAD, RENDERER_DIR } from './pages'
 import { engineEnv, getSettings, onSettingChanged } from './settings'
 import { mainLanguage, setMainLang, t } from './i18n'
-import { setMenus } from './menus'
+import { closeTrayMenu, setMenus } from './menus'
 import { openMonitor } from './monitor_window'
 import { formatDuration } from '@shared/duration'
 import { LOCALES, resolveLang } from '@shared/i18n'
@@ -84,13 +84,16 @@ function applyMenus(): void {
     texts: () => ({
       about: t('app.menu.about'), settings: t('app.menu.settings'), monitor: t('app.menu.monitor'),
       services: t('app.menu.services'), hide: t('app.menu.hide'), hideOthers: t('app.menu.hideOthers'),
-      showAll: t('app.menu.showAll'), quit: t('app.menu.quit'), open: t('app.menu.open'),
+      showAll: t('app.menu.showAll'), quit: t('app.menu.quit'), open: t('app.menu.open'), checkUpdate: t('app.menu.checkUpdate'),
       edit: t('app.menu.edit'), view: t('app.menu.view'), window: t('app.menu.window'),
       substitutions: t('app.menu.substitutions'), speech: t('app.menu.speech'),
       roles: Object.fromEntries(Object.keys(en.app.menu.roles).map((r) => [r, t(`app.menu.roles.${r as keyof typeof en.app.menu.roles}`)])),
     }),
     showMain,
     openMonitor,
+    // the Changelog page checks and says what it found; a new query each time, so a second click checks again
+    checkUpdate: () => showMain(`/changelog?check=${Date.now()}`),
+    updateBusy: appUpdateBusy,
     devTools: !app.isPackaged,
     status: () => {
       const q = queueStatus()
@@ -203,6 +206,8 @@ if (!app.requestSingleInstanceLock()) {
     shutdown()
     app.exit(0)
   })
+  // an open menu bar menu holds the main process in AppKit's menu loop: closed first, or the quit waits for it
+  app.on('before-quit', () => closeTrayMenu())
   app.on('will-quit', () => {
     void stopRemote()
     shutdown()

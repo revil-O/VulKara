@@ -77,7 +77,8 @@ export function makeApi(call: Call, on: On, extra: BridgeExtra): VulkaraApi {
       install: (id) => call('tools:install', id),
       importFile: () => call('tools:importFile'),
       remove: (folder) => call('tools:remove', folder),
-      select: (tool, image, points) => call('tools:select', tool, image, points),
+      select: (tool, image, points, pick) => call('tools:select', tool, image, points, pick),
+      subject: (image) => call('tools:subject', image),
     },
     imports: {
       inspect: (request) => call('imports:inspect', request),

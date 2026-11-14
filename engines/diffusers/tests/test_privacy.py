@@ -119,9 +119,18 @@ def test_the_helper_catalog_matches_what_the_engines_download():
     with open(pinned.PINS_FILE) as f:
         all_pins = json.load(f)
     for h in cat:
-        assert h["kind"] in ("content", "lama", "ddcolor", "preprocess", "controlnet", "upscaler", "faces", "pup", "lora"), h["id"]
+        assert h["kind"] in ("content", "lama", "ddcolor", "preprocess", "controlnet", "upscaler", "faces", "pup", "lora", "rorem",
+                             "objectclear"), h["id"]
         if h["kind"] in ("preprocess", "controlnet", "upscaler", "pup", "lora"):
             assert h["repo"] in all_pins, h["id"]
         if h["kind"] == "faces":  # GitHub releases: every file with an https URL and its SHA-256
             import restore
             assert all(u.startswith("https://github.com/") and len(d) == 64 for u, d in restore.FACE_FILES.values())
+        if h["kind"] == "rorem":  # pinned in remove.py, every file by its SHA-256
+            import remove
+            assert h["repo"] == remove.REPO and len(remove.PIN[0]) == 40
+            assert all(len(d) == 64 for d in remove.PIN[1].values())
+        if h["kind"] == "objectclear":  # pinned in objectclear.py, every file by its SHA-256
+            import objectclear
+            assert h["repo"] == objectclear.REPO and len(objectclear.PIN[0]) == 40
+            assert all(len(d) == 64 for d in objectclear.PIN[1].values())

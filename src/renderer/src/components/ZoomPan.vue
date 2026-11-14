@@ -116,7 +116,10 @@ function visible(): { x: number; y: number; w: number; h: number } | undefined {
   return { x: -view.x / (el.clientWidth * view.scale), y: -view.y / (el.clientHeight * view.scale), w: 1 / view.scale, h: 1 / view.scale }
 }
 
-defineExpose({ fit, visible })
+/** the zoom factor (1 = fitted), for content drawn at the size it is shown (MaskCanvas's outline) */
+const scale = computed(() => view.scale)
+
+defineExpose({ fit, visible, scale })
 </script>
 
 <template>

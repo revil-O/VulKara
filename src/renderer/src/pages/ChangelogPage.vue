@@ -1,7 +1,8 @@
 <!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 · Copyright (C) 2026 Oliver Schmidt -->
 <script setup lang="ts">
 // What changed from version to version: the changelog shipped with the app, newest first.
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { RefreshCw } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
@@ -25,6 +26,15 @@ onMounted(async () => {
 function check(): void {
   void window.vk.app.checkUpdate()
 }
+// "Check for Updates…" in the app menu or the menu bar menu opens this page with ?check=<time>: check, and a newer
+// version brings the update card up again, also after Later
+const route = useRoute()
+watch(() => route.query.check, async (asked) => {
+  if (!asked || remote) return
+  updates.start()
+  // a failed check shows on the page (checkError in the state); here it only must not end in an unhandled rejection
+  if ((await window.vk.app.checkUpdate().catch(() => undefined))?.available) updates.show()
+}, { immediate: true })
 function updateLine(u: AppUpdateState): string {
   if (u.checking) return t('app.changelog.checking')
   if (u.available) return t('app.changelog.newer', { version: u.available })

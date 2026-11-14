@@ -25,6 +25,7 @@ import { useSettingsStore } from '../stores/settings'
 import { num, t, type PlainKey } from '../i18n'
 import { isMonochrome } from '../util/monochrome'
 import { kleinTints, takesConsistency } from '@shared/hints'
+import { EDITION } from '@shared/edition'
 import type { QueuedJob } from '@shared/api'
 import type { RestoreTemplate } from '@shared/settings'
 import type { Job, RestoreOptions } from '@shared/types'
@@ -41,7 +42,9 @@ const FIXED_RULES: PlainKey[] = [
 // templates for the usual kinds of old photos; the user saves own ones
 const GUARDS = { lock: true, maxChange: 0.06, checkFaces: true, colorStrength: 1, sharpen: false, sharpness: 0.25 }
 // the AI steps for soft photos and faces, with the strengths that kept faces closest to themselves (MEASUREMENTS.md)
-const AI_STEPS = { correctStrength: 0.8, dust: true, dustSensitivity: 0.5, details: true, detailLevel: 2, detailStrength: 1, faces: true, faceFidelity: 0.9, faceStrength: 0.6, scale: 1 as const }
+// CodeFormer's licence is non-commercial: a build with commercialModelsOnly does not restore faces
+const FACES = !EDITION.commercialModelsOnly
+const AI_STEPS = { correctStrength: 0.8, dust: true, dustSensitivity: 0.5, details: true, detailLevel: 2, detailStrength: 1, faces: FACES, faceFidelity: 0.9, faceStrength: 0.6, scale: 1 as const }
 const TEMPLATES: RestoreTemplate[] = [
   { name: 'Black and white, damaged', correct: true, repair: true, colorize: false, ...GUARDS, note: 'an old black-and-white photograph' }, // i18n-ok
   { name: 'Black and white to colour', correct: true, repair: true, colorize: true, ...GUARDS, note: 'an old black-and-white photograph' }, // i18n-ok
@@ -246,7 +249,7 @@ async function send(o: RestoreOptions, kind: string): Promise<void> {
   if (!size.value) return
   sending.value = true
   try {
-    const data = painted.value ? mask.value?.exportMask() : undefined
+    const data = painted.value ? await mask.value?.exportMask() : undefined
     const maskImage = data ? await window.vk.files.writeImage(data) : undefined
     const what = [o.correct && 'corrected', o.dust && 'dust removed', o.repair && 'repaired', o.details && 'details rebuilt', o.faces && 'faces restored',
       o.colorize && 'coloured', o.sharpen && 'sharpened', o.scale === 2 && 'twice the size'].filter(Boolean).join(', ')
@@ -359,7 +362,7 @@ function open(q: QueuedJob, file: string): void {
             <SliderRow v-model="opts.detailLevel" class="indent" :label="t('restore.softness')" :min="1.25" :max="3" :step="0.25" :format="(v) => `× ${num(v, 2)}`" :fallback="2" />
             <SliderRow v-model="opts.detailStrength" class="indent" :label="t('restore.strength')" :min="0.2" :max="1" :step="0.05" :format="percent" :fallback="1" />
           </template>
-          <label class="check">
+          <label v-if="FACES" class="check">
             <input v-model="opts.faces" type="checkbox" /> {{ t('restore.faces') }}
             <HintBadge :text="t('restore.facesHint')" />
           </label>

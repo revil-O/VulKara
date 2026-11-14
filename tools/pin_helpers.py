@@ -30,6 +30,7 @@ def wanted():
         out.setdefault(m["repo"], []).extend(m["files"])
     out["Comfy-Org/Real-ESRGAN_repackaged"] = ["RealESRGAN_x4plus.safetensors"]
     out["lrzjason/Consistance_Edit_Lora"] = ["f2k_4B_consist_20260314.safetensors"]
+    out["fal/flux-2-klein-4B-outpaint-lora"] = ["flux-outpaint-lora.safetensors"]
     return out
 
 

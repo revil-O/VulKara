@@ -6,7 +6,9 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { dirname, isAbsolute, join } from 'node:path'
 import { homedir } from 'node:os'
 import { thisMac } from './foreign_mac'
+import { app } from 'electron'
 import { DEFAULT_IMAGES_DIR, DEFAULT_MODELS_DIR, dataDir } from './paths'
+import { subjectMaskHelper } from './subject_mask'
 import type { Settings } from '@shared/settings'
 import { DEFAULT_SETTINGS, FOLDER_KEYS } from '@shared/settings'
 import { EDITION } from '@shared/edition'
@@ -115,6 +117,8 @@ export function engineEnv(): Record<string, string> {
   const env: Record<string, string> = {
     VK_DATA_DIR: dataDir(), VK_MODELS_DIR: modelsDir(), VK_IMAGES_DIR: imagesDir(), VK_LORAS_DIR: lorasDir(),
     VK_HELPERS_DIR: helpersDir(), VK_SSD_STREAMING: s.ssdStreaming,
+    // Apple Vision for Remove with ObjectClear: the people that are not painted stay (native/subject_mask.swift)
+    VK_SUBJECT_HELPER: subjectMaskHelper(app.isPackaged, process.resourcesPath, app.getAppPath()),
     // this Mac's id (a hash, foreign_mac.ts), written into model.json by an import
     VK_MACHINE_ID: thisMac().machine,
     // the libraries' advice to developers (deprecations, fallbacks) is not for the log; errors still are

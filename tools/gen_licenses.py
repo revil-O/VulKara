@@ -113,6 +113,8 @@ EXTRA = [
     ("Helper models", "Comfy-Org/Real-ESRGAN_repackaged", "Real-ESRGAN x4plus (Upscale)"),
     ("Helper models", "VisualInference/FLUX-3-Image-Klein-pup-MLX-4bit", "FLUX 3 prompt upsampler (MLX, 4 bit)"),
     ("Helper models", "piddnad/ddcolor_modelscope", "DDColor (colouring old photos, Restore)"),
+    ("Helper models", "lrzjason/Consistance_Edit_Lora", "Consistency LoRA for FLUX.2 [klein] 4B (Restore)"),
+    ("Helper models", "fal/flux-2-klein-4B-outpaint-lora", "Outpaint LoRA for FLUX.2 [klein] 4B (AI Canvas)"),
     ("Helper models", "Falconsai/nsfw_image_detection", "NSFW image detection (content filter)"),
     ("Helper models", "dima806/facial_age_image_detection", "Facial age detection (content filter)"),
 ]
@@ -175,7 +177,8 @@ def civitai_entry(group, ref, title, model_id):
 
 
 TOOL_LICENSES = {"MIT": ("MIT License", "https://opensource.org/license/mit"),
-                 "Apache-2.0": ("Apache License 2.0", "https://www.apache.org/licenses/LICENSE-2.0")}
+                 "Apache-2.0": ("Apache License 2.0", "https://www.apache.org/licenses/LICENSE-2.0"),
+                 "CC-BY-4.0": ("Creative Commons Attribution 4.0", "https://creativecommons.org/licenses/by/4.0/")}
 
 
 def photo_tools():
@@ -188,6 +191,13 @@ def photo_tools():
         name, url = TOOL_LICENSES[t["licence"]]
         out.append(dict(group="Photo tools", id=None, title=t["name"], source=t["source_url"], license=name,
                         license_url=t["licence_url"] or url, model="yes", outputs="yes", note=t.get("licence_note", "")))
+        # other weights of a tool under their own licence (a CC BY variant names its author here)
+        for v in (t.get("variants") or {}).values():
+            if v.get("licence"):
+                name, url = TOOL_LICENSES[v["licence"]]
+                out.append(dict(group="Photo tools", id=None, title="%s: %s (%s)" % (t["name"], v["label"], v["file"]),
+                                source=v["source_url"], license=name, license_url=v.get("licence_url") or url,
+                                model="yes", outputs="yes", note=v.get("licence_note", "")))
     return out
 
 
@@ -198,6 +208,20 @@ GITHUB_HELPERS = [
          license_url="https://github.com/sczhou/CodeFormer/blob/master/LICENSE", model="no", outputs="no",
          note="For non-commercial use only: restored faces may not be used commercially. VulKara is free and downloads "
               "the weights from the project on first use."),
+    # Apache-2.0 on Hugging Face, but trained from SDXL Inpainting 0.1, whose licence and use restrictions carry over
+    dict(group="Helper models", id=None, title="RORem (object removal, Inpainting)",
+         source="https://huggingface.co/LetsThink/RORem",
+         license="Apache License 2.0 (base: SDXL Inpainting 0.1, CreativeML Open RAIL++-M)",
+         license_url="https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md", model="yes",
+         outputs="yes", note="Use-based restrictions (Attachment A) apply to the model and its outputs."),
+    # weights on Hugging Face without a licence field; the licence is the project's on GitHub
+    dict(group="Helper models", id=None, title="ObjectClear (object and shadow removal, Inpainting)",
+         source="https://huggingface.co/jixin0101/ObjectClear",
+         license="S-Lab License 1.0 (base: SDXL Inpainting 0.1, CreativeML Open RAIL++-M)",
+         license_url="https://github.com/zjx0101/ObjectClear/blob/main/LICENSE", model="no", outputs="no",
+         note="For non-commercial use only; the licence does not mention the pictures, so VulKara treats them as "
+              "non-commercial too. The use-based restrictions of SDXL's licence (Attachment A) also apply. VulKara runs "
+              "it with its own code and downloads the weights from the project once."),
     dict(group="Helper models", id=None, title="YuNet face detection (Restore)",
          source="https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet", license="MIT License",
          license_url="https://github.com/opencv/opencv_zoo/blob/main/models/face_detection_yunet/LICENSE", model="yes",

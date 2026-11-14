@@ -187,14 +187,16 @@ def _boxes(m, margin):
     grown = cv2.dilate(m, np.ones((margin * 2 + 1, margin * 2 + 1), np.uint8))
     count, _, stats, _ = cv2.connectedComponentsWithStats(grown, connectivity=8)
     h, w = m.shape
-    out = []
-    for x, y, bw, bh, _area in stats[1:count]:
-        side = min(max(bw, bh), max(w, h))
-        cx, cy = x + bw / 2, y + bh / 2
-        x0 = int(min(max(0, cx - side / 2), max(0, w - side)))
-        y0 = int(min(max(0, cy - side / 2), max(0, h - side)))
-        out.append((x0, y0, min(w, x0 + side), min(h, y0 + side)))
-    return out
+    return [square(x, y, bw, bh, w, h) for x, y, bw, bh, _area in stats[1:count]]
+
+
+def square(x, y, bw, bh, w, h):
+    """The square around the box x, y, bw, bh with the same centre, moved into a w x h picture."""
+    side = min(max(bw, bh), max(w, h))
+    cx, cy = x + bw / 2, y + bh / 2
+    x0 = int(min(max(0, cx - side / 2), max(0, w - side)))
+    y0 = int(min(max(0, cy - side / 2), max(0, h - side)))
+    return (x0, y0, min(w, x0 + side), min(h, y0 + side))
 
 
 def fill(img, m, report=None):
@@ -473,15 +475,16 @@ def _codeformer(device, report=None):
     return _face_net
 
 
-def find_faces(rgb, detector):
-    """The 5 landmarks (eyes, nose tip, mouth corners) of each face, largest first; small faces are left out."""
+def find_faces(rgb, detector, min_spread=FACE_MIN):
+    """The 5 landmarks (eyes, nose tip, mouth corners) of each face, largest first; faces whose landmarks spread less
+    than min_spread pixels are left out (CodeFormer can not restore them; the face detailer wants them)."""
     h, w = rgb.shape[:2]
     k = min(1.0, 1280 / max(h, w))
     small = cv2.resize(rgb, (round(w * k), round(h * k)), interpolation=cv2.INTER_AREA) if k < 1 else rgb
     det = cv2.FaceDetectorYN.create(detector, "", (small.shape[1], small.shape[0]), 0.7)
     _, found = det.detect(cv2.cvtColor(small, cv2.COLOR_RGB2BGR))
     faces = [f[4:14].reshape(5, 2).astype(np.float32) / k for f in (found if found is not None else [])]
-    faces = [p for p in faces if max(np.ptp(p[:, 0]), np.ptp(p[:, 1])) >= FACE_MIN]
+    faces = [p for p in faces if max(np.ptp(p[:, 0]), np.ptp(p[:, 1])) >= min_spread]
     return sorted(faces, key=lambda p: -np.ptp(p[:, 0]))
 
 

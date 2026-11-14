@@ -23,6 +23,7 @@ FLUX1 = {"attention_head_dim": 128, "guidance_embeds": True, "in_channels": 64, 
 KLEIN9 = {"attention_head_dim": 128, "axes_dims_rope": [32, 32, 32, 32], "eps": 1e-06, "guidance_embeds": False,
           "in_channels": 128, "joint_attention_dim": 12288, "mlp_ratio": 3.0, "num_attention_heads": 32, "num_layers": 8,
           "num_single_layers": 24, "out_channels": None, "patch_size": 1, "rope_theta": 2000, "timestep_guidance_channels": 256}
+KLEIN4 = dict(KLEIN9, joint_attention_dim=7680, num_attention_heads=24, num_layers=5, num_single_layers=20)
 QWEN21 = {"attention_head_dim": 128, "axes_dims_rope": [16, 56, 56], "context_in_dim": 4096, "in_channels": 64,
           "num_attention_heads": 32, "num_layers": 32, "out_channels": 64, "patch_size": 1, "mlp_ratio": 3, "eps": 1e-06,
           "causal_condition": True}
@@ -37,6 +38,7 @@ SDXL = {"addition_embed_type": "text_time", "addition_time_embed_dim": 256, "att
 TARGETS = {
     "FluxPipeline": ("FluxTransformer2DModel", FLUX1, "transformer"),
     "Flux2KleinPipeline": ("Flux2Transformer2DModel", KLEIN9, "transformer"),
+    "Flux2KleinPipeline/4B": ("Flux2Transformer2DModel", KLEIN4, "transformer"),
     "QwenImage21Pipeline": ("QwenImage21Transformer2DModel", QWEN21, "transformer"),
     "StableDiffusionXLPipeline": ("UNet2DConditionModel", SDXL, "unet"),
 }
@@ -44,8 +46,8 @@ _models = {}
 
 
 def stand_in(pipeline):
-    """Only the class name matters to lora_convert."""
-    return type(pipeline, (), {})()
+    """Only the class name matters to lora_convert ("/4B" names the model size only the tests need)."""
+    return type(pipeline.split("/")[0], (), {})()
 
 
 def tensors(name):
@@ -65,12 +67,13 @@ def tensors(name):
 def coverage(pipeline, sd):
     """(share of the layers diffusers' reader names that exist with the LoRA's input width, number of layers)."""
     cls, config, comp = TARGETS[pipeline]
+    pipeline = pipeline.split("/")[0]
     if not hasattr(diffusers, cls) or not hasattr(diffusers, pipeline):
         pytest.skip("this diffusers has no %s" % cls)
-    if cls not in _models:
+    if id(config) not in _models:
         with torch.device("meta"):
-            _models[cls] = getattr(diffusers, cls).from_config(config)
-    model = _models[cls]
+            _models[id(config)] = getattr(diffusers, cls).from_config(config)
+    model = _models[id(config)]
     kw = {"unet_config": model.config} if comp == "unet" else {}
     res = getattr(diffusers, pipeline).lora_state_dict(dict(sd), **kw)
     out = res[0] if isinstance(res, tuple) else res
@@ -104,6 +107,7 @@ def test_converted_loras_land_on_the_model(name, pipeline, layers):
 
 @pytest.mark.parametrize("name, pipeline", [("flux1_kohya_meta", "FluxPipeline"), ("flux1_aitoolkit_meta", "FluxPipeline"),
                                             ("klein9_aitoolkit", "Flux2KleinPipeline"), ("sdxl_kohya_te", "StableDiffusionXLPipeline"),
+                                            ("klein4_peft_bfl", "Flux2KleinPipeline/4B"),  # fal's outpaint LoRA
                                             ("illustrious_stabilizer_diffusers_names", "StableDiffusionXLPipeline")])
 def test_files_diffusers_reads_as_they_are_stay_as_they_are(name, pipeline):
     sd = tensors(name)

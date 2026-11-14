@@ -5,9 +5,11 @@ import contextlib
 import gc
 import inspect
 import json
+import math
 import os
 import random
 import time
+import traceback
 import types
 import uuid
 from pathlib import Path
@@ -627,21 +629,7 @@ class LoadedModel:
         return self.spec["family"] == "sdxl" and self.device == "mps"
 
     def decode_sdxl_latents(self, latents):
-        import torch
-        vae = self.pipe.vae
-        if vae.dtype != torch.bfloat16:
-            vae.to(torch.bfloat16)
-        cfg = vae.config
-        latents = latents.to(torch.bfloat16)
-        if getattr(cfg, "latents_mean", None) is not None and getattr(cfg, "latents_std", None) is not None:
-            mean = torch.tensor(cfg.latents_mean).view(1, -1, 1, 1).to(latents.device, latents.dtype)
-            std = torch.tensor(cfg.latents_std).view(1, -1, 1, 1).to(latents.device, latents.dtype)
-            latents = latents * std / cfg.scaling_factor + mean
-        else:
-            latents = latents / cfg.scaling_factor
-        with torch.no_grad():
-            image = vae.decode(latents, return_dict=False)[0]
-        return self.pipe.image_processor.postprocess(image.float(), output_type="pil")[0]
+        return _decode_sdxl(self.pipe, latents)
 
     def apply_loras(self, loras):
         """loras: [{"file", "scale", "name"}]; reloads adapters only when the selection changes."""
@@ -1193,6 +1181,89 @@ def keep_picture_loras(d, manifest, picture, report=None):
     return [rs.consistency_lora(scale=rs.KEEP_PICTURE_SCALE, report=report)]
 
 
+# fal's outpaint LoRA for FLUX.2 [klein] 4B (Apache-2.0): the empty part pure green, the picture edited with the fixed
+# prompt at 1.1, as its card says. It filled all ten test cases on the Mac mini where the prefill and inpaint route left
+# smeared bars in four, 104 s and 10.1 GB against 9.5 (MEASUREMENTS 7cg)
+OUTPAINT_HELPER = "klein4b_outpaint"
+OUTPAINT_FILE = "flux-outpaint-lora.safetensors"
+OUTPAINT_VARIANT = "klein4b"
+OUTPAINT_SCALE = 1.1
+OUTPAINT_GB = 0.6
+OUTPAINT_PROMPT = "Fill the green spaces according to the image"
+
+
+def outpaint_file(report=None):
+    """The outpaint LoRA's file, downloaded on first use (raises when that fails, e.g. offline)."""
+    import helpers
+    import restore
+    file = os.path.join(restore.helper_folder(OUTPAINT_HELPER), OUTPAINT_FILE)
+    if not os.path.isfile(file):
+        helpers.install(OUTPAINT_HELPER, report=report)
+    return file
+
+
+def outpaint_loras(d, manifest, picture, report=None):
+    """AI Canvas → Extend with FLUX.2 [klein] 4B: the outpaint LoRA (downloaded on first use)."""
+    if not (d.get("prefill") and picture and d.get("mask_image")) or registry.model_variant(manifest) != OUTPAINT_VARIANT:
+        return []
+    return [{"file": outpaint_file(report), "scale": OUTPAINT_SCALE, "name": "Outpaint LoRA", "trigger_words": [], "plan_gb": OUTPAINT_GB}]
+
+
+def outpaint_stand_in(d, manifest):
+    """Extending with FLUX.2 [klein] 9B: the folder of a klein 4B installed beside it, which extends with the outpaint
+    LoRA; 9B kept the smeared prefill in 7 of 10 pictures and the LoRA is made for 4B (MEASUREMENTS 7cg); without it
+    9B extends itself with the prefill blanked in its reference (blank_reference, 7ch). None when
+    the job is no extension with 9B, brings LoRAs of its own (made for 9B, they do not fit 4B) or no 4B is there. Only
+    a distilled 4B (few steps: the job keeps 9B's steps and guidance) imported on this Mac (its memory plan) is taken."""
+    if not (d.get("prefill") and d.get("input_image") and d.get("mask_image")) or d.get("loras") \
+            or registry.model_variant(manifest) != "klein9b":
+        return None
+    import importer
+    root = os.path.dirname(os.path.normpath(d["model_dir"]))
+    for name in sorted(os.listdir(root)):
+        folder = os.path.join(root, name)
+        try:
+            m = load_manifest(folder)
+        except (OSError, ValueError):
+            continue
+        if m.get("arch") == manifest.get("arch") and not m.get("unsupported") and registry.model_variant(m) == OUTPAINT_VARIANT \
+                and (m.get("defaults") or {}).get("num_steps", 50) <= 8 and not importer._made_elsewhere(m):
+            return folder
+    return None
+
+
+def green_border(image, mask):
+    """The picture with its empty (white in the mask) part pure green, as the outpaint LoRA was trained."""
+    from PIL import Image
+    return Image.composite(Image.new("RGB", image.size, (0, 255, 0)), image.convert("RGB"),
+                           mask.convert("L").point(lambda v: 255 if v >= 128 else 0))
+
+
+def blank_reference(latents, mask):
+    """klein's start picture as reference with the part to be painted set to the VAE's mean (0); any masked pixel
+    blanks its latent cell. Extending, the reference showed the smeared prefill and klein kept it (9B in 7 of 10
+    pictures, MEASUREMENTS 7cg); blanked, all three such cases of 7ch extended cleanly."""
+    import numpy as np
+    import torch
+    from PIL import Image
+    h, w = latents.shape[-2:]
+    keep = np.asarray(mask.convert("L").resize((w, h), Image.BOX)) == 0
+    return latents * torch.from_numpy(keep).to(latents.device, latents.dtype)
+
+
+def _blanked_reference(cls):
+    """cls (Flux2KleinInpaintPipeline), its start picture's reference blanked under pipe.reference_mask. diffusers
+    0.41 always takes the start picture as the first reference (ref_images = [image_latents_encoded])."""
+    class BlankedReference(cls):
+        reference_mask = None
+
+        def prepare_image_latents(self, images, *args, **kwargs):
+            if self.reference_mask is not None and images[0].shape[1] == self.latent_channels * 4:
+                images = [blank_reference(images[0], self.reference_mask), *images[1:]]
+            return super().prepare_image_latents(images, *args, **kwargs)
+    return BlankedReference
+
+
 def reference_gb(spec, plan, width, height, picture, masked):
     """What a picture taken along as reference tokens adds while denoising: FLUX.2 edits a picture that way, and so
     does klein's inpainting pipeline; twice the image tokens, one more set of activations (klein 9B: inpainting
@@ -1243,6 +1314,53 @@ def _mask_crop(mask, width, height):
     if cw_ >= width * 0.8:
         return None
     return (x0, y0, x0 + cw_, y0 + ch_), (width // 8 * 8, height // 8 * 8)
+
+
+# the face detailer (K4, plans/K4_GESICHTS_DETAILER.md): the largest faces, an ellipse 18 % larger than each face's
+# square, painted again at a low strength; for the families whose small faces come out blurred
+FACE_DETAIL_FAMILIES = ("sd1", "sdxl")
+FACE_DETAIL_MAX = 4
+FACE_DETAIL_GROW = 1.18
+# smaller than Restore's minimum (14): a 29 × 37 px face in a 512 × 768 SD 1.5 picture spreads its landmarks over
+# about 12 px, and those faces are what the detailer is for; below 6 a "face" is too small to gain (test app 2026-11-13)
+FACE_DETAIL_MIN = 6
+
+
+def face_masks(img, detector):
+    """Ellipse masks (mode L, the picture's size) around the largest faces in img, largest first."""
+    import numpy as np
+    import restore
+    from PIL import Image, ImageDraw
+    out = []
+    for pts in restore.find_faces(np.asarray(img.convert("RGB")), detector, FACE_DETAIL_MIN)[:FACE_DETAIL_MAX]:
+        box = restore.face_square(pts)
+        if not box:
+            continue
+        x, y, w, h = box
+        rx, ry = w * FACE_DETAIL_GROW / 2, h * FACE_DETAIL_GROW / 2
+        m = Image.new("L", img.size, 0)
+        ImageDraw.Draw(m).ellipse((x + w / 2 - rx, y + h / 2 - ry, x + w / 2 + rx, y + h / 2 + ry), fill=255)
+        out.append(m)
+    return out
+
+
+def _decode_sdxl(pipe, latents):
+    """SDXL latents decoded in bfloat16 (LoadedModel.decode_self)."""
+    import torch
+    vae = pipe.vae
+    if vae.dtype != torch.bfloat16:
+        vae.to(torch.bfloat16)
+    cfg = vae.config
+    latents = latents.to(torch.bfloat16)
+    if getattr(cfg, "latents_mean", None) is not None and getattr(cfg, "latents_std", None) is not None:
+        mean = torch.tensor(cfg.latents_mean).view(1, -1, 1, 1).to(latents.device, latents.dtype)
+        std = torch.tensor(cfg.latents_std).view(1, -1, 1, 1).to(latents.device, latents.dtype)
+        latents = latents * std / cfg.scaling_factor + mean
+    else:
+        latents = latents / cfg.scaling_factor
+    with torch.no_grad():
+        image = vae.decode(latents, return_dict=False)[0]
+    return pipe.image_processor.postprocess(image.float(), output_type="pil")[0]
 
 
 def _bf16_vae(vae):
@@ -1397,10 +1515,26 @@ class DiffusersEngine:
             return self.restore(d)
         if d.get("photo_tool"):
             return self.photo_tool(d)
+        if d.get("remove_object"):
+            return self.remove_object(d)
         model_dir = d.get("model_dir")
         if not model_dir or not os.path.isfile(os.path.join(model_dir, MANIFEST)):
             raise ValueError("Model not found, please re-import it")
         manifest = load_manifest(model_dir)
+        stand_in = outpaint_stand_in(d, manifest)
+        if stand_in:
+            try:
+                outpaint_file(report=self._state)
+            except StopRequested:
+                raise
+            except Exception as e:  # offline before the first download: 9B extends itself (blanked reference, 7ch)
+                protocol.log("[outpaint] LoRA not available: %s" % e)
+                protocol.note("Outpaint LoRA not available: extended with FLUX.2 [klein] 9B")
+                stand_in = None
+        if stand_in:
+            protocol.note("Extended with FLUX.2 [klein] 4B and its outpaint LoRA")
+            model_dir, d = stand_in, dict(d, model_dir=stand_in)
+            manifest = load_manifest(model_dir)
         if manifest.get("unsupported") or manifest.get("arch") not in registry.ARCHS:
             # installed, but no runtime of the app can run its kind yet
             raise ValueError(manifest.get("unsupported") or "%s models can not run in VulKara yet"
@@ -1433,6 +1567,11 @@ class DiffusersEngine:
                 negative = spec["empty_negative"]  # these pipelines only guide with a negative prompt
         loras = self._resolve_loras(d.get("loras") or [], spec, m) + list(helper_loras)
         loras += keep_picture_loras(d, manifest, init_image is not None, report=self._state)
+        outpaint = outpaint_loras(d, manifest, init_image is not None, report=self._state)
+        loras += outpaint
+        if outpaint:
+            # the LoRA's prompt first (set before the staged encoding below); the user's words follow it
+            prompt = OUTPAINT_PROMPT + (". " + prompt.strip() if prompt.strip() else "")
         # a model with LoRAs baked in (merge.py) takes their trigger words as the LoRAs would have brought them
         baked = (m.get("trigger_words") or []) if (m.get("source") or {}).get("type") == "merge" else []
         for words in [l["trigger_words"] for l in loras] + [baked]:
@@ -1496,7 +1635,7 @@ class DiffusersEngine:
         if init_image is not None and d.get("mask_image"):
             # inpainting / outpainting (AI Canvas): white in the mask is painted anew
             if not spec.get("inpaint_pipeline"):
-                raise ValueError("%s can not paint into a mask; use an SDXL, SD 3.5, FLUX.1, Chroma or Z-Image model" % spec["label"])
+                raise ValueError("%s can not paint into a mask; use an SD 1.5, SD 2.x, SDXL, SD 3.5, FLUX.1, Chroma, Qwen-Image or Z-Image model" % spec["label"])
             if pipe_class:
                 raise ValueError("ControlNet and a mask can not be combined")
             from PIL import Image
@@ -1506,7 +1645,11 @@ class DiffusersEngine:
             fraction = 16 if d.get("prefill") else 48
             mask = _grow_mask(raw_mask, fraction)
             strength = min(spec.get("max_strength", 1.0), max(0.05, float(d.get("inpaint_strength", 1.0))))
-            if d.get("prefill"):
+            if outpaint:
+                # an edit of the picture with a green border: the LoRA redraws all of it a little greener, so only
+                # the border is taken and its tone matched to the picture along the edge (blend_into below)
+                call["image"] = [green_border(init_image, raw_mask)]
+            elif d.get("prefill"):
                 # outpainting: the empty part starts from the colours along the picture's edge
                 init_image = _prefill(init_image, raw_mask)
             elif not (d.get("prompt") or "").strip():
@@ -1525,9 +1668,10 @@ class DiffusersEngine:
                 init_image = full_image.crop(box).resize((cw, ch), Image.LANCZOS)
                 mask = full_mask.crop(box).resize((cw, ch))
                 call["width"], call["height"] = cw, ch
-            call["image"], call["mask_image"] = init_image, mask
-            call["strength"] = strength
-            pipe_class = spec["inpaint_pipeline"]
+            if not outpaint:
+                call["image"], call["mask_image"] = init_image, mask
+                call["strength"] = strength
+                pipe_class = spec["inpaint_pipeline"]
         elif init_image is not None:
             init_image = init_image.resize((width, height))
             if spec["family"] == "flux2" or spec.get("image_reference"):
@@ -1547,7 +1691,12 @@ class DiffusersEngine:
 
         if pipe_class:
             import diffusers
-            pipe = _derive_pipeline(getattr(diffusers, pipe_class), pipe, **pipe_extra)
+            pipe_cls = getattr(diffusers, pipe_class)
+            # extending with klein: the start picture's reference without the smeared prefill (MEASUREMENTS 7ch)
+            blank = pipe_class == "Flux2KleinInpaintPipeline" and d.get("prefill")
+            pipe = _derive_pipeline(_blanked_reference(pipe_cls) if blank else pipe_cls, pipe, **pipe_extra)
+            if blank:
+                pipe.reference_mask = call["mask_image"]
             accepted = inspect.signature(pipe.__call__).parameters
             for k in ("width", "height"):
                 if k not in accepted:  # SDXL img2img takes the size from the image
@@ -1582,11 +1731,67 @@ class DiffusersEngine:
                 img = _blend_into(full_image, img, full_mask, raw_mask, fraction)
             elif mask is not None:
                 img = _blend_into(init_image, img, mask, raw_mask, fraction)
-            path = self._save(img, prompt)
+            elif d.get("face_detail") and spec["family"] in FACE_DETAIL_FAMILIES and spec.get("inpaint_pipeline"):
+                img = self._faces_refined(img, model, spec, call, seed + i, steps, d["face_detail"],
+                                          quiet=d.get("_quiet", False))
+            # an extension is named by the user's words, not by the LoRA's fixed prompt
+            path = self._save(img, (d.get("prompt") or "extended") if outpaint else prompt)
             paths.append(path)
             if not d.get("_quiet") and not d.get("_hold"):
                 protocol.result(path)
         return paths
+
+    def _faces_refined(self, img, model, spec, call, seed, steps, strength, quiet=False):
+        """The picture with its faces refined (_face_detail) and a note how many; when that fails the finished picture
+        as it is, with the reason (offline, the face finder's first download failed): the job is not lost for it."""
+        try:
+            img, faces = self._face_detail(img, model, spec, call, seed, steps, float(strength), quiet=quiet)
+        except StopRequested:
+            raise
+        except Exception as e:
+            traceback.clear_frames(e.__traceback__)  # the traceback holds the pipeline's tensors
+            protocol.log("[face detail] %s: %s" % (type(e).__name__, e))
+            protocol.note("Faces not refined: %s" % e)
+            return img
+        if faces:
+            protocol.note("Faces refined: %d" % faces)
+        return img
+
+    def _face_detail(self, img, model, spec, call, seed, steps, strength, quiet=False, fraction=48):
+        """The faces of a generated picture painted again (K4): each in the crop around it at the picture's size, with
+        the same prompt and seed at a low strength, put back with a soft edge and its tone matched (blend_into).
+        Returns (picture, faces refined); a face whose crop would be most of the picture is large enough already."""
+        import diffusers
+        import restore
+        from PIL import Image
+        self._state("Finding faces")
+        masks = face_masks(img, restore.detector_path())
+        if not masks:
+            return img, 0
+        pipe = _derive_pipeline(getattr(diffusers, spec["inpaint_pipeline"]), model.pipe)
+        accepted = inspect.signature(pipe.__call__).parameters
+        # the prompt, its encoding and the sampling settings; not the input or control picture of the first pass
+        base = {k: v for k, v in call.items() if k in accepted and not any(w in k for w in ("image", "control", "strength"))}
+        width, height = img.size
+        done = 0
+        for i, raw in enumerate(masks):
+            mask = _grow_mask(raw, fraction)
+            crop = _mask_crop(mask, width, height)
+            if not crop:
+                continue
+            box, (cw, ch) = crop
+            self._state("Refining face %d of %d" % (i + 1, len(masks)))
+            s = min(0.6, max(0.2, strength))
+            # the pipelines run steps × strength steps and refuse fewer than one (few-step models: 4 × 0.2)
+            n = max(steps, math.ceil(1 / s))
+            part = self._run(pipe, dict(base, image=img.crop(box).resize((cw, ch), Image.LANCZOS),
+                                        mask_image=mask.crop(box).resize((cw, ch)), width=cw, height=ch,
+                                        strength=s, num_inference_steps=n), seed, n, model, quiet=quiet)
+            painted = img.copy()
+            painted.paste(part.convert("RGB").resize((box[2] - box[0], box[3] - box[1]), Image.LANCZOS), box[:2])
+            img = _blend_into(img, painted, mask, raw, fraction)
+            done += 1
+        return img, done
 
     def photo_tool(self, d):
         """A photo tool (photo_tools.py, ONNX on the CPU): sharpen, denoise, enlarge, cut out. No diffusion model is
@@ -1604,6 +1809,138 @@ class DiffusersEngine:
         if not d.get("_quiet"):
             protocol.result(path)
         return [path]
+
+    def remove_object(self, d):
+        """A painted object removed (remove.py): LaMa fills small areas, RORem large ones or when asked, ObjectClear
+        (with shadows) when asked or downloaded and allowed; Compare makes one picture with each method on this Mac. No picture model is needed; RORem and ObjectClear free the loaded one first
+        (16 GB)."""
+        import objectclear as oc
+        import remove as rm
+        import restore as rs
+        from PIL import Image
+        method = d["remove_object"].get("method") or "auto"
+        # the app refuses it already in a build with commercially usable models only; the engine does not rely on that
+        if method == "objectclear" and d["remove_object"].get("objectclear") is not True:
+            raise ValueError("ObjectClear allows non-commercial use only: not in this edition")
+        original = colour.open_rgb(d["input_image"])
+        if not d.get("mask_image"):
+            raise ValueError("Paint over the object to remove first")
+        mask = Image.open(d["mask_image"])
+        folder, oc_folder = rs.helper_folder(rm.HELPER), rs.helper_folder(oc.HELPER)
+        seed = d.get("seed")
+        seed = int(seed) if seed not in (None, "") and int(seed) >= 0 else random.randint(0, 2 ** 31 - 1)
+        rorem_ready, oc_ready, allowed = rm.ready(folder), oc.ready(oc_folder), d["remove_object"].get("objectclear") is True
+        methods = rm.methods(method, rorem_ready, oc_ready, allowed)
+        if method == "compare" and len(methods) == 1:
+            protocol.note("Only LaMa to compare: the other methods are not downloaded (Models → Helper models)")
+        paths = []
+        for n, each in enumerate(methods, 1):
+            t0 = time.time()
+            out, used, share = rm.remove(
+                original, mask, each, lama=lambda img, m: rs.fill(img, m, report=self._state),
+                rorem=lambda img, m: self._rorem_fill(folder, img, m, seed),
+                rorem_ready=rorem_ready, state=self._state, note=protocol.note,
+                objectclear=lambda img, m: self._objectclear_fill(oc_folder, img, m, seed),
+                objectclear_ready=oc_ready, auto_objectclear=allowed, log=protocol.log,
+                persons=lambda: self._persons(d["input_image"], original.size), check=method != "compare")
+            name = {"lama": "LaMa", "rorem": "RORem", "objectclear": "ObjectClear"}[used]
+            said = "Picture %d: filled" % n if len(methods) > 1 else "Filled"
+            protocol.note("%s by %s (%.0f %% of the picture)" % (said, name, share * 100))
+            protocol.log("[remove] %s, %.1f %% of the picture, %.1fs" % (used, share * 100, time.time() - t0))
+            paths.append(self._save(out, "object removed %s" % name))
+            protocol.result(paths[-1])
+        return paths
+
+    def _rorem_fill(self, folder, img, m, seed):
+        """The grown mask m (0/1) of img filled by RORem at 512 px in a square around it; loaded for this job only."""
+        import numpy as np
+        import remove as rm
+        import torch
+        from diffusers import StableDiffusionXLInpaintPipeline
+        from PIL import Image
+        self.unload()
+        self._state("Loading RORem")
+        pipe = None
+        try:
+            with self.reader.interruptible(StopRequested) if self.reader is not None else _nothing():
+                pipe = StableDiffusionXLInpaintPipeline.from_pretrained(folder, dtype=torch.float16).to(self.device)
+            _bf16_vae(pipe.vae)  # SDXL's VAE overflows in float16
+            x0, y0, x1, y1 = rm.box(m, max(24, int(min(m.shape) * 0.06)))
+            crop, hole, side = rm.square_crop(np.asarray(img.convert("RGB")), m, (x0, y0, x1, y1))
+            self._state("Removing the object")
+            latents = self._run(pipe, dict(prompt="", image=crop, mask_image=hole, width=rm.SIZE, height=rm.SIZE,
+                                           num_inference_steps=rm.STEPS, guidance_scale=rm.GUIDANCE,
+                                           strength=rm.STRENGTH, output_type="latent"), seed, rm.STEPS)
+            filled = _decode_sdxl(pipe, latents[None]).resize((side, side), Image.LANCZOS).crop((0, 0, x1 - x0, y1 - y0))
+        except BaseException as e:
+            # the traceback holds the pipeline (in _run's frame): without this its 7 GB stayed after a cancel
+            traceback.clear_frames(e.__traceback__)
+            raise
+        finally:
+            del pipe
+            _free_memory("RORem")
+        out = img.copy()
+        out.paste(filled, (x0, y0))
+        return out
+
+    def _persons(self, picture, size):
+        """The people in the picture as a map (1..n each, 0 = none; uint8 at size) by Apple Vision (the app's helper,
+        VK_SUBJECT_HELPER), so Remove with ObjectClear leaves the unpainted ones alone; None when there is none or it
+        can not be asked (then only faces are protected)."""
+        import subprocess
+        import tempfile
+        import numpy as np
+        from PIL import Image
+        helper = os.environ.get("VK_SUBJECT_HELPER") or ""
+        if not os.path.isfile(helper):
+            protocol.log("[remove] no person map: helper not found")
+            return None
+        with tempfile.TemporaryDirectory() as work:
+            out = os.path.join(work, "persons.png")
+            try:
+                run = subprocess.run([helper, "--persons", picture, out], capture_output=True, text=True, timeout=60)
+            except (OSError, subprocess.TimeoutExpired) as e:
+                protocol.log("[remove] no person map: %s" % e)
+                return None
+            if run.returncode != 0:
+                if run.returncode != 4:  # 4: no person in the picture
+                    protocol.log("[remove] no person map: %s" % run.stderr.strip())
+                return None
+            with Image.open(out) as m:
+                # turned otherwise than the picture: no map rather than people protected in the wrong places
+                if abs(m.size[0] / m.size[1] - size[0] / size[1]) > 0.01:
+                    protocol.log("[remove] no person map: %s against the picture's %s" % (m.size, size))
+                    return None
+                return np.asarray(m.convert("L").resize(size, Image.NEAREST) if m.size != size else m.convert("L")).copy()
+
+    def _objectclear_fill(self, folder, img, m, seed):
+        """The grown mask m (0/1) of img filled by ObjectClear on the whole picture at its working size, and the
+        object's effects (shadow, reflection) it marked, 0/1 at img's size; loaded part by part for this job only."""
+        import objectclear as oc
+        import torch
+        from PIL import Image
+        self.unload()
+        self._state("Loading ObjectClear")
+        sync = torch.mps.synchronize if self.device == "mps" else (lambda: None)
+
+        def on_step(i, latents):
+            sync()  # MPS runs asynchronously: report a step once it is really done
+            protocol.progress(round(100.0 * (i + 1) / oc.STEPS, 1))
+            if self.reader is not None and self.reader.stop_requested():
+                raise StopRequested()
+
+        loading = (lambda: self.reader.interruptible(StopRequested)) if self.reader is not None else _nothing
+        small, hole = oc.prepare(img, Image.fromarray(m * 255))
+        try:
+            out, attention = oc.run(folder, small, hole, seed=seed, on_step=on_step, device=self.device,
+                                    loading=loading)
+        except BaseException as e:
+            # the traceback holds the models (in run's frame): without this their memory stayed after a cancel
+            traceback.clear_frames(e.__traceback__)
+            raise
+        finally:
+            _free_memory("ObjectClear")
+        return out, oc.effects(attention, m)
 
     def restore(self, d):
         """An old photo restored (restore.py): corrected, repaired by FLUX.2 under guard rails, its soft detail rebuilt

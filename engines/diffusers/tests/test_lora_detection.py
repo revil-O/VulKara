@@ -61,6 +61,7 @@ EXPECTED = {
     "flux2_dev_aitoolkit": ("flux2", "dev"),
     "klein9_aitoolkit": ("flux2", "klein9b"),
     "klein4_aitoolkit": ("flux2", "klein4b"),
+    "klein4_peft_bfl": ("flux2", "klein4b"),  # fal's outpaint LoRA: peft prefix, FLUX.2 original names
     "qwen_aitoolkit": ("qwen_image", None),
     "krea2_aitoolkit": ("krea2", None),
     "krea2_kohya": ("krea2", None),

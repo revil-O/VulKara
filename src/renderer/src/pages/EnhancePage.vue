@@ -7,7 +7,7 @@
 // .onnx). Results go through the queue, the content filter and the history like every other result.
 import { englishToolName } from '@shared/i18n/data'
 import { jobLabel } from '../util/labels'
-import { computed, onActivated, onMounted, ref, watch } from 'vue'
+import { computed, onActivated, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Download, Eraser, FileUp, Paintbrush, Play, Scissors, Trash2 } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
@@ -21,7 +21,8 @@ import { useImportsStore } from '../stores/imports'
 import { useQueueStore } from '../stores/queue'
 import { cleanError } from '../stores/runtimes'
 import { t } from '../i18n'
-import type { PhotoTool, QueuedJob, RecommendedTool } from '@shared/api'
+import type { PhotoTool, QueuedJob, RecommendedTool, Selected } from '@shared/api'
+import { nextRequest, type Click } from '../util/mask_ops'
 import type { Job } from '@shared/types'
 
 const queue = useQueueStore()
@@ -50,9 +51,17 @@ const jobs = computed(() => queue.ofPage('enhance'))
 const tool = computed(() => installed.value.find((tl) => tl.folder === chosen.value))
 
 // selecting (SAM): clicks in picture pixels, the mask they give
-const points = ref<[number, number, number][]>([])
-const selection = ref<{ mask: string; score: number }>()
+// every click is a row of the clicks so far and SAM's candidate, with SAM's answer once it is there, so undo goes back
+// exactly (also to a larger candidate) and the next click goes on from the answer of the row it follows
+// (shallow: a row is known by itself, it is replaced, never changed)
+const rows = shallowRef<{ clicks: Click[]; pick?: number; got?: Selected }[]>([])
+const points = computed(() => rows.value[rows.value.length - 1]?.clicks ?? [])
+const selection = computed(() => rows.value[rows.value.length - 1]?.got)
+// over the picture the last answer stays while the next click is worked on
+const shown = computed(() => rows.value.findLast((r) => r.got)?.got)
 const selecting = ref(false)
+let generation = 0  // an answer that comes back after the picture or the tool changed is dropped
+let queued: Click | undefined  // the last click made while a selection ran
 
 async function load(): Promise<void> {
   const list = await window.vk.tools.list()
@@ -82,8 +91,9 @@ watch(chosen, () => {
 })
 watch([input, chosen], () => {
   error.value = ''
-  points.value = []
-  selection.value = undefined
+  rows.value = []
+  queued = undefined
+  generation++
 })
 
 const downloading = (tl: RecommendedTool) => {
@@ -200,30 +210,45 @@ async function click(event: MouseEvent): Promise<void> {
   const box = img.getBoundingClientRect()
   const x = Math.round(((event.clientX - box.left) / box.width) * size.value[0])
   const y = Math.round(((event.clientY - box.top) / box.height) * size.value[1])
-  points.value = [...points.value, [x, y, event.altKey ? 0 : 1]]
-  await select()
+  await select([x, y, event.altKey ? 0 : 1])
 }
 
-async function select(): Promise<void> {
+async function select(c: Click): Promise<void> {
   const tl = tool.value
-  if (!tl || !points.value.length) {
-    selection.value = undefined
+  // a click while one is worked on: the last such click follows once it is done (as in the mask brush)
+  if (selecting.value) {
+    queued = c
     return
   }
+  if (!tl || !size.value) return
+  // the first click the whole thing, a click on the same spot again a smaller part of it (mask_ops.nextRequest)
+  const last = rows.value[rows.value.length - 1]
+  const prev = last ? { clicks: last.clicks, pick: last.got?.pick, candidates: last.got?.candidates } : undefined
+  const row: { clicks: Click[]; pick?: number } = nextRequest(prev, c, Math.min(...size.value) * 0.02)
+  rows.value = [...rows.value, row]
+  const made = generation
   selecting.value = true
   error.value = ''
   try {
-    selection.value = await window.vk.tools.select(tl.folder, input.value, points.value.map((p) => [p[0], p[1], p[2]] as [number, number, number]))
+    const got = await window.vk.tools.select(tl.folder, input.value, row.clicks.map((p) => [p[0], p[1], p[2]] as Click), row.pick)
+    // only for the row it was asked for, while that is still the last one
+    if (made === generation && rows.value[rows.value.length - 1] === row) rows.value = [...rows.value.slice(0, -1), { ...row, got }]
   } catch (err) {
-    error.value = cleanError(err)
+    // the click gave nothing: it goes, the selection before it stays
+    if (made === generation) {
+      error.value = cleanError(err)
+      rows.value = rows.value.filter((r) => r !== row)
+    }
   } finally {
     selecting.value = false
   }
+  const next = queued
+  queued = undefined
+  if (next && made === generation) await select(next)
 }
 
 function undoClick(): void {
-  points.value = points.value.slice(0, -1)
-  void select()
+  rows.value = rows.value.slice(0, -1)
 }
 
 function toInpaint(): void {
@@ -257,9 +282,9 @@ function open(q: QueuedJob, file: string): void {
         <template v-if="tool?.kind === 'segment'" #default="{ src, loaded }">
           <ZoomPan><div class="pick" :class="{ busy: selecting }">
             <img :src="src" draggable="false" @load="loaded" @click="click" />
-            <template v-if="selection">
-              <div class="overlay outside" :style="overlay(selection.mask, true)" />
-              <div class="overlay inside" :style="overlay(selection.mask, false)" />
+            <template v-if="shown">
+              <div class="overlay outside" :style="overlay(shown.mask, true)" />
+              <div class="overlay inside" :style="overlay(shown.mask, false)" />
             </template>
             <span
               v-for="(p, i) in size ? points : []" :key="i" class="dot" :class="{ no: !p[2] }"

@@ -64,3 +64,82 @@ def test_the_step_at_the_grown_mask_edge_is_hidden():
     out = np.asarray(engine._blend_into(original, painted, grown, raw, 48), dtype=float)[:, :, 0]
     assert np.abs(out[500, 300:450] - 100).max() <= 1  # no disc
     assert out[500, 460:540].min() >= 220
+
+
+K4 = {"arch": "flux2_klein", "family": "flux2", "components": {"transformer": 3.9}}
+K9 = {"arch": "flux2_klein", "family": "flux2", "components": {"transformer": 8.1}}
+
+
+def test_extending_with_klein_4b_takes_the_outpaint_lora_downloaded_once(monkeypatch, tmp_path):
+    import helpers
+    import restore
+    monkeypatch.setattr(restore, "helper_folder", lambda helper_id: str(tmp_path))
+    installs = []
+    monkeypatch.setattr(helpers, "install", lambda helper_id, report=None: (
+        installs.append(helper_id), (tmp_path / engine.OUTPAINT_FILE).write_bytes(b"")))
+    extend = {"prefill": True, "mask_image": "m.png"}
+    for _ in range(2):
+        (lora,) = engine.outpaint_loras(extend, K4, picture=True)
+    assert installs == [engine.OUTPAINT_HELPER]
+    assert lora["file"] == str(tmp_path / engine.OUTPAINT_FILE) and lora["scale"] == 1.1 and lora["plan_gb"] > 0
+    # only extending (not repainting a part, not a new picture) and only klein 4B: the LoRA is made for its width
+    assert engine.outpaint_loras({"mask_image": "m.png"}, K4, picture=True) == []
+    assert engine.outpaint_loras(extend, K4, picture=False) == []
+    assert engine.outpaint_loras(extend, K9, picture=True) == []
+
+
+def test_the_empty_part_turns_pure_green_the_picture_stays():
+    img = Image.new("RGB", (64, 32), (90, 120, 150))
+    out = np.asarray(engine.green_border(img, rect_mask((64, 32), [0, 0, 9, 31])))
+    assert (out[:, :10] == (0, 255, 0)).all() and (out[:, 10:] == (90, 120, 150)).all()
+
+
+def test_extending_with_klein_9b_takes_a_klein_4b_installed_beside_it(tmp_path):
+    import json
+    k4 = dict(K4, defaults={"num_steps": 4})
+    for name, mf in (("FLUX.2-klein-9B", K9), ("FLUX.2-klein-4B", k4), ("SDXL", {"arch": "sdxl", "family": "sdxl"})):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / engine.MANIFEST).write_text(json.dumps(mf))
+    (tmp_path / "half-imported").mkdir()  # no model.json
+    nine = str(tmp_path / "FLUX.2-klein-9B")
+    extend = {"prefill": True, "input_image": "a.png", "mask_image": "m.png", "model_dir": nine}
+    assert engine.outpaint_stand_in(extend, K9) == str(tmp_path / "FLUX.2-klein-4B")
+    # repainting a part, or the 4B itself: as chosen
+    assert engine.outpaint_stand_in(dict(extend, prefill=False), K9) is None
+    assert engine.outpaint_stand_in(extend, K4) is None
+    # LoRAs chosen for 9B do not fit 4B: the job stays as chosen
+    assert engine.outpaint_stand_in(dict(extend, loras=[{"path": "x"}]), K9) is None
+    # not the 4B base (50 steps, the job keeps 9B's 4), not a 4B imported on another Mac (its memory plan)
+    four = tmp_path / "FLUX.2-klein-4B" / engine.MANIFEST
+    four.write_text(json.dumps(dict(K4, defaults={"num_steps": 50})))
+    assert engine.outpaint_stand_in(extend, K9) is None
+    four.write_text(json.dumps(dict(k4, imported_on={"ram_gb": 999})))
+    assert engine.outpaint_stand_in(extend, K9) is None
+    four.unlink()
+    assert engine.outpaint_stand_in(extend, K9) is None
+
+
+def test_extending_with_klein_blanks_the_masked_part_of_the_reference():
+    torch = pytest.importorskip("torch")
+    latents = torch.ones(1, 128, 4, 6)
+    mask = rect_mask((96, 64), [80, 0, 95, 63])  # the right sixth of the picture is painted anew
+    mask.putpixel((10, 10), 255)  # one masked pixel blanks its whole cell
+    out = engine.blank_reference(latents, mask)
+    assert out.shape == latents.shape
+    assert (out[..., 5] == 0).all()  # the new border
+    assert out[0, 0, 0, 0] == 0
+    assert out[0, :, 1:, :5].eq(1).all() and out[0, :, 0, 1:5].eq(1).all()  # the rest of the picture as it was
+
+
+def test_the_outpaint_lora_says_when_it_can_not_be_downloaded(monkeypatch, tmp_path):
+    import helpers
+    import restore
+    monkeypatch.setattr(restore, "helper_folder", lambda helper_id: str(tmp_path))
+
+    def offline(helper_id, report=None):
+        raise OSError("no network")
+    monkeypatch.setattr(helpers, "install", offline)
+    with pytest.raises(OSError):  # the engine then lets 9B extend itself instead of its 4B stand-in
+        engine.outpaint_file()
+    (tmp_path / engine.OUTPAINT_FILE).write_bytes(b"")
+    assert engine.outpaint_file() == str(tmp_path / engine.OUTPAINT_FILE)  # there: no download asked

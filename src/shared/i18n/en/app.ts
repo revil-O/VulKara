@@ -11,6 +11,7 @@ export default {
     showAll: 'Show All',
     quit: 'Quit VulKara',
     open: 'Open VulKara',
+    checkUpdate: 'Check for Update…',
     noJob: 'No job running',
     running: '{model} · {progress} %',
     runningEta: '{model} · {progress} % · {eta} left',

@@ -41,6 +41,9 @@ def test_the_catalog_is_pinned_and_licensed_for_commercial_use():
             assert t["kind"] == "image" and t["model"].endswith(".pth") and t["range"] == "0-1", t["id"]
         else:
             assert t["model"].endswith(".onnx"), t["id"]
+        for v in (t.get("variants") or {}).values():  # other weights: pinned, and their own licence when it differs
+            assert v["url"].startswith("https://") and len(v["sha256"]) == 64, t["id"]
+            assert v.get("licence", t["licence"]) in ("MIT", "Apache-2.0", "BSD-3-Clause", "CC-BY-4.0"), t["id"]
     assert sum(t.get("runtime") == "torch" for t in photo_tools.catalog()) == 3
 
 
@@ -131,7 +134,7 @@ def test_a_variant_is_fetched_on_first_use_into_its_own_folder(helpers, tmp_path
     folder, m = photo_tools.import_file(tiny_torch_model, "Tiny")
     data = open(tiny_torch_model, "rb").read()
     m["variants"] = {"sharp": {"label": "Sharp", "description": "", "file": "sharp.pth", "url": "https://example.org/sharp.pth",
-                               "sha256": hashlib.sha256(data).hexdigest(), "size_mb": 1}}
+                               "sha256": hashlib.sha256(data).hexdigest(), "size_mb": 1, "tile_metal_gb": {"128": 0.1}}}
     json.dump(m, open(os.path.join(folder, "tool.json"), "w"))
     fetched = []
 
@@ -142,18 +145,29 @@ def test_a_variant_is_fetched_on_first_use_into_its_own_folder(helpers, tmp_path
         return dest
 
     monkeypatch.setattr(pinned, "fetch_urls", fake_fetch)
+    tables = []
+    tile = photo_tools.metal_tile
+    monkeypatch.setattr(photo_tools, "metal_tile", lambda m: tables.append(m.get("tile_metal_gb")) or tile(m))
     path = photo_tools.apply({"photo_tool": {"folder": folder, "variant": "sharp"}, "input_image": photo(tmp_path, (40, 30))}, tmp_path)
     assert Image.open(path).size == (80, 60)
     assert fetched == [os.path.join(folder, "variants", "sharp")]
+    photo_tools.apply({"photo_tool": {"folder": folder}, "input_image": photo(tmp_path, (40, 30))}, tmp_path)
+    assert tables == [{"128": 0.1}, None]  # the variant's own tile table, the tool's own (none) without it
     with pytest.raises(ValueError, match="no variant"):
         photo_tools.apply({"photo_tool": {"folder": folder, "variant": "gone"}, "input_image": photo(tmp_path, (40, 30))}, tmp_path)
 
 
-def test_the_catalog_offers_scunet_sharp_and_the_jpeg_quality():
+def test_the_catalog_offers_scunet_sharp_and_the_jpeg_quality(monkeypatch):
     tools = {t["id"]: t for t in photo_tools.catalog()}
     sharp = tools["scunet-real"]["variants"]["sharp"]
     assert sharp["url"].startswith("https://github.com/cszn/KAIR/") and len(sharp["sha256"]) == 64
     assert tools["fbcnn-color"].get("quality") is True
+    natural = tools["swinir-real-x4"]["variants"]["natural"]
+    monkeypatch.setattr(photo_tools, "_device", lambda: "mps")
+    assert natural["url"].startswith("https://github.com/Phhofm/models/") and natural["licence"] == "CC-BY-4.0"
+    # 16 GB Mac (Metal budget 12.7 GB): 512 alone (11.5 GB, run in the test app at 12.3 GB, no swap), 384 beside 1 GB
+    assert photo_tools.metal_tile(natural, budget_gb=12.7, used_gb=0.0) == 512
+    assert photo_tools.metal_tile(natural, budget_gb=12.7, used_gb=1.0) == 384
 
 
 def test_a_file_that_is_no_photo_model_is_refused(tmp_path):
@@ -278,3 +292,143 @@ def test_the_importer_takes_onnx_files_as_photo_tools(helpers, monkeypatch):
     tag, done = seen[-1]
     assert tag == "__import_done__" and done["manifest"]["name"] == "Twice"
     assert [m["name"] for _, m in photo_tools.installed()] == ["Twice"]
+
+
+class _Session:
+    """An ONNX session stand-in: fixed outputs, the inputs it got kept."""
+
+    def __init__(self, names, outputs):
+        self.names, self.outputs, self.got = names, outputs, None
+
+    def get_inputs(self):
+        return [type("I", (), {"name": n})() for n in self.names]
+
+    def get_outputs(self):
+        return [type("O", (), {"name": n})() for n in self.outputs]
+
+    def run(self, _names, feeds):
+        self.got = feeds
+        return [self.outputs[n] for n in self.outputs]
+
+
+def test_a_selection_is_made_on_the_upright_picture_of_a_rotated_jpeg(tmp_path):
+    # upright 100×60, red on the left; stored on its side with EXIF orientation 6 (as a phone saves a portrait)
+    upright = np.zeros((60, 100, 3), np.uint8)
+    upright[:, :50, 0] = 255
+    path = str(tmp_path / "rotated.jpg")
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    Image.fromarray(upright).transpose(Image.Transpose.ROTATE_90).save(path, exif=exif, quality=95)
+    assert Image.open(path).size == (60, 100)
+
+    seg = object.__new__(photo_tools.Segmenter)
+    seg.m, seg.image, seg.embeddings = {"size": 32}, None, None
+    seg.encoder = _Session(["pixel_values"], {"image_embeddings": np.zeros((1, 4, 2, 2), np.float32)})
+    low = np.full((1, 1, 1, 8, 8), -1.0, np.float32)
+    low[..., :, :4] = 1.0  # the left half selected
+    seg.decoder = _Session(["input_points", "input_labels", "image_embeddings"],
+                           {"iou_scores": np.ones((1, 1, 1), np.float32), "pred_masks": low})
+    out = str(tmp_path / "mask.png")
+    seg.select(path, [[25, 30, 1]], out)
+
+    x = seg.encoder.got["pixel_values"][0]  # 3×32×32, the picture as the model saw it
+    assert x[0, :, :14].mean() > x[0, :, 18:].mean() + 1  # red on the left: upright, not on its side
+    mask = np.asarray(Image.open(out))
+    assert mask.shape[:2] == (60, 100)
+    assert mask[:, :45].min() == 255 and mask[:, 55:].max() == 0
+    # the click in the upright picture's pixels, scaled to the model's side
+    assert np.allclose(seg.decoder.got["input_points"][0, 0, 0], [25 * 32 / 100, 30 * 32 / 60])
+
+
+def test_a_selection_picks_its_candidate_by_size_largest_first(tmp_path):
+    # three candidates as SAM gives them: a detail (rated best), the whole thing, a part
+    path = str(tmp_path / "p.png")
+    Image.new("RGB", (16, 16)).save(path)
+    low = np.full((1, 1, 3, 16, 16), -1.0, np.float32)
+    low[0, 0, 0, :2, :2] = 1.0   # 4 pixels
+    low[0, 0, 1, :, :] = 1.0     # 256
+    low[0, 0, 2, :8, :8] = 1.0   # 64
+    seg = object.__new__(photo_tools.Segmenter)
+    seg.m, seg.image, seg.embeddings = {"size": 16}, None, None
+    seg.encoder = _Session(["pixel_values"], {"image_embeddings": np.zeros((1, 4, 2, 2), np.float32)})
+    seg.decoder = _Session(["input_points", "input_labels", "image_embeddings"],
+                           {"iou_scores": np.array([[[0.9, 0.5, 0.7]]], np.float32), "pred_masks": low})
+    out = str(tmp_path / "m.png")
+
+    def area(pick):
+        seg.select(path, [[1, 1, 1]], out, pick)
+        return int((np.asarray(Image.open(out)) > 0).sum())
+
+    # 0 = the whole thing, then ever smaller, and round again
+    assert [area(p) for p in (0, 1, 2, 3)] == [256, 64, 4, 256]
+    ans = seg.select(path, [[1, 1, 1]], out, 1)
+    assert (ans["pick"], ans["candidates"], round(ans["score"], 2)) == (1, 3, 0.7)
+    # no pick: the one SAM rates best, with its place by size
+    ans = seg.select(path, [[1, 1, 1], [9, 9, 0]], out)
+    assert (ans["pick"], round(ans["score"], 2)) == (2, 0.9)
+    assert int((np.asarray(Image.open(out)) > 0).sum()) == 4
+
+
+def test_a_selection_leaves_out_candidates_the_same_as_another(tmp_path):
+    # SAM gives the whole thing twice and a part: two candidates, so the next pick always changes the mask
+    path = str(tmp_path / "p.png")
+    Image.new("RGB", (16, 16)).save(path)
+    low = np.full((1, 1, 3, 16, 16), -1.0, np.float32)
+    low[0, 0, 0, :, :] = 1.0
+    low[0, 0, 1, :, :] = 2.0     # the same shape, other values
+    low[0, 0, 2, :8, :8] = 1.0
+    seg = object.__new__(photo_tools.Segmenter)
+    seg.m, seg.image, seg.embeddings = {"size": 16}, None, None
+    seg.encoder = _Session(["pixel_values"], {"image_embeddings": np.zeros((1, 4, 2, 2), np.float32)})
+    seg.decoder = _Session(["input_points", "input_labels", "image_embeddings"],
+                           {"iou_scores": np.array([[[0.5, 0.9, 0.7]]], np.float32), "pred_masks": low})
+    out = str(tmp_path / "m.png")
+    ans = seg.select(path, [[1, 1, 1]], out)
+    # the best rated one is the duplicate: it takes the place of the shape kept
+    assert (ans["pick"], ans["candidates"]) == (0, 2)
+    areas = []
+    for p in (0, 1, 2):
+        seg.select(path, [[1, 1, 1]], out, p)
+        areas.append(int((np.asarray(Image.open(out)) > 0).sum()))
+    assert areas == [256, 64, 256]
+
+
+def test_a_tool_works_on_the_upright_picture_of_a_rotated_jpeg(helpers, tmp_path):
+    # a phone portrait stored on its side (EXIF orientation 6): the result and a selection's mask are upright
+    folder, _ = photo_tools.import_file(os.path.join(FIX, "enlarge2.onnx"))
+    path = str(tmp_path / "rotated.jpg")
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    Image.new("RGB", (70, 40)).save(path, exif=exif)
+    out = photo_tools.apply({"photo_tool": {"folder": folder}, "input_image": path}, tmp_path)
+    assert Image.open(out).size == (80, 140)
+
+
+def test_a_click_selection_is_one_piece_without_dots_or_holes():
+    # SAM unsure on a glass bottle: a pattern of dots (hand test); and a second thing apart from the click
+    low = np.full((32, 32), -1.0, np.float32)
+    low[4:28, 4:14] = 1.0
+    low[4:28, 4:14][(np.add.outer(np.arange(24), np.arange(10)) % 2) == 1] = -1.0  # every other pixel
+    low[10:12, 8:10] = -1.0  # a hole
+    low[4:10, 20:30] = 1.0   # something else
+    out = photo_tools.whole(low, [(8, 16)])
+    # the bottle whole (the outermost corner pixels of the pattern aside)
+    assert (out[5:27, 5:13] > 0).all() and (out[4:28, 4:14] > 0).mean() > 0.99
+    assert (out[4:10, 20:30] <= 0).all()          # the other thing left out
+    assert (out[:, 15:19] <= 0).all() and (out[0] <= 0).all()
+    # no click on any part: all parts stay
+    assert (photo_tools.whole(low, [(17, 30)])[4:10, 20:30] > 0).all()
+
+
+def test_a_hole_with_a_not_this_click_stays_open_and_a_click_beside_the_picture_counts_at_its_edge():
+    ring = np.full((20, 20), -1.0, np.float32)
+    ring[2:18, 2:18] = 1.0
+    ring[7:13, 7:13] = -1.0  # the gap in a mug's handle
+    assert (photo_tools.whole(ring, [(3, 3)])[7:13, 7:13] > 0).all()
+    assert (photo_tools.whole(ring, [(3, 3)], [(10, 10)])[7:13, 7:13] <= 0).all()
+    # x = -1 would have wrapped round to the other side (nothing there): the part at the left edge is taken
+    edge = np.full((20, 20), -1.0, np.float32)
+    edge[:, :5] = 1.0
+    edge[:, 15:] = 1.0
+    out = photo_tools.whole(edge, [(-1, 10)])
+    assert (out[:, :5] > 0).all() and (out[:, 15:] <= 0).all()

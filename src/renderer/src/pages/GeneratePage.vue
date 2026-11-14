@@ -4,7 +4,7 @@
 // the results are in the work area, the settings of the job in the panel on the right.
 import { computed, onActivated, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Dices, Minus, Plus, ScanText, Sparkles, X } from '@lucide/vue'
+import { Dices, Eraser, Minus, Plus, RotateCw, ScanText, Sparkles, X } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import ImageInput from '../components/ImageInput.vue'
 import HintBadge from '../components/HintBadge.vue'
@@ -18,7 +18,7 @@ import { useQueueStore } from '../stores/queue'
 import { useImportsStore } from '../stores/imports'
 import { cleanError } from '../stores/runtimes'
 import { guidanceHint, stepsHint } from '../util/model_fit'
-import { MAX_LORAS, MODES, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, modelDefaults, emptyForm, formProblem, lorasFor, modelsFor, keepsPicture, takesReferences, takesTurbo, takesUpsampler, turboLora, upsamplerHelper, TURBO, type GenerateForm, type Mode } from '../util/job_form'
+import { MAX_LORAS, MODES, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, buildRemoveJob, modelDefaults, emptyForm, formProblem, lorasFor, modelsFor, keepsPicture, takesFaceDetail, takesReferences, takesTurbo, takesUpsampler, turboLora, upsamplerHelper, removes, removeHelper, removeMethods, TURBO, type GenerateForm, type Mode } from '../util/job_form'
 import { MAX_REFERENCES } from '@shared/engine_job'
 import { DEFAULT_SIZES, RATIOS, ratioOf, sizeForRatio } from '../util/sizes'
 import { CONSENT_QUESTION } from '@shared/content_policy'
@@ -26,7 +26,7 @@ import { askConsent } from '../util/consent'
 import { controlTypesFor } from '@shared/controlnet'
 import { flux1Outline } from '@shared/hints'
 import { SIGMA_SCHEDULES, samplersFor } from '@shared/samplers'
-import type { QueuedJob } from '@shared/api'
+import type { HelperModel, QueuedJob } from '@shared/api'
 import type { Job } from '@shared/types'
 import { seedOf } from '@/util/seed'
 import { samplerLabel } from '../util/labels'
@@ -66,6 +66,9 @@ watch(form, () => {
   }
 })
 
+// Inpainting → Remove: the painted object filled from its surroundings, no model and no prompt
+const removing = computed(() => removes(props.mode, form))
+const REMOVE_METHODS = removeMethods()
 const models = computed(() => modelsFor(props.mode, assets.models))
 const model = computed(() => models.value.find((m) => m.id === form.modelId))
 const loras = computed(() => lorasFor(model.value, assets.loras))
@@ -117,7 +120,7 @@ const suggestText = computed(() => {
 
 // steps and guidance the chosen model is not made for (kept from another model)
 // the fast option (FLUX.1 [dev]): the Turbo-Alpha LoRA sets steps and guidance itself
-const fastOffered = computed(() => does.loras && takesTurbo(model.value?.meta))
+const fastOffered = computed(() => does.loras && !removing.value && takesTurbo(model.value?.meta))
 const fastOn = computed(() => fastOffered.value && form.fast)
 const turbo = computed(() => turboLora(assets.loras))
 const stepsFit = computed(() => (fastOn.value ? null : stepsHint(model.value?.meta, form.steps)))
@@ -222,6 +225,43 @@ async function downloadPup(): Promise<void> {
   }
 }
 
+// RORem fills large areas when removing (Auto, Thorough), ObjectClear takes shadows along (With shadows): helper
+// models, downloaded here or on the Models page; the remote web UI can not install helpers, so it only says so
+const shadows = computed(() => form.removeMethod === 'objectclear')
+const helperId = computed(() => removeHelper(form.removeMethod))
+const removeHelpers = ref<HelperModel[] | null>(null)
+async function checkRemoveHelpers(): Promise<void> {
+  try {
+    removeHelpers.value = await window.vk.helpers.list()
+  } catch {
+    removeHelpers.value = null  // the engine says when it is missing
+  }
+}
+watch(removing, (on) => { if (on) void checkRemoveHelpers() }, { immediate: true })
+const helper = computed(() => removeHelpers.value?.find((h) => h.id === helperId.value))
+const helperInstalled = computed<boolean | null>(() => (removeHelpers.value ? helper.value?.installed ?? false : null))
+const helperGb = computed(() => num((helper.value?.sizeMb ?? 0) / 1024, 1))
+const helperDownload = computed(() => imports.of({ source: 'helper', ref: helperId.value }))
+const helperDownloading = computed(() => helperDownload.value?.state === 'waiting' || helperDownload.value?.state === 'running')
+watch(() => ['rorem', 'objectclear'].map((id) => imports.of({ source: 'helper', ref: id })?.state).join(), (states) => {
+  if (states.includes('done')) void checkRemoveHelpers()
+})
+async function downloadHelper(): Promise<void> {
+  const id = helperId.value
+  const gb = helperGb.value
+  const asked = shadows.value
+    ? window.vk.dialog.ask(t('generate.remove.shadowsDownloadAsk', { gb }), t('generate.remove.downloadYes'), t('common.cancel'), t('generate.remove.shadowsDownloadDetail', { gb }))
+    : window.vk.dialog.ask(t('generate.remove.downloadAsk', { gb }), t('generate.remove.downloadYes'), t('common.cancel'), t('generate.remove.downloadDetail', { gb }))
+  if (!(await asked)) return
+  error.value = ''
+  try {
+    void imports.start()
+    await window.vk.helpers.install(id)
+  } catch (err) {
+    error.value = cleanError(err)
+  }
+}
+
 const turboRequest = { source: 'hf' as const, ref: TURBO.ref, file: TURBO.file, name: TURBO.name }
 const turboDownload = computed(() => imports.of(turboRequest))
 const turboDownloading = computed(() => turboDownload.value?.state === 'waiting' || turboDownload.value?.state === 'running')
@@ -239,12 +279,15 @@ async function generate(): Promise<void> {
   error.value = problem.value
   if (!error.value && fastOn.value && !turbo.value) error.value = t('generate.fast.missing')
   if (!error.value && props.mode === 'text' && form.upsample && pupInstalled.value === false) error.value = up('missing')
-  if (error.value || !model.value || sending.value) return
+  if (!error.value && removing.value && (form.removeMethod === 'rorem' || shadows.value) && helperInstalled.value === false) {
+    error.value = shadows.value ? t('generate.remove.shadowsMissing') : t('generate.remove.missing')
+  }
+  if (error.value || (!model.value && !removing.value) || sending.value) return
   sending.value = true
   try {
     let maskImage: string | undefined
     if (props.mode === 'inpaint') {
-      const data = mask.value?.exportMask()
+      const data = await mask.value?.exportMask()
       if (!data) return
       maskImage = await window.vk.files.writeImage(data)
     }
@@ -254,21 +297,49 @@ async function generate(): Promise<void> {
       if (!data) return
       patternImage = await window.vk.files.writeImage(data)
     }
-    const job = buildJob(props.mode, form, model.value, assets.loras, { maskImage, patternImage, inputSize: inputSize.value })
-    const count = does.count ? form.count : 1
-    try {
-      await queue.add(job, count)
-    } catch (err) {
-      const message = cleanError(err)
-      if (message !== CONSENT_QUESTION) throw err
-      if (await askConsent()) await queue.add({ ...job, consent: true }, count)
-    }
+    const extras = { maskImage, patternImage, inputSize: inputSize.value }
+    await send(removing.value ? buildRemoveJob(form, extras) : buildJob(props.mode, form, model.value!, assets.loras, extras),
+      does.count && !removing.value ? form.count : 1)
   } catch (err) {
     error.value = cleanError(err)
   } finally {
     sending.value = false
   }
 }
+
+async function send(job: Omit<Job, 'id'>, count: number): Promise<void> {
+  try {
+    await queue.add(job, count)
+  } catch (err) {
+    const message = cleanError(err)
+    if (message !== CONSENT_QUESTION) throw err
+    if (await askConsent()) await queue.add({ ...job, consent: true }, count)
+  }
+}
+
+// the newest finished removal of this page: Remove again takes its result with the same mask (leftovers, shadows)
+// (not after Compare: which of its pictures to go on with is the user's pick, from the gallery)
+const lastRemoval = computed(() => {
+  const q = jobs.value.filter((q) => q.state === 'done' && q.job.removeObject && q.job.maskImage && q.results.length).at(-1)
+  return q?.job.removeObject?.method === 'compare' ? undefined : q
+})
+async function removeAgain(): Promise<void> {
+  const q = lastRemoval.value
+  if (!q || sending.value) return
+  error.value = ''
+  sending.value = true
+  try {
+    const picture = q.results[0]
+    form.inputImage = picture
+    baseMask.value = { image: picture, mask: q.job.maskImage! }
+    await send(buildRemoveJob(form, { maskImage: q.job.maskImage, inputSize: [q.job.width, q.job.height] }), 1)
+  } catch (err) {
+    error.value = cleanError(err)
+  } finally {
+    sending.value = false
+  }
+}
+
 
 function addLora(): void {
   const free = loras.value.find((l) => !form.loras.some((x) => x.id === l.id))
@@ -301,13 +372,14 @@ const labelPreview = computed(() => {
       <PatternEditor v-if="mode === 'illusion'" ref="pattern" :width="form.width" :height="form.height" />
       <ImageInput v-if="does.input" v-model="form.inputImage" @size="(w, h) => (inputSize = [w, h])">
         <template v-if="mode === 'inpaint'" #default="{ src, loaded }">
-          <MaskCanvas ref="mask" :src="src" :base="startMask" @loaded="loaded" @change="hasMask = $event" />
+          <MaskCanvas ref="mask" :src="src" :base="startMask" :image="remote ? undefined : form.inputImage" @loaded="loaded" @change="hasMask = $event" />
         </template>
       </ImageInput>
 
       <div class="prompt card">
+        <p v-if="removing" class="dim">{{ t('generate.remove.intro') }}</p>
         <textarea
-          v-model="form.prompt" :placeholder="t(TEXTS[mode].prompt)" :rows="mode === 'video' || mode === 'illusion' ? 5 : 14" spellcheck="false"
+          v-else v-model="form.prompt" :placeholder="t(TEXTS[mode].prompt)" :rows="mode === 'video' || mode === 'illusion' ? 5 : 14" spellcheck="false"
           @keydown.meta.enter.prevent="generate"
         />
         <div class="send">
@@ -360,13 +432,17 @@ const labelPreview = computed(() => {
               <label class="check"><input v-model="form.aiLabelSubtle" type="checkbox" /> {{ t('generate.aiLabel.subtle') }}</label>
             </template>
           </div>
+          <button v-if="removing && lastRemoval" class="btn" :disabled="sending" :title="t('generate.remove.againHint')" @click="removeAgain">
+            <RotateCw :size="14" /> {{ t('generate.remove.again') }}
+          </button>
           <button class="btn primary" :disabled="sending || !!describing" @click="generate">
-            <Sparkles :size="14" /> {{ does.count && form.count > 1 ? t('generate.send.generateCount', { n: form.count }) : t('generate.send.generate') }}
+            <template v-if="removing"><Eraser :size="14" /> {{ t('generate.remove.send') }}</template>
+            <template v-else><Sparkles :size="14" /> {{ does.count && form.count > 1 ? t('generate.send.generateCount', { n: form.count }) : t('generate.send.generate') }}</template>
           </button>
         </div>
       </div>
 
-      <p v-if="!models.length" class="dim">
+      <p v-if="!models.length && !removing" class="dim">
         {{ t('generate.send.noModel') }} <RouterLink to="/models">{{ t('generate.send.noModelLink') }}</RouterLink>
       </p>
       <JobGallery :jobs="jobs" @open="open" />
@@ -374,148 +450,187 @@ const labelPreview = computed(() => {
 
     <template #panel>
       <div class="fields">
-        <label class="field">
-          <span>{{ t('generate.panel.model') }}</span>
-          <select :value="form.modelId" @change="chooseModel(($event.target as HTMLSelectElement).value)">
-            <option v-if="!model" value="" disabled>{{ t('generate.panel.chooseModel') }}</option>
-            <option v-for="m in models" :key="m.id" :value="m.id">{{ m.title }}</option>
-          </select>
-          <small v-if="model" class="dim">{{ model.meta.label }}</small>
-          <small v-if="flux1Outline(mode, model?.meta)" class="dim">{{ t('generate.panel.flux1MaskHint') }}</small>
-        </label>
-
-        <div v-if="does.styles" class="field">
-          <span>{{ t('generate.panel.style') }}</span>
-          <StylePicker v-model="form.style" />
+        <div v-if="mode === 'inpaint'" class="tabs segmented" role="radiogroup" :aria-label="t('generate.remove.action')">
+          <button role="radio" :aria-checked="!removing" :class="{ on: !removing }" @click="form.inpaintAction = 'repaint'">{{ t('generate.remove.repaint') }}</button>
+          <button role="radio" :aria-checked="removing" :class="{ on: removing }" @click="form.inpaintAction = 'remove'">{{ t('generate.remove.remove') }}</button>
         </div>
-
-        <template v-if="mode === 'video'">
-          <label class="field">
-            <span>{{ t('generate.panel.length') }} <b>{{ form.videoSeconds }} s</b></span>
-            <input v-model.number="form.videoSeconds" type="range" min="1" max="5" />
-            <small class="dim">{{ t('generate.panel.lengthHint') }}</small>
-          </label>
-          <label class="field">
-            <span>{{ t('generate.panel.resolution') }}</span>
-            <select v-model="form.videoResolution">
-              <option value="480p">480p</option>
-              <option value="720p">720p</option>
-            </select>
-            <small class="dim">{{ t('generate.panel.resolutionHint') }}</small>
-          </label>
-        </template>
-
-        <label v-if="mode === 'illusion'" class="field">
-          <span>{{ t('generate.panel.patternStrength') }} <b>{{ dec(form.patternStrength) }}</b></span>
-          <input v-model.number="form.patternStrength" type="range" min="0.5" max="2" step="0.05" />
-          <small class="dim">{{ t('generate.panel.patternStrengthHint') }}</small>
-        </label>
-
-        <label v-if="mode === 'image'" class="check">
-          <input v-model="form.customSize" type="checkbox" /> {{ t('generate.panel.customSize') }}
-        </label>
-        <div v-if="showSize" class="field">
-          <span>{{ t('generate.panel.size') }}</span>
-          <div class="ratios">
-            <button v-for="r in RATIOS" :key="r.label" class="ratio" :class="{ on: ratio === r.label }" :title="r.label" @click="setRatio(r)">
-              <i :style="shape(r)">{{ r.label }}</i>
+        <div v-if="removing" class="field">
+          <span class="label-row">{{ t('generate.remove.method') }} <HintBadge :text="t('generate.remove.methodHint')" /></span>
+          <div class="tabs segmented methods" role="radiogroup" :aria-label="t('generate.remove.method')">
+            <button
+              v-for="m in REMOVE_METHODS" :key="m.id" role="radio" :aria-checked="form.removeMethod === m.id"
+              :class="{ on: form.removeMethod === m.id }" @click="form.removeMethod = m.id"
+            >
+              {{ t(m.title) }}
             </button>
           </div>
-          <div class="pair">
-            <select v-model.number="form.width" :title="t('generate.panel.width')"><option v-for="s in sizes" :key="s" :value="s">{{ s }}</option></select>
-            <span class="dim">×</span>
-            <select v-model.number="form.height" :title="t('generate.panel.height')"><option v-for="s in sizes" :key="s" :value="s">{{ s }}</option></select>
-          </div>
-        </div>
-
-        <label v-if="showStrength" class="field">
-          <span>{{ t('generate.panel.change') }} <b>{{ Math.round(form.strength * 100) }} %</b></span>
-          <input v-model.number="form.strength" type="range" min="0.05" max="1" step="0.05" />
-          <small class="dim">{{ mode === 'inpaint' ? t('generate.panel.changeInpaintHint') : t('generate.panel.changeHint') }}</small>
-        </label>
-        <label v-if="mode === 'image' && keepsPicture(model?.meta)" class="check">
-          <input v-model="form.keepPicture" type="checkbox" /> {{ t('generate.keepPicture.label') }}
-          <HintBadge :text="t('generate.keepPicture.hint')" />
-        </label>
-
-        <div v-if="showReferences" class="field">
-          <span>{{ t('generate.panel.references') }} <HintBadge :text="t('generate.panel.referencesHint')" /></span>
-          <ImageInput
-            v-for="i in referenceSlots" :key="i" class="control" :model-value="form.references[i - 1] ?? ''"
-            @update:model-value="(p: string) => setReference(i - 1, p)"
-          />
-        </div>
-
-        <div v-if="offDefaults && suggested" class="defaults">
-          <button class="btn small" @click="model && applyDefaults(form, model)">{{ t('generate.panel.modelDefaults') }}</button>
-          <HintBadge notice :text="suggestText" />
-        </div>
-        <label class="field">
-          <span>
-            <span class="label-row">{{ t('generate.panel.steps') }}
-              <template v-if="stepsFit">
-                <HintBadge notice start :text="stepsFit.text" />
-                <button class="btn small fix" @click.prevent="form.steps = stepsFit.fix.value">{{ stepsFit.fix.label }}</button>
-              </template>
-            </span>
-            <b>{{ fastOn ? TURBO.steps : form.steps }}</b>
-          </span>
-          <input v-if="fastOn" :value="TURBO.steps" type="range" min="1" max="80" disabled />
-          <input v-else v-model.number="form.steps" type="range" min="1" max="80" />
-        </label>
-        <div v-if="fastOffered" class="field fast">
-          <label class="check">
-            <input v-model="form.fast" type="checkbox" /> {{ t('generate.fast.label') }}
-            <HintBadge :text="t('generate.fast.hint')" />
-          </label>
-          <button v-if="fastOn && !turbo" class="btn small" :disabled="turboDownloading" @click="downloadTurbo">
-            {{ turboDownloading ? t('generate.upsample.downloading') : t('generate.fast.download') }}
-          </button>
-        </div>
-        <label class="field">
-          <span>
-            <span class="label-row">{{ t('generate.panel.guidance') }}
-              <template v-if="guidanceFit">
-                <HintBadge notice start :text="guidanceFit.text" />
-                <button class="btn small fix" @click.prevent="form.guidance = guidanceFit.fix.value">{{ guidanceFit.fix.label }}</button>
-              </template>
-            </span>
-            <b>{{ num(fastOn ? TURBO.guidance : form.guidance, 1) }}</b>
-          </span>
-          <div class="ruler" aria-hidden="true">
-            <i v-for="n in 21" :key="n" :class="{ major: (n - 1) % 5 === 0 }"><em v-if="(n - 1) % 5 === 0">{{ n - 1 }}</em></i>
-          </div>
-          <input v-if="fastOn" :value="TURBO.guidance" type="range" min="0" max="20" step="0.1" disabled />
-          <input v-else v-model.number="form.guidance" type="range" min="0" max="20" step="0.1" />
-          <small class="dim">{{ t('generate.panel.guidanceHint') }}</small>
-        </label>
-
-        <div v-if="controlTypes.length" class="field">
-          <span>{{ t('generate.panel.control') }}</span>
-          <select v-model="form.controlType" @change="controlNote = ''">
-            <option value="">{{ t('generate.panel.none') }}</option>
-            <option v-for="ct in controlTypes" :key="ct.id" :value="ct.id">{{ t(ct.title) }}</option>
-          </select>
-          <template v-if="controlType">
-            <small class="dim">{{ t('generate.panel.controlHint', { hint: t(controlType.hint) }) }}</small>
-            <ImageInput v-model="form.controlImage" class="control" />
-            <label class="check"><input v-model="form.controlPreprocess" type="checkbox" /> {{ t('generate.panel.controlPhoto') }}</label>
-            <span>{{ t('generate.panel.weight') }} <b>{{ dec(form.controlWeight) }}</b></span>
-            <input v-model.number="form.controlWeight" type="range" min="0" max="2" step="0.05" />
+          <template v-if="helperId">
+            <small v-if="remote" class="dim">{{ shadows ? t('generate.remove.shadowsOnTheMac') : t('generate.remove.onTheMac') }}</small>
+            <template v-else-if="helperInstalled === false">
+              <small class="dim">
+                {{ shadows ? t('generate.remove.shadowsMissing') : form.removeMethod === 'auto' ? t('generate.remove.missingAuto') : t('generate.remove.missing') }}
+              </small>
+              <button class="btn small" :disabled="helperDownloading" @click="downloadHelper">
+                {{ helperDownloading ? t('generate.upsample.downloading')
+                  : shadows ? t('generate.remove.shadowsDownload', { gb: helperGb }) : t('generate.remove.download', { gb: helperGb }) }}
+              </button>
+            </template>
           </template>
         </div>
-        <p v-if="controlNote" class="error">{{ t(controlNote) }}</p>
-
-        <div v-if="samplers && does.sampler" class="field">
-          <span class="label-row">{{ t('generate.panel.sampler') }} <HintBadge v-if="model?.meta.samplers?.length" :text="t('generate.panel.samplerMakerOnly')" /><HintBadge notice v-if="form.sampler !== samplerShown" :text="t('generate.panel.samplerMissingHint', { name: samplerLabel(form.sampler) })" /></span>
-          <div class="pair">
-            <select v-model="samplerShown"><option v-for="s in samplers" :key="s" :value="s">{{ samplerLabel(s) }}</option></select>
-            <!-- i18n-ok: the sampler's value -->
-            <select v-model="form.sigmaSchedule" :disabled="samplerShown === 'Default'" :title="t('generate.panel.noiseSchedule')">
-              <option v-for="s in SIGMA_SCHEDULES" :key="s" :value="s">{{ samplerLabel(s) }}</option>
+        <template v-if="!removing">
+          <label class="field">
+            <span>{{ t('generate.panel.model') }}</span>
+            <select :value="form.modelId" @change="chooseModel(($event.target as HTMLSelectElement).value)">
+              <option v-if="!model" value="" disabled>{{ t('generate.panel.chooseModel') }}</option>
+              <option v-for="m in models" :key="m.id" :value="m.id">{{ m.title }}</option>
             </select>
+            <small v-if="model" class="dim">{{ model.meta.label }}</small>
+            <small v-if="flux1Outline(mode, model?.meta)" class="dim">{{ t('generate.panel.flux1MaskHint') }}</small>
+          </label>
+
+          <div v-if="does.styles" class="field">
+            <span>{{ t('generate.panel.style') }}</span>
+            <StylePicker v-model="form.style" />
           </div>
-        </div>
+
+          <template v-if="mode === 'video'">
+            <label class="field">
+              <span>{{ t('generate.panel.length') }} <b>{{ form.videoSeconds }} s</b></span>
+              <input v-model.number="form.videoSeconds" type="range" min="1" max="5" />
+              <small class="dim">{{ t('generate.panel.lengthHint') }}</small>
+            </label>
+            <label class="field">
+              <span>{{ t('generate.panel.resolution') }}</span>
+              <select v-model="form.videoResolution">
+                <option value="480p">480p</option>
+                <option value="720p">720p</option>
+              </select>
+              <small class="dim">{{ t('generate.panel.resolutionHint') }}</small>
+            </label>
+          </template>
+
+          <label v-if="mode === 'illusion'" class="field">
+            <span>{{ t('generate.panel.patternStrength') }} <b>{{ dec(form.patternStrength) }}</b></span>
+            <input v-model.number="form.patternStrength" type="range" min="0.5" max="2" step="0.05" />
+            <small class="dim">{{ t('generate.panel.patternStrengthHint') }}</small>
+          </label>
+
+          <label v-if="mode === 'image'" class="check">
+            <input v-model="form.customSize" type="checkbox" /> {{ t('generate.panel.customSize') }}
+          </label>
+          <div v-if="showSize" class="field">
+            <span>{{ t('generate.panel.size') }}</span>
+            <div class="ratios">
+              <button v-for="r in RATIOS" :key="r.label" class="ratio" :class="{ on: ratio === r.label }" :title="r.label" @click="setRatio(r)">
+                <i :style="shape(r)">{{ r.label }}</i>
+              </button>
+            </div>
+            <div class="pair">
+              <select v-model.number="form.width" :title="t('generate.panel.width')"><option v-for="s in sizes" :key="s" :value="s">{{ s }}</option></select>
+              <span class="dim">×</span>
+              <select v-model.number="form.height" :title="t('generate.panel.height')"><option v-for="s in sizes" :key="s" :value="s">{{ s }}</option></select>
+            </div>
+          </div>
+
+          <label v-if="showStrength" class="field">
+            <span>{{ t('generate.panel.change') }} <b>{{ Math.round(form.strength * 100) }} %</b></span>
+            <input v-model.number="form.strength" type="range" min="0.05" max="1" step="0.05" />
+            <small class="dim">{{ mode === 'inpaint' ? t('generate.panel.changeInpaintHint') : t('generate.panel.changeHint') }}</small>
+          </label>
+          <label v-if="mode === 'image' && keepsPicture(model?.meta)" class="check">
+            <input v-model="form.keepPicture" type="checkbox" /> {{ t('generate.keepPicture.label') }}
+            <HintBadge :text="t('generate.keepPicture.hint')" />
+          </label>
+          <template v-if="(mode === 'text' || mode === 'image') && takesFaceDetail(model?.meta)">
+            <label class="check">
+              <input v-model="form.faceDetail" type="checkbox" /> {{ t('generate.faceDetail.label') }}
+              <HintBadge :text="t('generate.faceDetail.hint')" />
+            </label>
+            <label v-if="form.faceDetail" class="field">
+              <span>{{ t('generate.faceDetail.strength', { pct: Math.round(form.faceDetailStrength * 100) }) }} <HintBadge :text="t('generate.faceDetail.strengthHint')" /></span>
+              <input v-model.number="form.faceDetailStrength" type="range" min="0.2" max="0.6" step="0.05" />
+            </label>
+          </template>
+
+          <div v-if="showReferences" class="field">
+            <span>{{ t('generate.panel.references') }} <HintBadge :text="t('generate.panel.referencesHint')" /></span>
+            <ImageInput
+              v-for="i in referenceSlots" :key="i" class="control" :model-value="form.references[i - 1] ?? ''"
+              @update:model-value="(p: string) => setReference(i - 1, p)"
+            />
+          </div>
+
+          <div v-if="offDefaults && suggested" class="defaults">
+            <button class="btn small" @click="model && applyDefaults(form, model)">{{ t('generate.panel.modelDefaults') }}</button>
+            <HintBadge notice :text="suggestText" />
+          </div>
+          <label class="field">
+            <span>
+              <span class="label-row">{{ t('generate.panel.steps') }}
+                <template v-if="stepsFit">
+                  <HintBadge notice start :text="stepsFit.text" />
+                  <button class="btn small fix" @click.prevent="form.steps = stepsFit.fix.value">{{ stepsFit.fix.label }}</button>
+                </template>
+              </span>
+              <b>{{ fastOn ? TURBO.steps : form.steps }}</b>
+            </span>
+            <input v-if="fastOn" :value="TURBO.steps" type="range" min="1" max="80" disabled />
+            <input v-else v-model.number="form.steps" type="range" min="1" max="80" />
+          </label>
+          <div v-if="fastOffered" class="field fast">
+            <label class="check">
+              <input v-model="form.fast" type="checkbox" /> {{ t('generate.fast.label') }}
+              <HintBadge :text="t('generate.fast.hint')" />
+            </label>
+            <button v-if="fastOn && !turbo" class="btn small" :disabled="turboDownloading" @click="downloadTurbo">
+              {{ turboDownloading ? t('generate.upsample.downloading') : t('generate.fast.download') }}
+            </button>
+          </div>
+          <label class="field">
+            <span>
+              <span class="label-row">{{ t('generate.panel.guidance') }}
+                <template v-if="guidanceFit">
+                  <HintBadge notice start :text="guidanceFit.text" />
+                  <button class="btn small fix" @click.prevent="form.guidance = guidanceFit.fix.value">{{ guidanceFit.fix.label }}</button>
+                </template>
+              </span>
+              <b>{{ num(fastOn ? TURBO.guidance : form.guidance, 1) }}</b>
+            </span>
+            <div class="ruler" aria-hidden="true">
+              <i v-for="n in 21" :key="n" :class="{ major: (n - 1) % 5 === 0 }"><em v-if="(n - 1) % 5 === 0">{{ n - 1 }}</em></i>
+            </div>
+            <input v-if="fastOn" :value="TURBO.guidance" type="range" min="0" max="20" step="0.1" disabled />
+            <input v-else v-model.number="form.guidance" type="range" min="0" max="20" step="0.1" />
+            <small class="dim">{{ t('generate.panel.guidanceHint') }}</small>
+          </label>
+
+          <div v-if="controlTypes.length" class="field">
+            <span>{{ t('generate.panel.control') }}</span>
+            <select v-model="form.controlType" @change="controlNote = ''">
+              <option value="">{{ t('generate.panel.none') }}</option>
+              <option v-for="ct in controlTypes" :key="ct.id" :value="ct.id">{{ t(ct.title) }}</option>
+            </select>
+            <template v-if="controlType">
+              <small class="dim">{{ t('generate.panel.controlHint', { hint: t(controlType.hint) }) }}</small>
+              <ImageInput v-model="form.controlImage" class="control" />
+              <label class="check"><input v-model="form.controlPreprocess" type="checkbox" /> {{ t('generate.panel.controlPhoto') }}</label>
+              <span>{{ t('generate.panel.weight') }} <b>{{ dec(form.controlWeight) }}</b></span>
+              <input v-model.number="form.controlWeight" type="range" min="0" max="2" step="0.05" />
+            </template>
+          </div>
+          <p v-if="controlNote" class="error">{{ t(controlNote) }}</p>
+
+          <div v-if="samplers && does.sampler" class="field">
+            <span class="label-row">{{ t('generate.panel.sampler') }} <HintBadge v-if="model?.meta.samplers?.length" :text="t('generate.panel.samplerMakerOnly')" /><HintBadge notice v-if="form.sampler !== samplerShown" :text="t('generate.panel.samplerMissingHint', { name: samplerLabel(form.sampler) })" /></span>
+            <div class="pair">
+              <select v-model="samplerShown"><option v-for="s in samplers" :key="s" :value="s">{{ samplerLabel(s) }}</option></select>
+              <!-- i18n-ok: the sampler's value -->
+              <select v-model="form.sigmaSchedule" :disabled="samplerShown === 'Default'" :title="t('generate.panel.noiseSchedule')">
+                <option v-for="s in SIGMA_SCHEDULES" :key="s" :value="s">{{ samplerLabel(s) }}</option>
+              </select>
+            </div>
+          </div>
+        </template>
 
         <div class="field">
           <span>{{ t('generate.panel.seed') }}</span>
@@ -527,30 +642,32 @@ const labelPreview = computed(() => {
             <button class="btn" :class="{ on: form.seed === null }" :title="t('generate.panel.randomHint')" @click="form.seed = null"><Dices :size="14" /></button>
           </div>
         </div>
-        <label v-if="does.count" class="field">
-          <span>{{ t('generate.panel.pictures') }} <b>{{ form.count }}</b></span>
-          <input v-model.number="form.count" type="range" min="1" max="20" />
-        </label>
+        <template v-if="!removing">
+          <label v-if="does.count" class="field">
+            <span>{{ t('generate.panel.pictures') }} <b>{{ form.count }}</b></span>
+            <input v-model.number="form.count" type="range" min="1" max="20" />
+          </label>
 
-        <div v-if="loras.length && does.loras" class="field">
-          <span>{{ t('generate.panel.loras') }}</span>
-          <div v-for="(l, i) in form.loras" :key="i" class="lora">
-            <select v-model="l.id"><option v-for="a in loras" :key="a.id" :value="a.id">{{ a.title }}</option></select>
-            <!-- a phone's keyboard offers no stepping on a number field: the buttons step the weight by a tenth -->
-            <span class="weight">
-              <button class="btn small ghost" :aria-label="t('generate.panel.weight') + ' −'" @click="l.scale = stepWeight(l.scale, -0.1)"><Minus :size="12" /></button>
-              <input v-model.number="l.scale" type="number" min="-2" max="2" step="0.05" :title="t('generate.panel.weight')" />
-              <button class="btn small ghost" :aria-label="t('generate.panel.weight') + ' +'" @click="l.scale = stepWeight(l.scale, 0.1)"><Plus :size="12" /></button>
-            </span>
-            <button class="btn small ghost" :title="t('generate.panel.remove')" @click="form.loras.splice(i, 1)"><X :size="12" /></button>
+          <div v-if="loras.length && does.loras" class="field">
+            <span>{{ t('generate.panel.loras') }}</span>
+            <div v-for="(l, i) in form.loras" :key="i" class="lora">
+              <select v-model="l.id"><option v-for="a in loras" :key="a.id" :value="a.id">{{ a.title }}</option></select>
+              <!-- a phone's keyboard offers no stepping on a number field: the buttons step the weight by a tenth -->
+              <span class="weight">
+                <button class="btn small ghost" :aria-label="t('generate.panel.weight') + ' −'" @click="l.scale = stepWeight(l.scale, -0.1)"><Minus :size="12" /></button>
+                <input v-model.number="l.scale" type="number" min="-2" max="2" step="0.05" :title="t('generate.panel.weight')" />
+                <button class="btn small ghost" :aria-label="t('generate.panel.weight') + ' +'" @click="l.scale = stepWeight(l.scale, 0.1)"><Plus :size="12" /></button>
+              </span>
+              <button class="btn small ghost" :title="t('generate.panel.remove')" @click="form.loras.splice(i, 1)"><X :size="12" /></button>
+            </div>
+            <button v-if="form.loras.length < Math.min(MAX_LORAS, loras.length)" class="btn small" @click="addLora"><Plus :size="12" /> {{ t('generate.panel.addLora') }}</button>
           </div>
-          <button v-if="form.loras.length < Math.min(MAX_LORAS, loras.length)" class="btn small" @click="addLora"><Plus :size="12" /> {{ t('generate.panel.addLora') }}</button>
-        </div>
 
-        <label v-if="model?.meta.negativePrompt" class="field">
-          <span>{{ t('generate.panel.negative') }}</span>
-          <textarea v-model="form.negativePrompt" rows="10" spellcheck="false" :placeholder="t('generate.panel.negativePlaceholder')" />
-        </label>
+          <label v-if="model?.meta.negativePrompt" class="field">
+            <span>{{ t('generate.panel.negative') }}</span>
+            <textarea v-model="form.negativePrompt" rows="10" spellcheck="false" :placeholder="t('generate.panel.negativePlaceholder')" />
+          </label>
+        </template>
       </div>
     </template>
   </PageFrame>
@@ -559,6 +676,16 @@ const labelPreview = computed(() => {
 <style scoped>
 .prompt {
   padding: 12px 12px 10px 14px;
+}
+
+/* four remove methods do not fit the panel in one row in the longer languages: two by two */
+.methods {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+}
+.methods button:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .send {

@@ -423,6 +423,22 @@ export interface HelperModel {
   preview: string
 }
 
+/** a selection by click: the mask, SAM's rating, the candidate's place by size (0 = largest) and how many there were */
+export interface Selected {
+  mask: string
+  score: number
+  pick: number
+  candidates: number
+}
+
+/** "Select subject": the mask (white = all subjects); with more than one subject also the picture of which subject
+ *  each pixel belongs to (grey value 1..subjects, 0 = none) */
+export interface SubjectMask {
+  mask: string
+  labels?: string
+  subjects: number
+}
+
 /** An installed photo tool (Enhance page). */
 export interface PhotoTool {
   folder: string
@@ -596,8 +612,11 @@ export interface VulkaraApi {
     /** asks for a model file (.pth, .safetensors, .onnx) and imports it; undefined when cancelled */
     importFile(): Promise<string | undefined>
     remove(folder: string): Promise<void>
-    /** selection tools: the mask of what the clicks mean ([x, y, 1 | 0] in picture pixels) */
-    select(tool: string, image: string, points: [number, number, number][]): Promise<{ mask: string; score: number }>
+    /** selection tools: the mask of what the clicks mean ([x, y, 1 | 0] in picture pixels); pick: SAM's candidate
+     *  by size (0 = the whole thing), left out: the one SAM rates best */
+    select(tool: string, image: string, points: [number, number, number][], pick?: number): Promise<Selected>
+    /** the subjects of the picture as a mask (Apple Vision, on this Mac) */
+    subject(image: string): Promise<SubjectMask>
   }
   imports: {
     inspect(request: ImportRequest): Promise<ImportInfo>

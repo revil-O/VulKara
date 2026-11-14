@@ -160,6 +160,7 @@ export function engineFor(job: Record<string, unknown>): RuntimeId {
   if (job.upscale) return 'comfyui'  // enlarging needs no model of the user
   if (job.restore) return 'diffusers'  // correcting needs no model; the AI steps edit with FLUX.2 there
   if (job.photo_tool) return 'diffusers'  // ONNX on the CPU with the Diffusers runtime's onnxruntime
+  if (job.remove_object) return 'diffusers'  // LaMa (ONNX) or RORem (SDXL inpainting) with the Diffusers runtime
   const m = readManifest(String(job.model_dir ?? ''))
   if (!m) throw new Error(t('main.engines.modelGone'))
   if (m.runtime === 'comfyui') return 'comfyui'

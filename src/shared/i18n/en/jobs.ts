@@ -50,5 +50,6 @@ export default {
     coloured: 'coloured',
     sharpened: 'sharpened',
     twiceTheSize: 'twice the size',
+    objectRemoved: 'Object removed',
   },
 } as const

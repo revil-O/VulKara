@@ -2305,6 +2305,386 @@ The pictures are identical pixel for pixel (all three seeds). The plan (14.4 GB)
 engine now stays 3.4 GB under it, and the swap is inside the target (at most 2 GB). The MLX log after a picture:
 8.8 GB in use, peak 10.3 GB.
 
+## 7by. Object removal: LaMa against RORem (2026-11-10, Mac mini M4 16 GB)
+
+Before building "Remove object" (plans/K2_OBJEKT_ENTFERNEN.md). Six pictures of RORem's own test set
+(LetsThink/RORem_dataset, testset_RORem, 1024×1024, masks from 3 % to 50 % of the picture), Diffusers runtime of
+0.8.1 (diffusers 0.41.0, torch 2.14.1, MPS, fp16). LaMa: VulKara's `restore.fill` (ONNX on the CPU, 512 crops).
+RORem: LetsThink/RORem at 22d02de (SDXL inpainting, UNet 5.1 GB), the maker's settings (guidance 1, strength 0.99,
+512), seed 1. The test set has no ground truth pictures, so the quality is judged by looking at every result.
+
+| | time per picture | GPU memory (MPS driver) |
+| --- | --- | --- |
+| LaMa | 1.3 s (2.3–6.3 s with the first load) | — (CPU, under 1 GB) |
+| RORem 512, 50 steps | 25–27 s | 8.8 GB |
+| RORem 512, 20 steps | 10.3–10.4 s | 8.8 GB |
+| RORem 512, 8 steps | 4.6 s | 8.8 GB |
+| RORem 1024, 20 steps | 43–45 s | 14.1 GB (too much for 16 GB) |
+
+RORem loads in 13 s. Round 1 (mask exactly on the object, hard edge): both leave a ghost of the object (outline of the
+jet, coin shape, dark patch). Round 2 (mask grown by 15 px, soft edge outwards), what the pictures show:
+
+- small object on a plain background (jet 5 %, cat on a carpet 16 %): LaMa clean in 1.3 s, RORem clean as well;
+- large area (laptop on a wooden table 54 %, horse 27 %): LaMa smears (grey band, blur); RORem fills with plausible
+  wood grain or background, a slightly lighter patch stays (colour matching I1 is needed);
+- object in front of a face or a hand (camera 7 %) and a coin on a stack (10 %): all fail; RORem paints a new coin.
+- the whole picture at 512 instead of a crop, and the maker's quality prompt: no clear difference.
+
+Decision for the tool: grow the mask (about 1.5 % of the picture side) and blend softly; LaMa by default and for
+small masks, RORem 512 at 20 steps for large areas or "Thorough"; never 1024 on 16 GB.
+
+## 7bz. Object removal with shadows: ObjectClear against LaMa and RORem (2026-11-10, Mac mini M4 16 GB)
+
+After the first tests of "Remove" the user saw shadows and fragments stay. A shadow finder of our own (darker than
+the background around, same colour, touching the object) was tried in two versions on 24 pictures of RORem's test
+set: the first took neighbouring animals, buildings and trees, the stricter second found almost no real shadow, so
+it is not built in. Then ObjectClear (jixin0101/ObjectClear at c73af80, fp16 weights 7.3 GB, S-Lab licence,
+non-commercial; its own code from github.com/zjx0101/ObjectClear at c052d91, run only on the test drive) with its
+maker's settings (shorter side 512, 20 steps, guidance 2.5) against LaMa and RORem as VulKara runs them now (grown
+mask, local colour match, soft blend), on ObjectClear's 5 example pictures (shadows; chosen by its makers) and the
+6 pictures of 7by.
+
+| | time per picture | GPU memory |
+| --- | --- | --- |
+| LaMa (VulKara) | 1.4 s at 1024², 5–38 s on 4–19 MP photos | CPU |
+| RORem (VulKara) | 10.5 s at 1024², 15–48 s on 4–19 MP photos | 8.8 GB |
+| ObjectClear | 20 s at 1024², 30–38 s on large photos (load 16 s) | 9.5–10.8 GB |
+
+What the pictures show: ObjectClear removes the shadows with the object (bicycle on a road, vase on a table, a hand
+with flowers in front of a wall, a cat on tiles), where LaMa and RORem leave the shadow or a dark patch; it also
+fills the face behind a camera plausibly. All three fail on the coin on a stack and the horse (a new coin, legs or
+a saddle are painted in). On calm backgrounds (dancer in the clouds, laptop, jet, cat on a carpet) all three are
+good, LaMa smears the laptop's large area.
+
+## 7ca. ObjectClear in VulKara: full resolution, memory (2026-11-10, Mac mini M4 16 GB)
+
+VulKara's own ObjectClear (engines/diffusers/objectclear.py, plans/OBJECTCLEAR_NACHBAU.md) now runs as a third filler
+of "Remove" (method `objectclear`, only when asked for; Auto and Thorough unchanged). The whole picture goes in at
+shorter side 512 (longer side at most 1024), the model gets VulKara's grown mask, and the result is put back at full
+resolution: the area = grown mask joined with ObjectClear's attention map (threshold 128, widened as the model's own
+fusion does, only the parts touching the mask), then VulKara's local colour match and soft blend; outside that area
+the photo stays to the pixel. Same 11 cases as 7bz, seed 1, through the engine's `remove_object` job (load per job,
+put back included), Diffusers runtime of 0.8.1 (diffusers 0.41.0, torch 2.14.1, MPS, fp16), weights from a helper
+folder checked by pinned.fetch (c73af80, sha256 per file). Peaks: `torch.mps.driver_allocated_memory` sampled every
+10 ms, footprint = macOS' `interval_max_phys_footprint` of the process per job.
+
+Savings (step 5): the fixed prompt's text embeddings are computed once and kept beside the weights
+(`prompt-embeds-<encoder checksums>.safetensors`, 0.6 MB), so the two text encoders (1.6 GB) are no longer loaded;
+only CLIP's image half is read; the object embedding and both VAE encodings run before the UNet is read, and CLIP is
+freed first. "Before" is the step 4 code (whole pipeline at once), run again in the same session right after "after".
+
+| per job, 11 cases | before | after |
+| --- | --- | --- |
+| time per job, mean (range) | 95.2 s (79.6–125.3) | 90.5 s (62.2–124.0) |
+| until the first step (reading weights, encodings) | 42.9 s | 32.8 s (47.1 s on the first job: text encoders once) |
+| MPS driver peak | 9.94–10.24 GB | 7.01–8.38 GB |
+| process footprint peak | 10.61–11.39 GB | 7.57–9.36 GB |
+
+Peaks are 7.0 GB at 512×512 (1024² inputs) and 8.3 GB at 912×512 / 512×768 (the photos). The results with the
+savings are bit-identical: the 11 full-resolution results after equal those before (max. difference 0), and the
+work-size result, attention map and fused picture equal step 3's (oc_cmp/own) on all 11.
+
+- Longer side capped at 1024: a 3:1 panorama at 1536×512 (no cap) took 11.3 GB MPS and 155 s, capped to 1024×352
+  8.2 GB and 92 s (with the savings). 11.3 GB plus the app leaves too little on 16 GB; up to 2:1 the short side stays 512.
+- VAE tiling not used: this VAE's tile size is 512 (sample_size), so tiling would split every picture above 512 px and
+  change the result; the VAE at up to 1024×512 is not where the peak is.
+- Times are slow and spread: during all runs okAI's embedding server (llama-server, bge-m3) worked beside us (5–16 %
+  CPU, its memory grew from 3.7 to 4.9 GB), swap 0.7–2 GB; the queue lock was ours (okAI's server does not take it).
+  RORem took 55–65 s per job in the same session (7by: about 24 s with loading). Read the times as a comparison
+  within the session, not as absolute values; the memory peaks are not affected.
+
+What the full-size pictures show (contact sheets original | LaMa | RORem | ObjectClear): the shadows of the bicycle,
+the vase with flowers, the hand with flowers and the cat go with the object, where LaMa and RORem leave them; at the
+size of the sheets no edge of the put-back shows. The cat's area also lightens a little of the tree shadow next to it, and a
+faint outline stays there. The jumping dancer's shadow on the ground stays (not touching the mask). The coin on the
+stack and the horse fail as in 7bz (a new coin, new trousers and cloth are painted in).
+
+## 7cb. Remove on pictures with architecture: LaMa, RORem, ObjectClear (2026-11-11, Mac mini M4 16 GB)
+
+28 pictures of the RORem test set (test_set_1024, with its masks) showing buildings, streets, a station and reliefs:
+vehicles in front of facades, a bus, a train at a platform, a flag in front of trees, a building beside a skyline,
+figures on a relief; masks 3–48 % of the picture. Each through VulKara's engine job (remove_object, loading per job,
+seed 1), the three methods one after the other; okAI's queue was free.
+
+| Method | Time per job (mean) | MPS peak | Process footprint peak |
+| --- | --- | --- | --- |
+| LaMa (Fast) | 1.5 s | – (CPU, ONNX) | 1.2 GB |
+| RORem (Thorough) | 26.9 s | 8.9 GB | 10.4 GB |
+| ObjectClear (With shadows) | 32.0 s | 7.0 GB | 8.6 GB |
+
+Looked at on contact sheets (mask | LaMa | RORem | ObjectClear, 720 px each), best result per picture:
+ObjectClear about 19, RORem 3 (a tower against the sky, a goods train, a column next to a relief), LaMa 1 (the edge of
+a building against white sky), the rest even (small objects at the edge: all three good).
+
+- Vehicles: LaMa and RORem leave a dark patch where the car stood, the shadow under it, at 4–48 % of the picture
+  (a car at 4 % in a car park, 5 % on cobbles, 12 % beside two people). ObjectClear takes it away with the car and
+  continues the street, kerb and parked cars behind it.
+- ObjectClear invents in about 6 of 28: another taxi or car in a traffic jam, a crane at the edge of the sky, a
+  kiosk where the bus stood, new ornaments where a figure of a relief was. LaMa and RORem paint a plain surface
+  there instead (relief: a smooth stone face).
+- Large buildings against the sky: RORem gave the cleanest sky; ObjectClear put another building there.
+
+Decision (user, 2026-11-11): Auto takes ObjectClear whenever it is downloaded and allowed (not in a build with
+commercially usable models only), whatever the size of the mask; without it LaMa below 15 %, RORem above as before.
+
+## 7cc. ObjectClear beyond the painted mask: only lighter, never another face (2026-11-11, Mac mini M4 16 GB)
+
+Hand test (user): a man painted out of a group photo (1.2 % of the picture), but 4.4 % changed. ObjectClear's
+attention area ("effects", joined to the painted mask) spilled onto the neighbour's face and arm and onto papers on
+the table, which were painted anew; the neighbour got a different face. In the spilled area the result was lighter
+in 48 % and darker in 52 % of the pixels: no shadow, just a repainted neighbourhood.
+
+New rule (remove.py `shadows()`, `other_faces()`): beyond the painted mask ObjectClear's area counts only where its
+fill is lighter than the photo (Lab L, smoothed with sigma = half the mask growth, more than 3 units; a removed shadow
+gets lighter), only the parts touching the grown mask, and never on a face: YuNet (the face detector of the face
+restoration helper, 0.2 MB, already used by Restore) finds the faces; each face whose eyes, nose and mouth all lie
+outside the painted mask is protected as an ellipse in its slightly enlarged square, where only the painted mask itself
+is replaced (no soft edge) and the colour match does not measure. Without the face detector downloaded the lighter
+rule alone applies; the engine log names the protected boxes. The painted mask is replaced as before; outside the
+final area the photo stays to the pixel.
+
+Measured on ObjectClear's cached raw result per case (one ObjectClear run each, seed 1, through the engine's
+`_objectclear_fill`), then the engine's `remove_object` with the old and the new remove.py, so that only the rule
+differs. Share = pixels changed outside the painted mask, of the whole picture (the grown edge of 1.5 % included).
+
+| Set | Cases | changed outside the painted mask, before → after (mean) | after, range | beyond the grown mask, before → after |
+| --- | --- | --- | --- | --- |
+| 7bz/7ca (photos, RORem test pictures) | 11 | 14.3 % → 6.5 % | 2.2–13.2 % | 10.7 % → 3.0 % |
+| 7cb (architecture) | 28 | 11.7 % → 6.0 % | 0.7–20.6 % | 9.6 % → 3.9 % |
+| hand test (group photo) | 1 | 4.65 % → 1.08 % | | 3.84 % → 0.37 % |
+
+The rule costs 0.02–0.2 s per picture (Lab and blur only around the marked area, YuNet at most 1280 px). Faces were
+protected in 7 of 40 pictures (the two riders, the man at the shop door, the man beside the taxi, the woman beside the
+limousine, the painted boy at the stop sign, the two men shaking hands, four people of the hand test).
+
+What the contact sheets (original with mask | before | after) show:
+
+- Shadows that still go: bicycle, vase with flowers, hand with flowers, cat (7ca), and the car shadows of 7cb (car
+  park, cobbles, the street with two people, the parked cars); at the size of the sheets as before.
+- Hand test: the neighbour's face stays identical: in his face square only the 168 pixels the user painted changed and
+  4 in its corners outside the protected ellipse (before: 5092); his arm and the papers keep their original. Where the man's outline lies inside the neighbour's protected
+  ellipse, a thin light sliver of it stays next to the neighbour's cheek and hand.
+- What stays now: things ObjectClear removed along with the object that are lighter than what it paints there, such
+  as the white flag pole of the flag picture (7cb, a diagonal ghost of the pole stays) and a small grey piece of the
+  car beside the striped sleeve; the repainted sleeve, van lettering and neighbouring vehicles keep their original
+  instead. A reflection in water that is lighter than the water would also stay (no such case in the sets).
+
+Review fixes (same day): the lighter test, its smoothing and the touching check now run at most at 1024 px on the
+longer side (ObjectClear's fill has no finer detail), the rest of the rule at full size. `shadows()` on a synthetic
+24 MP picture (6000×4000, effects over 29 % of it), Mac mini: 0.23 → 0.05 s, peak of numpy/OpenCV allocations
+555 → 76 MB (tracemalloc), process max RSS 948 → 437 MB. Faces are now looked for whenever ObjectClear ran (also a
+neighbour in the soft edge of the mask), a face at the picture's edge keeps its whole ellipse, and a broken face
+detector file no longer loses the result (a note says faces were not protected). Against the run above, 35 of the
+40 results are bit-identical; the five photos with a longer side above 1024 px differ in 0.6–1.8 % of their pixels by at most
+21 levels along the edges of the kept shadow area; changed share outside the painted mask within ±0.1 point.
+
+## 7cd. Remove: Compare, people and click selection after the second hand test (2026-11-11, Mac mini M4 16 GB)
+
+Hand test (user, conference photo and the bottles picture), after which Compare (one picture with each method on
+this Mac) was added: 5 Compare jobs with LaMa, RORem and ObjectClear took 63–72 s for all three pictures. ObjectClear
+invented a bottle where a red one was removed (LaMa and RORem clean), and at 23 % of the picture all three methods made
+things up (ghosts, longer tables, objects), as expected for large areas.
+
+People. With a man painted out of the back row (1.1 % of the picture), ObjectClear smeared the woman next to him,
+who was not painted. Neither detector knew her: YuNet found five faces, not hers (small, looking down), and Apple
+Vision's person masks (`VNGeneratePersonInstanceMaskRequest`, which Apple documents for up to four people) found the
+four people in front, two of them merged into one. A probe with Vision's person rectangles
+(`VNDetectHumanRectanglesRequest`, full and upper body) found 12 boxes, the painted man among them, but not her (at the
+picture's edge, cut off). Added: Vision's person map protects every person of whom less than 10 % is painted from
+ObjectClear's effects beyond the mask (grown by the mask growth), and the colour match does not measure on them; the
+engine asks the app's helper only when ObjectClear ran. On her picture changes beyond twice the growth went from 0.36 %
+to 0.11 % of the picture, but her face stays smeared: it lies in the soft edge of the painted mask, where ObjectClear's
+fill is its own repainting of the whole picture at 512 px, not the original.
+
+Tried and left out: effects beyond the mask only below half the painted object's height (shadows on the ground), on
+ObjectClear's cached raw output of all 7cc cases plus this one, only the rule differing; changed beyond the grown mask
+(mean): 7bz/7ca 3.04 → 2.48 %, 7cb 3.93 → 3.65 %, hand tests 0.53 → 0.49 %, the woman's picture 0.70 → 0.69 %. It does
+not reach the soft edge and would keep shadows falling sideways, so it brings nothing for the case it was meant for.
+For a person right beside the object Thorough or Compare is the choice (RORem left her as she was).
+
+Click selection (SAM 2.1 tiny). A click on a green glass bottle gave a pattern of dots (every other pixel), so LaMa
+left the bottle and RORem shreds of it. SAM's 256 px mask had been cut at 0 and then made big; now only the parts at
+the click stay, one-pixel gaps are closed (3 × 3 at 256 px), holes are filled, and the model's values are made big
+before the cut. The same bottle at three click points and all three candidates: one piece each (70 % of the bottle's
+box, the rest background), no dots.
+
+## 7ce. Photo upscaler 4xBHI_dat2_real against SwinIR and Real-ESRGAN (2026-11-11, Mac mini M4 16 GB)
+
+4xBHI_dat2_real (DAT2, Philip Hofmann, CC-BY-4.0, the author's release `4xBHI_dat2_real.safetensors`, 139,792,588
+bytes, SHA-256 1f651fe8…5b38f6) against SwinIR-M ×4 GAN (Enhance → Upscale) and Real-ESRGAN x4plus (the Upscale
+page's model), all three through `photo_tools` (spandrel 0.4.2, MPS, the same tiling with overlap 32). One tile
+after a warm-up; Metal = peak of `driver_allocated_memory`, sampled every 5 ms.
+
+| Model | 256² tile | 384² | 512² | fp16 |
+| --- | --- | --- | --- | --- |
+| SwinIR-M ×4 GAN | 2.8 s, 2.3 GB | 6.3 s, 4.6 GB | 11.3 s, 7.2 GB | not taken (spandrel: no half), same result |
+| Real-ESRGAN x4plus | 0.9 s, 1.2 GB | 2.0 s, 2.4 GB | 3.6 s, 4.5 GB | 0.66 s at 256², max diff 2, mean 0.06 |
+| 4xBHI_dat2_real | 3.6 s, 3.5 GB | 8.1 s, 6.2 GB | 14.6 s, 11.5 GB | not taken (spandrel: no half), same result |
+
+Five photos of the RORem test set made web-like (512 px, saved as JPEG quality 60), enlarged to 2048 px with the
+largest tile within 10.8 GB (a 16 GB Mac's Metal budget less 1 GB): SwinIR 11.2 s each (one 512 tile), Real-ESRGAN
+3.5 s, DAT2 32.0 s (tile 384; 512 needs 11.5 GB). DAT2 takes about 3 × SwinIR's and 9 × Real-ESRGAN's time; a 1024 px
+photo would take about 2 minutes, one of 2048 px about 8.
+
+Seen at full size (crops 512² of the 2048 px results): on the car, the high-rise, the limousine and the two men DAT2
+keeps the most natural texture (asphalt grain, brick, the emblem's detail), where Real-ESRGAN smooths into plastic and
+SwinIR paints harder edges; faces are about even. On the noisiest picture (grey foliage before a house) DAT2 turned
+the noise into a fine grid pattern, worse than both others there.
+
+In the app (Enhance → Upscale ×4 → Natural (slow), test build 2026-11-11, queue free before and after): the variant
+was downloaded on first use and its checksum matched; a 512 px photo became 2048 px in 23.5 s from queue to result,
+the first download included (the engine's photo tool step 18.8 s). The variant's own tile table let `metal_tile` take
+one 512 tile on the empty 16 GB Mac (Metal budget 12.7 GB less 1 GB): peak 12.3 GB, swap unchanged (748 → 732 MB).
+
+## 7cf. Face detailer (Refine faces) with SD 1.5 and SDXL (2026-11-13, Mac mini M4 16 GB)
+
+Test build, Text to image, seed 1234, each model with the maker's settings: epiCPhotoGasm (SD 1.5, 25 steps,
+guidance 7) and Juggernaut-XL-v7 (SDXL, 35 steps, guidance 4.5, DPM++ 2M SDE). Four prompts (full body 2:3, group
+and street 3:2, close-up portrait 1:1; SD 1.5 at 512/768, SDXL at 832/1216/1024), each without and with Refine faces
+at strength 0.4. Queue lock held by the test throughout (no okAI or LmAI job); swap 0.3–0.9 GB, no growth. Times from
+queue to result; "peak" is the job's measured footprint.
+
+| Model, picture | Without | With | Faces refined | Peak without / with |
+| --- | --- | --- | --- | --- |
+| SD 1.5, full body | 23.0 s¹ | 45.4 s | 1 | 4.8 / 4.9 GB |
+| SD 1.5, group (backs turned) | 23.0 s | 23.7 s | 0 | 4.8 / 4.8 GB |
+| SD 1.5, street | 23.0 s | 70.8 s | 4 | 4.8 / 4.9 GB |
+| SD 1.5, portrait | 13.8 s | 14.6 s | 0 (fills the picture) | 4.8 / 4.8 GB |
+| SDXL, full body | 155.0 s¹ | 197.5 s | 1 | 10.0 / 10.1 GB |
+| SDXL, group | 134.8 s | 376.5 s | 4 | 9.8 / 10.1 GB |
+| SDXL, street | 136.7 s | 340.8 s | 3 | 10.1 / 10.2 GB |
+| SDXL, portrait | 140.1 s | 140.0 s | 0 (fills the picture) | 8.9 / 9.0 GB |
+
+¹ The first job of each model also loaded it (34.1 s and 155.0 s); the SD 1.5 row shows the later jobs' 23 s.
+
+Per face about 10–25 s with SD 1.5 and 40–70 s with SDXL (a pass at the picture's size with 40 % of the steps, plus
+finding the faces); no new memory peak, the inpainting pipeline shares the loaded model.
+
+The first run refined no face with SD 1.5: Restore's face finder leaves out faces whose landmarks spread less than
+14 px (CodeFormer can not restore them), and a 29 × 37 px face in a 512 × 768 picture spreads about 12. The detailer
+now takes faces from 6 px (`FACE_DETAIL_MIN`); YuNet at its threshold 0.7 found no face on the group seen from behind.
+
+Seen at full size: the SD 1.5 full-body face turned from smeared features into a clean face; SDXL's group faces got
+sharper eyes, teeth and skin, the people stay recognisable (one man gained stubble); no seams. In the SDXL street
+one blurred figure became a clear man; with the tiniest faces the head and shoulders around them are painted too, so
+another blurred figure became a different passer-by and a back of a head a profile, plausible but a change of the
+scene.
+
+Image to image (same build, SD 1.5, the full-body picture as input, strength 0.6, "red coat" added): 1 face refined,
+29.6 s, peak 3.8 GB, the face clean and without seams.
+
+## 7cg. Extend (outpainting): FLUX.2 [klein] 4B with and without the outpaint LoRA, Juggernaut XL (2026-11-13, Mac mini M4 16 GB)
+
+Test build, five SDXL pictures (street, interior, group of friends, landscape, oil painting; 1216 × 832), each
+extended left and right by 15 % and on all four sides by 25 %, seed 77, result 1216 × 832. Queue lock held by the
+test throughout (no okAI or LmAI job); swap 0.9 GB at the end, no growth. Times from start to result; "peak" is the
+job's measured footprint.
+
+| Variant | Way | Time per picture | Peak |
+| --- | --- | --- | --- |
+| A | klein 4B (distilled), AI Canvas Extend today (prefill + inpaint, 4 steps) | 100–126 s | 9.0–9.5 GB |
+| B | klein 4B (distilled) + fal outpaint LoRA 1.1, green border, edit, fixed prompt, 4 steps, guidance 1 | 104 s (129 s with load) | 10.1 GB |
+| C | Juggernaut XL v7, AI Canvas Extend today | 139–145 s (160 s with load) | 10.2 GB |
+| D | klein **Base** 4B + LoRA 1.1, 50 steps, guidance 4 (2 pictures) | 2504–2585 s | 10.1 GB |
+
+The LoRA came as the repo's ComfyUI file (`…_comfy_converted.safetensors`, `diffusion_model.*` names); the PEFT file
+(`flux-outpaint-lora.safetensors`, `base_model.model.*` with FLUX.2 original names) is refused by the LoRA import
+("Target modules … not found"), a renaming fault of the import.
+
+Seen at full size:
+
+- **A:** in 4 of 10 cases (interior 15 %, landscape 15 % and 25 %, painting 25 %) the smeared prefill bars stay,
+  the model does not paint over them; the other 6 are good.
+- **B:** all 10 extended coherently, no seams; people cut by the edge are completed (group 15 %: both half people
+  become whole). But the whole picture is redrawn with a green cast: in the known part green rises by 5–19 of 255 on
+  average (mean difference 6.5–17.7). The original would have to be put back and the new border colour-matched.
+- **C:** all 10 extended; in the group (15 %) ghostly, greenish faces at both edges.
+- **D:** no green cast (a slight shift to magenta instead), quality like B, but 42–43 minutes per picture.
+
+In the app (test build, same day, queue lock held, no okAI or LmAI job): AI Canvas → Extend with FLUX.2-klein-4B
+now takes route B with the pinned PEFT file (`flux-outpaint-lora.safetensors`, loaded unchanged since the LoRA import
+fix), then puts the original back and matches the border's tone along the edge (blend_into). The same ten cases with
+the source prompts, plus the landscape (15 %) without a prompt: 104–126 s per picture (147 s for the first, with the
+73 MB download and loading), peak 10.0–10.2 GB, plan 11.6 GB. All eleven extended without seams, the known part
+unchanged, the people cut by the edge completed with right faces and hands; the green cast stays only as a slight
+tint in the widest borders (25 % on all sides). Phase correlation of route B against the originals: no shift in any
+case, so no realignment is needed.
+
+FLUX.2-klein-9B on today's route (prefill + inpaint, 4 steps, guidance 1, the same ten cases and prompts, test build,
+queue lock held): 212–268 s per picture, peak 10.9–13.0 GB, swap 1.4 GB at the end. The smeared prefill bars stay in
+7 of 10 (street both, interior 15 %, landscape both, painting both); interior 25 % and the group both are good. Cause
+in diffusers 0.41: Flux2KleinInpaintPipeline always takes the start picture as a reference too
+(`ref_images = [image_latents_encoded]`), so with an extension it shows the model the smeared bars, which the editing
+model keeps.
+
+FLUX.2-klein-9B with the green border and the fixed prompt, without a LoRA (the outpaint LoRA is made for 4B; same
+ten cases, 4 steps, guidance 1, test build, queue lock held): 216–270 s, peak 10.7–11.8 GB. The border stays green in
+all ten (black in the landscape at 15 %); the model keeps the green as part of the picture. Without the LoRA the
+green border does not work.
+
+With the stand-in (test build, FLUX.2-klein-9B chosen, klein 4B installed beside it): the three 9B failures interior
+15 %, landscape 15 % and painting 25 % ran on 4B with the LoRA, 106–121 s, peak 10.1 GB, all three extended without
+bars or seams; each job carries the note.
+
+## 7ch. FLUX.2 [klein] inpainting: the start picture as reference, without it, or with the mask blanked (2026-11-14, Mac mini M4 16 GB)
+
+Flux2KleinInpaintPipeline (diffusers 0.41.0, unchanged on main and in 0.43.0) always takes the start picture as
+reference tokens too (`ref_images = [image_latents_encoded]`, line 1136). Probe on VulKara's own engine (source copy,
+no app change), only the reference swapped: **R** as today, **N** reference tokens dropped, **M** reference with the
+masked part's latents set to 0 (the VAE's mean). Extensions took the prefill + inpaint route (outpaint LoRA and 4B
+stand-in switched off). 4 steps, guidance 1, seed 77. Queue lock held throughout, no okAI or LmAI job; swap 0 GB
+before the 4B series, 1.0 GB left from an aborted 9B load before the 9B series, 1.0 GB after. Cases: bottles (green
+bottle → "a shiny red apple"), fox → "a grey wolf", cabin → "empty sandy lake shore … no building", landscape and
+street from 7cg extended left and right by 15 %. 9B ran R and M only (N was the worst in all five 4B cases).
+
+| Model | Variant | Time per picture | Peak |
+| --- | --- | --- | --- |
+| klein 4B | R | 114–116 s (126 s with load) | 9.4–10.0 GB |
+| klein 4B | N | 51–52 s | 7.9–8.1 GB |
+| klein 4B | M | 101–102 s | 8.9–9.1 GB |
+| klein 9B | R | 255–259 s (223 s for the first) | 10.9–11.7 GB |
+| klein 9B | M | 213–214 s | 10.7–11.9 GB |
+
+R ran first for each case, so it alone encoded the case's new prompt; the 12–17 % lead of M over R is most likely that,
+not the blanking (open, not checked). N's halving is real: half the image tokens.
+
+Seen side by side:
+
+| Case | 4B R | 4B N | 4B M | 9B R | 9B M |
+| --- | --- | --- | --- | --- | --- |
+| bottle → apple | bottle gone, no apple | box and pink blob, seam | like R | like 4B R | like R |
+| fox → wolf | wolf in the fox's pose and tail | wolf, square seam in the snow | **own wolf, no seam** | fox pose and tail | **own wolf**, faint edge |
+| cabin gone | **clean** | picture in picture | trees, rectangle visible | clean | clean |
+| landscape 15 % | **prefill bars stay** | extended, hard seams | **extended**, light haze left | **bars stay** | **extended**, smudge at one edge |
+| street 15 % | **clean** | wrong scale, seams | seam on the right | **blur left, bar right** | **clean** |
+
+- N (no reference) loses the picture's context: seams and pasted-looking parts in all five 4B cases.
+- M fixes every case where R kept the prefill bars (4B landscape, 9B landscape and street) and lets a repaint leave
+  the old shape (wolf); it is worse than R where R was already clean (4B cabin, 4B street).
+- No apple in any variant: the mask (130 × 370 px around the bottle) or 4 steps; not a reference effect.
+
+## 7ci. ObjectClear painting the object again: caught by its edges (2026-11-14, Mac mini M4 16 GB)
+
+Hand test (test build): the bottles picture with a 16 % mask (the blue bottle painted loosely with the brush, the
+orange one chosen with Select subject); With shadows left both bottles paler, Auto (ObjectClear) painted the blue one
+dark grey, LaMa removed both. Probe on the engine's own code (queue lock held, no okAI or LmAI job), ObjectClear's raw
+output and the app's result after colour match and blend, seeds 1 and 2:
+
+| Mask | Seed 1 | Seed 2 |
+| --- | --- | --- |
+| both bottles | dark and olive bottles painted | both removed |
+| blue bottle, brush | a brown bottle painted | a clear bottle painted |
+| orange bottle, Select subject | removed | removed |
+
+Raw output and app result look alike: the colour match does not cause it. Signal: correlation of the grey gradients
+inside the painted mask, result against photo. The three failures 0.46–0.63, the three removals 0.08–0.21; all 128
+kept results of 7bz–7cd (LaMa 39, RORem 39, ObjectClear 50; arch/run, arch/run2, oc45 before/after) at most 0.21,
+median 0.01–0.04. Limit 0.35 (`remove.KEPT`); above it the part is filled again as Auto without ObjectClear.
+
+In the app (test build, queue lock held): Auto on the same mask, seed 1: "ObjectClear kept the object: filled again
+without it", then RORem (16 %), 66 s, peak 8.8 GB, both bottles gone; seed 2: ObjectClear kept its result, 35 s,
+7.1 GB, both bottles gone. Only three failures are known, all on this picture; other kinds of pictures are open.
+
 ## 8. Earlier references (from the user guide and the changelog)
 
 - Training on the M2 (2025–26): SDXL about 2.5 s per step at 768 px, FLUX.2 [klein] 4B about 15 s, 9B about 30 s,

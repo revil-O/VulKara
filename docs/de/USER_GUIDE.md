@@ -114,7 +114,7 @@ einen Neustart hinweg.
   Inhalte → *Signalton abspielen, wenn die Warteschlange abgearbeitet wurde* ausschalten.
 - Während ein LoRA trainiert wird, startet kein Auftrag.
 - Das Schließen des Fensters hält die Aufträge nicht an: VulKara läuft mit seinem Symbol in der Menüleiste weiter (der
-  laufende Auftrag, sein Fortschritt und wie viele warten; **VulKara öffnen**, **Monitor**, **Einstellungen**).
+  laufende Auftrag, sein Fortschritt und wie viele warten; **VulKara öffnen**, **Monitor**, **Auf Update prüfen …**, **Einstellungen**).
   **VulKara beenden** (⌘Q oder im Menü des Symbols) beendet es samt Engines; ist der Fernzugriff an, bleibt die
   Fern-Weboberfläche bis dahin erreichbar, und das Menü des Symbols sagt es. **Einstellungen …** im App-Menü hat ⌘, .
 
@@ -182,6 +182,21 @@ Klicke auf eine Kachel, um sie in der [großen Ansicht](#18-die-große-ansicht) 
 | **Bilder** | 1–20 | Wie viele Bilder erstellt werden, jedes mit eigenem Seed. |
 | **LoRAs** | bis zu 3 | Erweiterungen, die dem Modell einen Stil, eine Person oder ein Objekt beibringen, jede mit eigener Gewichtung (−2 bis 2; − und + daneben ändern sie in Zehntelschritten, auch am Handy). Angeboten werden nur LoRAs der Familie des Modells. |
 | **Nicht im Bild** | Text | Der Negativ-Prompt: was nicht erscheinen soll. Nur sichtbar, wenn das Modell einen unterstützt. |
+
+### Gesichter verfeinern (SD 1.5, SDXL)
+
+SD 1.5 und SDXL malen kleine Gesichter oft verschwommen oder verzerrt (Ganzkörperbilder, Gruppen, Straßen). Mit
+**Gesichter verfeinern** wird nach dem Bild jedes der vier größten Gesichter neu gemalt: der Bereich darum in voller
+Bildgröße, mit demselben Modell, Prompt und Seed bei **Stärke** 40 % (20–60 %), und weich zurückgesetzt. Ein Gesicht,
+das schon einen großen Teil des Bildes füllt (ein Porträt), bleibt, wie es ist; der Hinweis zum Auftrag nennt, wie
+viele Gesichter verfeinert wurden. Der Gesichtsfinder (YuNet, MIT, 0,2 MB) wird einmal geladen; ein weiteres Modell
+ist nicht nötig, der Speicher bleibt wie beim Bild selbst.
+
+Auf einem Mac mini mit 16 GB brauchte jedes Gesicht mit SD 1.5 etwa 10–25 s, mit SDXL 40–70 s (MEASUREMENTS 7cf). In
+einer Menschenmenge wird ein winziges Gesicht samt Kopf neu gemalt, ein verschwommener Passant kann dann ein anderer
+werden. Nur für SD-1.5- und SDXL-Modelle auf der Diffusers-Engine, bei Text zu Bild und Bild zu Bild.
+
+![Gesichter verfeinern](../screenshots/de/generate_face_detail.jpg)
 
 ### Modell wechseln
 
@@ -340,9 +355,62 @@ Malt einen Teil eines Bildes neu und behält den Rest.
 
 1. Wähle das Bild.
 2. **Malen** über den Teil, der sich ändern soll. **Radieren** nimmt Farbe weg. **Größe** stellt den Pinsel ein (1–30 %
-   der kürzeren Bildseite). Der Pfeil-Button widerruft den letzten Strich, der Papierkorb entfernt alle Farbe.
+   der kürzeren Bildseite). Der Pfeil-Button widerruft den letzten Schritt, der Papierkorb entfernt alle Farbe. Eine
+   dünne weiß-schwarze Linie um das Orange zeigt den Rand der Maske auf hellen wie dunklen Bildern.
 3. Beschreibe, was im bemalten Teil erscheinen soll, oder lass den Prompt leer, um nur etwas zu entfernen.
 4. **Veränderung** (Standard 100 %): Niedrigere Werte behalten mehr vom Vorhandenen.
+
+![Motiv auswählen](../screenshots/de/inpaint_select.jpg)
+
+**Motiv auswählen** findet das Motiv des Bildes (eine Person, ein Tier, einen Gegenstand im Vordergrund) mit Apple
+Vision auf diesem Mac, ohne Download, und fügt es der Maske hinzu: in unter einer Sekunde, beim ersten Mal nach dem
+Start in wenigen Sekunden. **Per Klick auswählen** wählt mit SAM 2.1 aus, was du anklickst, dem Auswahlwerkzeug der
+Seite Verbessern (installiere es zuerst dort): Ein Klick fügt hinzu, ⌥-Klick nimmt weg, und die Auswahl wird aus allen
+Klicks der Reihe neu bestimmt. Beides kommt zum Gemalten hinzu; **Malen** und **Radieren** wirken wie gewohnt darauf,
+und der Pfeil-Button nimmt eine Auswahl oder einen Klick nach dem anderen zurück. Bei einem Bild ohne klares Motiv (einer
+Landschaft) erscheint stattdessen ein Hinweis; dann male die Maske oder wähle per Klick aus. Beides geht auch, während
+ein Auftrag läuft, und beides gibt es nicht in der Fern-Weboberfläche.
+
+![Mehrere Motive, eines herausgenommen](../screenshots/de/inpaint_subjects.jpg)
+
+Bei **mehreren Motiven** (Flaschen, Teller, Menschen mit Abstand) bekommt jedes seinen eigenen Umriss, und **Motiv
+auswählen** bleibt eingeschaltet: Ein Klick auf ein Motiv nimmt es aus der Auswahl, ein weiterer Klick holt es zurück;
+ein herausgenommenes behält einen gepunkteten Umriss, und der Pfeil-Button nimmt einen solchen Klick nach dem anderen
+zurück. **Malen**, **Radieren** oder **Per Klick auswählen** beenden das; **Motiv auswählen** schaltet es wieder ein,
+solange die Motivauswahl der letzte Schritt ist. Menschen, die eng beieinander sitzen, werden oft als ein Motiv
+erkannt; wähle dann einen von ihnen per Klick aus. **Per Klick auswählen** nimmt zuerst das ganze Objekt (die ganze
+Person, nicht nur das angeklickte Gesicht); ein Klick auf dieselbe Stelle nimmt einen kleineren Teil davon (den
+Oberkörper, dann das Gesicht) und noch einer wieder das Ganze. Auf der Seite Verbessern geht das genauso.
+
+![Entfernen](../screenshots/de/inpaint_remove.jpg)
+
+**Neu malen | Entfernen**: **Entfernen** nimmt das bemalte Objekt ohne Prompt und ohne Bildmodell heraus; seine Stelle
+wird aus der Umgebung gefüllt.
+
+- **Schnell**: LaMa, etwa eine Sekunde auf der CPU; am besten für kleine Objekte vor ruhigem Hintergrund.
+- **Gründlich**: RORem, ein Modell, das eigens zum Entfernen trainiert ist (Apache-2.0, 6,5 GB, einmal nach Rückfrage
+  geladen). Etwa 25 s mit Laden und 9 GB Speicher auf einem Mac mini mit 16 GB; es gibt das geladene Bildmodell vorher
+  frei. Es malt glaubwürdigen Hintergrund in große Flächen.
+- **Auto** (Standard): Ist ObjectClear geladen, immer **Mit Schatten**: Auf 28 Bildern mit Gebäuden und Straßen ließen LaMa und RORem den dunklen Schatten unter Autos stehen, auch bei kleinen Autos (MEASUREMENTS 7cb). Ohne ObjectClear: LaMa unter 15 % des Bildes, darüber RORem. Ohne RORem füllt Auto auch große Flächen mit LaMa.
+- **Mit Schatten**: ObjectClear, ein Modell, das darauf trainiert ist, ein Objekt samt Schatten und Spiegelung zu
+  entfernen (7,3 GB, einmal nach Rückfrage geladen). Male das Objekt an: Ein Schatten auf dem Boden oder eine dunklere
+  Spiegelung, die es berührt, verschwindet mit; eine helle Spiegelung male mit an. Außerhalb der bemalten Stelle
+  ersetzt es nur, was es heller macht, etwa einen Schatten. Personen, die Apple Vision findet und die du nicht angemalt hast, bleiben, wie sie sind (bis zu vier, meist die vorne). Eine Person direkt neben dem Objekt kann trotzdem verwischt werden: ObjectClear malt den weichen Rand der angemalten Stelle aus seinem eigenen, kleineren Bild; nimm dort „Gründlich“ oder „Vergleichen“. Ab und zu, meist bei grob angemalter Stelle, malt ObjectClear das Objekt neu, statt es zu entfernen; VulKara erkennt das und füllt die Stelle neu wie Auto ohne ObjectClear (die Notiz des Auftrags sagt es). Gesichter anderer Personen bleiben, wie sie sind, wenn der
+  Gesichtsfinder von „Restaurieren“ geladen ist und sie findet; ein Gesicht, dessen Augen, Nase oder Mund du übermalst,
+  zählt als bemalt. Etwa 1–1,5 min je Bild mit Laden und etwa 8 GB Speicher auf
+  einem Mac mini mit 16 GB; es gibt das geladene Bildmodell vorher frei. Nimm es, wenn mit den anderen Verfahren ein
+  dunkler Fleck oder ein Spiegelbild stehen bleibt; bei Bildern ohne Schatten bringt es nichts gegenüber „Gründlich“.
+  Seine Lizenz (S-Lab License 1.0) erlaubt nur nicht kommerzielle Nutzung.
+- **Vergleichen**: je ein Bild mit jedem Verfahren auf diesem Mac („Schnell“, dazu „Gründlich“ und „Mit Schatten“,
+  wenn geladen), nebeneinander in den Ergebnissen, damit du das beste behältst. Jedes Verfahren erfindet ab und zu
+  etwas, bei großen Flächen öfter: einen Tisch, der weitergeht, wo er endete, einen Gegenstand, den es nie gab. Ein
+  Objekt nach dem anderen zu entfernen hilft auch. „Nochmal entfernen“ gibt es nach „Vergleichen“ nicht: Öffne das
+  Bild, das du behältst, und mach dort weiter.
+
+Der bemalte Teil wird um 1,5 % der längeren Bildseite vergrößert, seine Farben werden an die Umgebung angeglichen und er
+wird weich eingeblendet; außerhalb bleibt das Bild, wie es ist. Ein Schatten des Objekts verschwindet nur, wenn er
+mitbemalt ist oder mit **Mit Schatten**. **Nochmal entfernen** entfernt im letzten Ergebnis noch einmal mit derselben
+Maske, für Reste. In der Fern-Weboberfläche lassen sich RORem und ObjectClear nur am Mac laden.
 
 Inpainting können SD 1.x, SD 2.x, SDXL, SD 3.5, FLUX.1, Chroma, Qwen-Image, Z-Image, FLUX.2 [klein] und Fibo 2.0.
 *SDXL Inpainting* (bei den empfohlenen Modellen) ist dafür trainiert und fügt Neues sauber ein, etwa 1½ Minuten pro
@@ -390,6 +458,15 @@ Der Bereich rechts erklärt immer, welcher dieser Fälle eintritt.
   beliebige Größe.
 - Zum Erweitern braucht es ein SDXL-, SD 3.5-, FLUX.1-, Chroma- oder Z-Image-Modell oder ein Inpainting-Modell. Andere
   Modelle sind mit *(nur neue Bilder)* markiert.
+- **Erweitern mit FLUX.2 [klein] 4B** nimmt die Outpaint-LoRA von fal (73 MB, beim ersten Mal geladen): Der neue Teil
+  setzt Linien, Licht und Personen des Bildes fort, auch eine vom Rand angeschnittene Person. Das Bild selbst bleibt
+  pixelgenau, nur der neue Teil wird gemalt; ein Prompt ist freiwillig und wird an den der LoRA angehängt. Etwa
+  105–125 s und 10 GB auf einem Mac mini mit 16 GB. Sehr breite Ränder (ein Viertel des Bildes an jeder Seite) können
+  in der Farbe abweichen. Ist FLUX.2 [klein] 9B gewählt, läuft das Erweitern ohne eigene LoRAs mit einem installierten
+  klein 4B und der LoRA (9B ließ den Rand in 7 von 10 Testbildern verschmiert); die Notiz des Auftrags sagt das. Mit eigenen LoRAs oder
+  ohne klein 4B erweitert 9B selbst, ohne verschmierten Rand.
+
+  ![Erweitern mit FLUX.2 [klein] 4B](../screenshots/de/canvas_extend.jpg)
 - Die Leinwand samt ihren Bildern, Ansicht, Prompt und Modell bleibt über einen Neustart hinweg erhalten.
 
 ## 8. Bild zu Video
@@ -454,6 +531,13 @@ Linie die Lizenz, ihren Hinweis und die Quelle.
 - **Charakter** (Entrauschen): *Natürlich* bleibt nah am Foto; *Scharf* nutzt die GAN-Gewichte von SCUNet, knackiger,
   mit feiner Struktur, die dort erfunden wird, wo das Rauschen war. Scharf wird beim ersten Einsatz einmalig
   heruntergeladen (72 MB).
+- **Charakter** (Vergrößern ×4): *Standard* ist SwinIR; *Natürlich (langsam)* nutzt 4xBHI_dat2_real von Philip
+  Hofmann (CC BY 4.0), das die natürlichste Struktur erhält (Asphalt, Ziegel, Laub), aber etwa dreimal so lange braucht;
+  bei stark verrauschten Bildern kann aus dem Rauschen ein feines Gitter werden, dort ist Standard besser. Es wird beim
+  ersten Einsatz einmalig heruntergeladen (140 MB). Auf einem Mac mini mit 16 GB wurde ein Foto mit 512 px samt
+  erstem Herunterladen in etwa 24 s zu 2048 px (MEASUREMENTS 7ce).
+
+  ![Vergrößern ×4 mit Natürlich (langsam)](../screenshots/de/enhance_natural.jpg)
 - **Vergrößern** (Werkzeuge, die vergrößern, etwa Vergrößern ×4): dieselben vorgegebenen Kacheln und derselbe Regler
   wie auf der Seite „Vergrößern“; das Ergebnis ist so viel Mal so groß wie dein Bild.
 - **Hintergrund entfernen**: *Transparent* ergibt ein PNG mit transparentem Hintergrund, *Maske* die Maske in Schwarz
@@ -936,7 +1020,10 @@ Was beim Import passiert:
 
 ![Verlauf](../screenshots/de/history.jpg)
 
-Jeder fertige Auftrag, der neueste zuerst, mit allen seinen Einstellungen.
+Jeder fertige Auftrag, der neueste zuerst, mit allen seinen Einstellungen. Ein Bild, das nicht mehr dort liegt, wo es
+gespeichert wurde (andere Platte, verschobener Ordner), wird über seinen Namen im Ordner `pictures` des Verlaufs oder
+im Bilderordner wiedergefunden; der Verlauf merkt sich dann den neuen Pfad (Ergebnisse und Favoriten; die Datei davor bleibt als
+`entries.jsonl.before-repair-<Datum>` erhalten).
 
 - **Suchen** findet Wörter in Prompts, Modellnamen und Bezeichnungen.
 - **Auswählen**: Ein Klick wählt einen Eintrag aus, ⌘-Klick fügt einen hinzu oder nimmt ihn heraus, ⇧-Klick wählt einen
@@ -1055,7 +1142,7 @@ Es wird kein Token gesendet und nichts über deine Dateien; gelesen werden nur d
 
 #### App-Updates
 
-Mit derselben täglichen Prüfung (und **Auf Update prüfen** auf der Seite Änderungen) fragt VulKara GitHub nach seinem
+Mit derselben täglichen Prüfung (und **Auf Update prüfen** auf der Seite Änderungen, oder **Auf Update prüfen …** im App-Menü und im Menü der Menüleiste: öffnet diese Seite und prüft sofort) fragt VulKara GitHub nach seinem
 neuesten Release. Gibt es ein neueres, sagt es eine Karte in der Ecke: **Aktualisieren und neu starten** lädt es,
 prüft es (die SHA-256-Prüfsumme, die GitHub für die Datei angibt, die Version darin, die Developer-ID-Signatur der
 VulKara-Releases und Gatekeeper) und setzt es an die Stelle der App, sobald VulKara beendet ist; dann startet die neue

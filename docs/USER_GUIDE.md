@@ -111,7 +111,7 @@ canvas or a pose. Each generate page also remembers its settings after a restart
   *Play a sound when the queue is finished*.
 - No job starts while a LoRA is training.
 - Closing the window does not stop the jobs: VulKara keeps running with its icon in the menu bar (the running job,
-  its progress and how many wait; **Open VulKara**, **Monitor**, **Settings**). **Quit VulKara** (⌘Q, or in the menu bar
+  its progress and how many wait; **Open VulKara**, **Monitor**, **Check for Update…**, **Settings**). **Quit VulKara** (⌘Q, or in the menu bar
   menu) ends it and its engines; with remote access on, the remote web UI stays reachable until then, and the menu
   bar menu says so. **Settings…** in the app menu has ⌘, .
 
@@ -174,6 +174,21 @@ running job shows its progress on its tile, and a waiting job shows its place in
 | **Pictures** | 1–20 | How many pictures are made, each with its own seed. |
 | **LoRAs** | up to 3 | Add-ons that teach the model a style, person or object, each with its own weight (−2 to 2; the − and + next to it step it by a tenth, also on a phone). Only LoRAs of the model's family are offered. |
 | **Not in the picture** | text | The negative prompt: what should not appear. Only shown when the model supports one. |
+
+### Refine faces (SD 1.5, SDXL)
+
+SD 1.5 and SDXL often paint small faces blurred or distorted (full-body pictures, groups, streets). With **Refine
+faces** on, each of the four largest faces is painted again after the picture: the part around it at the picture's
+full size, with the same model, prompt and seed at **Strength** 40 % (20–60 %), and put back with a soft edge. A
+face that already fills much of the picture (a portrait) stays as it is; the job's note says how many faces were
+refined. The face finder (YuNet, MIT, 0.2 MB) is downloaded once; no other model is needed and the memory stays as
+for the picture itself.
+
+On a 16 GB Mac mini each face took about 10–25 s with SD 1.5 and 40–70 s with SDXL (MEASUREMENTS 7cf). In a crowd a
+tiny face is painted together with its head, so a blurred passer-by may become someone else. Only for SD 1.5 and SDXL
+models on the Diffusers engine, on Text to image and Image to image.
+
+![Refine faces](screenshots/generate_face_detail.jpg)
 
 ### Switching the model
 
@@ -322,9 +337,57 @@ Repaints one part of a picture and keeps the rest.
 
 1. Choose the picture.
 2. **Paint** over the part that is to change. **Erase** takes paint away. **Size** sets the brush (1–30 % of the
-   shorter side of the picture). The arrow button undoes the last stroke, and the bin removes all paint.
+   shorter side of the picture). The arrow button undoes the last step, and the bin removes all paint. A thin
+   white-and-black line around the orange shows the edge of the mask on light and dark pictures alike.
 3. Describe what should appear in the painted part, or leave the prompt empty to just remove something.
 4. **Change** (default 100 %): lower values keep more of what is there.
+
+![Select subject](screenshots/inpaint_select.jpg)
+
+**Select subject** finds the subject of the picture (a person, an animal, an object in front) with Apple Vision on
+this Mac, without a download, and adds it to the mask: under a second, a few seconds the first time after a start.
+**Select by click** selects what you click with SAM 2.1, the selection tool of the Enhance page (install it there
+first): a click adds, ⌥-click takes away, and the selection is made again from all clicks of the row. Both add to what
+is painted; **Paint** and **Erase** work on top of it as usual, and the arrow button takes back one selection or click
+at a time. A picture without a clear subject (a landscape) gets a message instead; then paint the mask or select by
+click. Both work while a job runs, and neither is offered in the remote web UI.
+
+![Several subjects, one taken out](screenshots/inpaint_subjects.jpg)
+
+With **several subjects** (bottles, plates, people standing apart) each one gets its own outline and **Select subject**
+stays on: a click on a subject takes it out of the selection, another click brings it back; one taken out keeps a
+dotted outline, and the arrow button takes back one such click at a time. **Paint**, **Erase** or **Select by click**
+end it; **Select subject** turns it on again while the subject selection is the last step. People sitting close
+together are often found as one subject; then select one of them by click. **Select by click** takes the whole thing
+first (a whole person, not just the face you clicked); a click on the same spot again takes a smaller part of it (the
+upper body, then the face), and once more the whole again. This works the same on the Enhance page.
+
+![Remove](screenshots/inpaint_remove.jpg)
+
+**Repaint | Remove**: **Remove** takes the painted object out without a prompt or a picture model; its place is filled
+from the surroundings.
+
+- **Fast**: LaMa, about a second on the CPU; best for small objects on a calm background.
+- **Thorough**: RORem, a model trained to remove objects (Apache-2.0, 6.5 GB, downloaded once after a question). About
+  25 s with loading and 9 GB of memory on a Mac mini with 16 GB; it frees the loaded picture model first. It paints
+  plausible background into large areas.
+- **Auto** (default): with ObjectClear downloaded always **With shadows**: on 28 pictures with buildings and streets LaMa and RORem left the dark shadow under cars even when the car was small (MEASUREMENTS 7cb). Without ObjectClear: LaMa below 15 % of the picture, RORem above. Without RORem, Auto fills large areas with LaMa too.
+- **With shadows**: ObjectClear, a model trained to remove an object together with its shadow and reflection (7.3 GB,
+  downloaded once after a question). Paint the object: a shadow on the floor or a darker reflection that touches it
+  goes with it; paint a light reflection too. Beyond the painted part it only replaces what it makes lighter, such as
+  a shadow. People that Apple Vision finds and that you did not paint stay as they are (up to four, mostly those in front). A person right beside the object can still be blurred: ObjectClear paints the soft edge of the painted part from its own smaller picture; use Thorough or Compare there. Now and then, mostly with a loosely painted mask, ObjectClear paints the object again instead of removing it; VulKara notices that and fills the part again as Auto does without ObjectClear (the job's note says so). Faces of other people stay as they are when the face detector of Restore is downloaded and finds them; a
+  face whose eyes, nose or mouth you paint over counts as painted. About 1–1.5 min per picture including loading and about 8 GB of memory on a Mac mini with 16 GB; it frees
+  the loaded picture model first. Use it when a dark patch or a mirror image stays with the other methods; for pictures
+  without a shadow it brings nothing over Thorough. Its licence (S-Lab License 1.0) allows non-commercial use only.
+- **Compare**: one picture with each method on this Mac (Fast, and Thorough and With shadows when downloaded), side by
+  side in the results, to keep the best. Every method makes something up now and then, more often on large areas: a
+  table that goes on where it ended, an object that was never there. Removing one object at a time helps too.
+  **Remove again** is not offered after Compare: open the picture you keep and go on from there.
+
+The painted part is grown by 1.5 % of the picture's longer side, its colours are matched to the surroundings and it is
+blended in softly; outside it the picture stays as it is. A shadow of the object goes only when it is painted too, or
+with **With shadows**. **Remove again** removes once more in the last result with the same mask, for leftovers. In the
+remote web UI RORem and ObjectClear can only be downloaded on the Mac.
 
 Models that can inpaint are SD 1.x, SD 2.x, SDXL, SD 3.5, FLUX.1, Chroma, Qwen-Image, Z-Image, FLUX.2 [klein] and Fibo
 2.0. *SDXL Inpainting* (in the recommended models) is trained for it and blends new parts in cleanly, about 1½ minutes
@@ -370,6 +433,15 @@ The panel always explains which of these will happen.
 - **Frame** sets the proportions: 1:1, 3:4, 4:3, 16:9 or 9:16, or drag the frame's corners for any size.
 - Extending needs an SDXL, SD 3.5, FLUX.1, Chroma or Z-Image model, or an inpainting model. Other models are marked *(new pictures
   only)*.
+- **Extending with FLUX.2 [klein] 4B** takes fal's outpaint LoRA (73 MB, downloaded the first time): the new part goes
+  on with the picture's lines, light and people, also a person cut by the edge. The picture itself stays to the pixel,
+  only the new part is painted; a prompt is optional and is added to the LoRA's own. About 105–125 s and 10 GB on a
+  16 GB Mac mini. Very wide borders (a quarter of the picture on every side) can drift in colour. With
+  FLUX.2 [klein] 9B chosen, extending runs on an installed klein 4B with the LoRA, unless LoRAs of its own are chosen
+  (9B left the edge smeared in 7 of 10 test pictures); the job's note says so. With LoRAs of its own or
+  without a klein 4B, 9B extends itself, without the smeared edge.
+
+  ![Extending with FLUX.2 [klein] 4B](screenshots/canvas_extend.jpg)
 - The canvas, including its pictures, view, prompt and model, is kept after a restart.
 
 ## 8. Image to video
@@ -429,6 +501,12 @@ download size, and below a line the licence, its note and the source.
   one more gently.
 - **Character** (Denoise): *Natural* keeps the photo faithful; *Sharp* uses SCUNet's GAN weights, crisper, with fine
   texture made up where the noise was. Sharp is downloaded once (72 MB) when first used.
+- **Character** (Upscale ×4): *Standard* is SwinIR; *Natural (slow)* uses 4xBHI_dat2_real by Philip Hofmann
+  (CC BY 4.0), which keeps the most natural texture (asphalt, brick, foliage) but takes about three times as long; on
+  very noisy pictures it can turn the noise into a fine grid, there Standard is better. It is downloaded once (140 MB)
+  when first used. On a 16 GB Mac mini a 512 px photo became 2048 px in about 24 s, the first download included (MEASUREMENTS 7ce).
+
+  ![Upscale ×4 with Natural (slow)](screenshots/enhance_natural.jpg)
 - **Enlarge** (tools that enlarge, such as Upscale ×4): the same preset tiles and slider as on the Upscale page; the
   result is that many times the size of your picture.
 - **Remove background**: *Transparent* gives a PNG with a transparent background, *Mask* the mask in black and white.
@@ -876,7 +954,9 @@ What happens on import:
 
 ![History](screenshots/history.jpg)
 
-Every finished job, newest first, with all its settings.
+Every finished job, newest first, with all its settings. A picture that is no longer where it was saved (another
+drive, a moved folder) is found again by its name in the history's `pictures` folder or the pictures folder; the
+history then keeps the new path (results and favourites; the file before is kept as `entries.jsonl.before-repair-<date>`).
 
 - **Search** finds words in prompts, model names and labels.
 - **Select**: click selects one entry, ⌘-click adds or removes one, ⇧-click selects a range, ⌘A selects all and
@@ -988,7 +1068,7 @@ No token is sent and nothing about your files; only the public version lists are
 
 #### App updates
 
-With the same daily check (and **Check for update** on the Changelog page) VulKara asks GitHub for its newest
+With the same daily check (and **Check for update** on the Changelog page, or **Check for Update…** in the app menu and the menu bar menu, which opens that page and checks at once) VulKara asks GitHub for its newest
 release. When there is a newer one, a card in the corner says so: **Update and restart** downloads it, checks it
 (the SHA-256 checksum GitHub lists for the file, the version inside, the Developer ID signature of the VulKara releases
 and Gatekeeper) and puts it in place of the app once VulKara has quit; then the new version starts. **What's new** opens

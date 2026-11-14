@@ -9,7 +9,7 @@ import { useAssetsStore } from '../stores/assets'
 import { useFavoritesStore } from '../stores/favorites'
 import { useQueueStore } from '../stores/queue'
 import { jobFacts, jobProgress } from '../util/format'
-import { t } from '../i18n'
+import { engineNote, t } from '../i18n'
 import type { QueuedJob } from '@shared/api'
 
 defineProps<{ jobs: QueuedJob[] }>()
@@ -38,7 +38,7 @@ const details = (q: QueuedJob): string => [
   q.job.label ? `${jobLabel(q.job.label)} · ${modelName(q.job.modelDir)}` : modelName(q.job.modelDir),
   q.job.prompt || t('library.noPrompt'),
   jobFacts(q),
-  q.job.note,
+  q.job.note && engineNote(q.job.note),
   q.state === 'failed' ? q.error || t('library.gallery.failed') : undefined,
 ].filter(Boolean).join('\n\n')
 </script>
@@ -65,7 +65,7 @@ const details = (q: QueuedJob): string => [
             </template>
             <template v-if="q.job.note">
               <span class="note" tabindex="0" :aria-label="t('library.gallery.note')" @click.stop @keydown.enter.stop><Info :size="12" /></span>
-              <div class="details-panel note-panel selectable" @click.stop>{{ q.job.note }}</div>
+              <div class="details-panel note-panel selectable" @click.stop>{{ engineNote(q.job.note) }}</div>
             </template>
           </OpenHint>
         </span>
@@ -95,7 +95,7 @@ const details = (q: QueuedJob): string => [
           <strong>{{ q.job.label ? jobLabel(q.job.label) : modelName(q.job.modelDir) }}</strong>
           <p class="prompt dim">{{ q.job.prompt || t('library.noPrompt') }}</p>
           <p class="dim">{{ jobFacts(q) }}</p>
-          <p v-if="q.job.note" class="note-text">{{ q.job.note.split(':')[0] }}</p>
+          <p v-if="q.job.note" class="note-text">{{ engineNote(q.job.note).split(':')[0] }}</p>
           <template v-if="q.state === 'running'">
             <div class="bar" :class="{ unknown: q.progress <= 0 }">
               <i :style="q.progress > 0 ? { width: q.progress + '%' } : {}" />

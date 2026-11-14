@@ -65,6 +65,14 @@
    "name": "LaMa (Auffüllen)",
    "description": "Füllt Kratzer, Flecken und Löcher alter Fotos aus ihrer Umgebung auf (Restaurieren)."
   },
+  "rorem": {
+   "name": "RORem (Objekte entfernen)",
+   "description": "Entfernt größere übermalte Objekte auf der Seite „Inpainting“ (Entfernen, Auto und Gründlich) und füllt ihre Stelle mit glaubwürdigem Hintergrund; kleine füllt LaMa. RORem von LetsThink (Apache-2.0), auf Grundlage von SDXL Inpainting 0.1 (CreativeML Open RAIL++-M)."
+  },
+  "objectclear": {
+   "name": "ObjectClear (Objekte samt Schatten entfernen)",
+   "description": "Entfernt ein auf der Seite „Inpainting“ übermaltes Objekt samt Schatten und Spiegelung, wenn es dort gewählt ist; es arbeitet auf dem ganzen Bild. ObjectClear (S-Lab License 1.0, nicht kommerziell), auf Grundlage von SDXL Inpainting 0.1 (CreativeML Open RAIL++-M)."
+  },
   "ddcolor": {
    "name": "DDColor (Kolorieren)",
    "description": "Koloriert Schwarzweißfotos; die Formen bleiben die des Originals (Restaurieren)."
@@ -76,6 +84,10 @@
   "klein4b_consistency": {
    "name": "Konsistenz-LoRA für FLUX.2 [klein] 4B (Restaurieren)",
    "description": "Hält FLUX.2 [klein] 4B beim Reparieren nah am Foto: Kratzer verschwinden gründlicher (Restaurieren, Option Konsistenz-LoRA). LoRA von lrzjason, Apache-2.0."
+  },
+  "klein4b_outpaint": {
+   "name": "Outpaint-LoRA für FLUX.2 [klein] 4B (KI-Leinwand)",
+   "description": "Lässt FLUX.2 [klein] 4B ein Bild auf der KI-Leinwand erweitern: der neue Teil setzt Linien, Licht und Personen des Bildes fort. LoRA von fal, Apache-2.0."
   },
   "dwpose": {
    "name": "DWPose (Posenerkennung)",
@@ -165,7 +177,8 @@
   "Pose and depth": "Pose und Tiefe",
   "Restore": "Restaurieren",
   "Upscale": "Vergrößern",
-  "Prompt": "Prompt"
+  "Prompt": "Prompt",
+  "AI Canvas": "KI-Leinwand"
  },
  "tools": {
   "nafnet-deblur": {
@@ -188,7 +201,13 @@
   "swinir-real-x4": {
    "name": "Vergrößern ×4 (SwinIR)",
    "summary": "Viermal größer",
-   "description": "Vergrößert ein Foto auf das Vierfache und stellt feine Details neu her; für echte Fotos."
+   "description": "Vergrößert ein Foto auf das Vierfache und stellt feine Details neu her; für echte Fotos.",
+   "variants": {
+    "natural": {
+     "label": "Natürlich (langsam)",
+     "description": "4xBHI_dat2_real von Philip Hofmann (CC BY 4.0): die natürlichste Struktur (Asphalt, Ziegel, Laub), etwa dreimal langsamer als SwinIR; bei stark verrauschten Bildern kann aus dem Rauschen ein feines Gitter werden."
+    }
+   }
   },
   "fbcnn-color": {
    "name": "JPEG-Bereinigung (FBCNN)",
@@ -252,6 +271,8 @@
   "Non-commercial use of the model. Pictures may be used commercially only by people and companies below USD 5 million annual revenue, with content filter measures and the AI disclosure the law requires; anything else needs a licence from Black Forest Labs. Distributing the model needs Black Forest Labs' attribution notice.": "Nutzung des Modells nur nichtkommerziell. Bilder dürfen nur Personen und Unternehmen mit weniger als 5 Millionen USD Jahresumsatz kommerziell nutzen, mit Inhaltsfilter-Maßnahmen und der gesetzlich verlangten KI-Kennzeichnung; alles andere braucht eine Lizenz von Black Forest Labs. Wer das Modell weitergibt, muss den Hinweis von Black Forest Labs beilegen.",
   "OpenCV's ONNX export stays the Sharpen tool: the original NAFNet-GoPro weights blow up on many picture crops (MEASUREMENTS.md), this export does not.": "Das Schärfen-Werkzeug bleibt OpenCVs ONNX-Export: Die originalen NAFNet-GoPro-Gewichte entgleisen bei vielen Bildausschnitten (MEASUREMENTS.md), dieser Export nicht.",
   "The original weights, published with KAIR (MIT) by SCUNet's author; SCUNet itself is Apache-2.0. Both allow any use.": "Die originalen Gewichte, vom SCUNet-Autor mit KAIR (MIT) veröffentlicht; SCUNet selbst steht unter Apache-2.0. Beides erlaubt jede Nutzung.",
-  "Recommended: FLUX 3": "Empfohlen: FLUX 3"
+  "Recommended: FLUX 3": "Empfohlen: FLUX 3",
+  "For non-commercial use only; the licence does not mention the pictures, so VulKara treats them as non-commercial too. The use-based restrictions of SDXL's licence (Attachment A) also apply. VulKara runs it with its own code and downloads the weights from the project once.": "Nur für nicht kommerzielle Nutzung; die Lizenz erwähnt die Bilder nicht, darum behandelt VulKara auch sie als nicht kommerziell. Die nutzungsbasierten Beschränkungen der SDXL-Lizenz (Anhang A) gelten zusätzlich. VulKara führt es mit eigenem Code aus und lädt die Gewichte einmal vom Projekt herunter.",
+  "By Philip Hofmann; VulKara downloads the weights unchanged from his release on first use.": "Von Philip Hofmann; VulKara lädt die Gewichte beim ersten Einsatz unverändert aus seiner Veröffentlichung."
  }
 }

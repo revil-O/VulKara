@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Copyright (C) 2026 Oliver Schmidt
-"""The helper models (content filter, Restore, pose and depth detection, ControlNets, upscaling) as the Models page
-shows them: helpers.json lists them with their folder under the helpers folder. They are downloaded when first
-needed anyway; install() fetches one ahead (Models → Installed → Helper models → Download), always at its pinned
-commit and checked (pinned.py)."""
+"""The helper models (content filter, Restore, object removal, pose and depth detection, ControlNets, upscaling) as
+the Models page shows them: helpers.json lists them with their folder under the helpers folder. They are downloaded
+when first needed anyway (RORem and ObjectClear only here); install() fetches one ahead (Models → Installed → Helper
+models → Download), always at its pinned commit and checked (pinned.py)."""
 import json
 import os
 
@@ -41,6 +41,13 @@ def install(helper_id, report=None, token=None):
     elif kind == "lama":
         import restore
         pinned.fetch(h["repo"], restore.LAMA_PIN[0], {restore.LAMA_FILE: restore.LAMA_PIN[1]}, folder, report=say)
+    elif kind in ("rorem", "objectclear"):
+        import importer
+        import objectclear
+        import remove
+        importer.ensure_install_room(folder)  # the free space rule of model installs: they are 6.6 and 7.8 GB
+        revision, files = (objectclear if kind == "objectclear" else remove).PIN
+        pinned.fetch(h["repo"], revision, files, folder, token=token, report=say)
     elif kind == "ddcolor":
         import restore
         pinned.fetch(h["repo"], restore.COLOR_PIN[0], {restore.COLOR_FILE: restore.COLOR_PIN[1]}, folder, report=say)

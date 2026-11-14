@@ -47,6 +47,24 @@ describe('menus', () => {
     expect(roles(true)).toEqual(expect.arrayContaining(['reload', 'forceReload', 'toggleDevTools']))
   })
 
+  it('checks for updates from the app menu and the menu bar menu, not while one installs', () => {
+    type Entry = { label?: string; enabled?: boolean; click?: () => void }
+    const checkUpdate = vi.fn()
+    let busy = false
+    const h = { ...hooks(), texts: () => ({ ...texts, checkUpdate: 'Auf Update prüfen …' }), checkUpdate, updateBusy: () => busy }
+    const find = (items: Entry[]): Entry => items.find((i) => i.label === 'Auf Update prüfen …')!
+    const inApp = find(appMenuTemplate(h)[0].submenu as Entry[])
+    const inTray = find(trayMenuTemplate(h) as Entry[])
+    inApp.click!()
+    inTray.click!()
+    expect(checkUpdate).toHaveBeenCalledTimes(2)
+    expect([inApp.enabled, inTray.enabled]).toEqual([true, true])
+    busy = true
+    expect(find(trayMenuTemplate(h) as Entry[]).enabled).toBe(false)
+    // without the hook (okAI-helper's menus, tests) no entry
+    expect((trayMenuTemplate(hooks()) as Entry[]).some((i) => i.label === 'Auf Update prüfen …')).toBe(false)
+  })
+
   it('opens the settings with ⌘, and the monitor from the app menu, in the app language', () => {
     const h = hooks()
     const items = appMenuTemplate(h)[0].submenu as { label?: string; accelerator?: string; click?: () => void; role?: string }[]

@@ -32,6 +32,7 @@ export function jobLabel(label: string): string {
   const up = /^Upscale ×([\d.]+)$/.exec(label)
   if (up) return t('jobs.labels.upscale', { factor: Number(up[1]) })
   if (label === 'Without LoRA') return t('lora.compare.withoutLora') // i18n-ok
+  if (label === 'Object removed') return t('jobs.labels.objectRemoved') // i18n-ok
   const restore = /^(Restored|Preview): (.*)$/.exec(label)
   if (restore) {
     const steps = restore[2].split(', ').filter(Boolean).map((s) => (RESTORE_STEPS[s] ? t(RESTORE_STEPS[s]) : s)).join(', ')

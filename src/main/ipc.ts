@@ -20,13 +20,15 @@ import { FileAccess } from './file_access'
 import { unlabelledOf } from './unlabelled'
 import { ImportQueue, processRunner, publicRef } from './imports'
 import { PhotoSelector, installedTools, recommendedTools } from './photo_tools'
-import { listHelpers } from './helpers'
+import { pruneSelections, selectionsDir, subjectMask, subjectMaskHelper } from './subject_mask'
+import { listHelpers, usesNonCommercialHelper } from './helpers'
 import { SystemMonitor, hardwareInfo, treeFootprintGb } from './system_stats'
 import { Benchmarks } from './benchmark'
 import { currentSession, log, logFolder, logLines, logOutput, onLog } from './log'
 import { hiddenSummary, redact } from './log_redact'
 import { listSessions, machineContext, readSession, sessionStart, stamp } from './log_sessions'
 import { issueUrl } from '@shared/report'
+import { EDITION } from '@shared/edition'
 import { cachedLicence, fetchLicence, setOrigin } from './licence_info'
 import { cachedInfo, fetchInfo } from './lora_info'
 import { loraDetails, setCategory, setTriggerWords } from './loras'
@@ -167,7 +169,7 @@ async function fetchPage(url: string, headers: Record<string, string>, lora: boo
   return res.text()
 }
 
-const history = new History(historyDir, () => send('history:change'))
+const history = new History(historyDir, () => send('history:change'), () => [join(historyDir(), 'pictures'), imagesDir()], log)
 
 // which pictures the pages may see (vk-file://) or hand to a job: the app's folders, the history's files and what
 // the user chose or dropped (file_access.ts)
@@ -341,6 +343,9 @@ const appUpdate = (): AppUpdater => (appUpdater ??= new AppUpdater({
   log,
 }))
 
+/** An update downloads, is checked or restarts the app: no second one from the menus. */
+export const appUpdateBusy = (): boolean => ['downloading', 'checking', 'restarting'].includes(appUpdater?.status().stage ?? 'idle')
+
 /** Once a day, a few seconds after the start and then on the hour, while nothing is generated or installed (the
  *  runtimes); the app's own release list once a day too, whenever. */
 function scheduleUpdateChecks(): void {
@@ -386,6 +391,7 @@ function handle(channel: string, fn: Handler): void {
 }
 
 export function registerIpc(): void {
+  void pruneSelections(selectionsDir(dataDir()), (path) => history.hasFile(path))
   ipcMain.on('files:dropped', (event, path: unknown) => {
     // synchronous, so the picture can be shown right after; only the main window's own page
     if (win && event.sender === win.webContents && event.senderFrame === event.sender.mainFrame && typeof path === 'string' && isMedia(path)) {
@@ -474,6 +480,9 @@ export function registerIpc(): void {
     if (captioning) throw new Error(t('main.queue.captioning'))
     if (!job || typeof job !== 'object' || typeof job.modelDir !== 'string' || (job.prompt !== undefined && typeof job.prompt !== 'string'))
       throw new Error(t('main.queue.incomplete'))
+    if (EDITION.commercialModelsOnly && usesNonCommercialHelper(job)) throw new Error(t('main.queue.notCommercial'))
+    // Auto takes ObjectClear when it is there (MEASUREMENTS 7cb); whatever the sender said, this build decides
+    if (job.removeObject) job = { ...job, removeObject: { method: job.removeObject.method, objectclear: !EDITION.commercialModelsOnly } }
     // without the content filter no result could be shown: the job does not start
     if (!engineCommand('diffusers', ['content_check']))
       throw new Error(t('main.queue.needsFilter'))
@@ -697,14 +706,22 @@ export function registerIpc(): void {
     selector.stop()
     await shell.trashItem(String(folder))
   })
-  handle('tools:select', (tool: string, image: string, points: [number, number, number][]) => {
+  handle('tools:select', (tool: string, image: string, points: [number, number, number][], pick?: number) => {
     if (!isInside(String(tool), toolsDir())) throw new Error(t('main.tools.notATool'))
     if (typeof image !== 'string' || !isAbsolute(image) || !isMedia(image)) throw new Error(t('main.files.choosePicture'))
     fileAccess.check(image)
     const clicks = (Array.isArray(points) ? points : []).slice(0, 64)
       .filter((p) => Array.isArray(p) && p.length === 3 && p.every((v) => Number.isFinite(Number(v))))
       .map((p) => [Number(p[0]), Number(p[1]), Number(p[2]) ? 1 : 0] as [number, number, number])
-    return selector.select(String(tool), image, clicks)
+    return selector.select(String(tool), image, clicks, Number.isInteger(pick) && Number(pick) >= 0 && Number(pick) < 16 ? Number(pick) : undefined)
+  })
+  handle('tools:subject', (image: string) => {
+    if (typeof image !== 'string' || !isAbsolute(image) || !isMedia(image) || !existsSync(image)) throw new Error(t('main.files.choosePicture'))
+    fileAccess.check(image)
+    // next to the selections of SAM (photo_tools.segment_serve), inside the data folder the pages may read
+    const work = selectionsDir(dataDir())
+    mkdirSync(work, { recursive: true })
+    return subjectMask(subjectMaskHelper(app.isPackaged, process.resourcesPath, app.getAppPath()), image, join(work, `subject_${randomUUID().slice(0, 16)}.png`), log)
   })
   handle('imports:clearFinished', () => imports.clearFinished())
   handle('imports:list', () => imports.list())

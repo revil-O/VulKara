@@ -281,7 +281,9 @@ def _kind(pipe):
     name = type(pipe).__name__
     if name.startswith("Chroma"):
         return "chroma"
-    if name.startswith("Flux") and not name.startswith("Flux2"):
+    if name.startswith("Flux2"):
+        return "flux2"
+    if name.startswith("Flux"):
         return "flux1"
     if name.startswith("QwenImage21"):
         return "qwen_image21"
@@ -302,6 +304,8 @@ def _needs(kind, keys):
         return ["zimage"] if z_image_needs(keys) else []
     if kind == "auraflow" and auraflow_needs(keys):
         return ["auraflow"]
+    if kind == "flux2" and any(k.startswith("base_model.model.") for k in keys) and not any(".default." in k for k in keys):
+        return []  # diffusers' FLUX.2 reader takes peft's prefix itself (as ComfyUI's "diffusion_model.", any naming)
     if any(k.endswith(_OLD_FACTORS) for k in keys) and any(".lora_A." in k for k in keys):
         steps.append("one_naming")
     if any(".default." in k or k.startswith("base_model.model.") for k in keys):

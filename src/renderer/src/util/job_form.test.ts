@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
 import { describe, expect, it } from 'vitest'
-import { TURBO, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, emptyForm, keepsPicture, formPage, formProblem, lorasFor, modelsFor, takesTurbo, takesUpsampler, upsamplerHelper } from './job_form'
+import { TURBO, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, buildRemoveJob, emptyForm, removeHelper, removeMethods, keepsPicture, takesFaceDetail, formPage, formProblem, lorasFor, modelsFor, takesTurbo, takesUpsampler, upsamplerHelper, type RemoveMethod } from './job_form'
 import type { Asset, ModelMeta } from '@shared/types'
+import { EDITION } from '@shared/edition'
 
 const model = (id: string, meta: Partial<ModelMeta> = {}): Asset => ({
   id: 'model:' + id, title: id, name: id, folder: '/models/' + id, type: 'model',
@@ -185,6 +186,20 @@ describe('generate form', () => {
     expect(back.keepPicture).toBe(true)
   })
 
+  it('refines faces only for SD 1.5 and SDXL on the Diffusers engine, on Text and Image to image', () => {
+    const SD1 = model('sd1', { arch: 'sd15', family: 'sd1' })
+    const form = { ...emptyForm('text'), prompt: 'a crowd', faceDetail: true, faceDetailStrength: 0.35 }
+    expect([takesFaceDetail(SDXL.meta), takesFaceDetail(SD1.meta), takesFaceDetail(FLUX.meta)]).toEqual([true, true, false])
+    expect(takesFaceDetail(model('cx', { runtime: 'comfyui' }).meta)).toBe(false)
+    expect(buildJob('text', form, SDXL, []).faceDetail).toBe(0.35)
+    expect(buildJob('text', { ...form, faceDetail: false }, SDXL, []).faceDetail).toBeUndefined()
+    expect(buildJob('text', form, FLUX, []).faceDetail).toBeUndefined()
+    expect(buildJob('inpaint', form, SDXL, [], { maskImage: '/m.png' }).faceDetail).toBeUndefined()
+    const back = emptyForm('text')
+    applyJob(back, { id: 'j', ...buildJob('text', form, SDXL, []) }, [SDXL], [])
+    expect([back.faceDetail, back.faceDetailStrength]).toEqual([true, 0.35])
+  })
+
   it('describes jobs with an input picture', () => {
     const form = { ...emptyForm('image'), prompt: 'x', inputImage: '/in.png' }
     applyModel(form, SDXL, [])
@@ -256,7 +271,8 @@ describe('generate form', () => {
     const old = model('oldxl', { inpaint: undefined })
     const said = model('nope', { inpaint: false })
     const anima = model('anima', { family: 'anima', inpaint: undefined })
-    expect(modelsFor('inpaint', [old, said, anima]).map((m) => m.title)).toEqual(['oldxl'])
+    const qwen = model('oldqwen', { family: 'qwen_image', inpaint: undefined })
+    expect(modelsFor('inpaint', [old, said, anima, qwen]).map((m) => m.title)).toEqual(['oldxl', 'oldqwen'])
   })
 
   it('offers a FLUX.2 [klein] model only the LoRAs of its size, and sends no other', () => {
@@ -267,5 +283,58 @@ describe('generate form', () => {
     expect(lorasFor(klein4, loras).map((l) => l.title)).toEqual(['k4l', 'plain'])
     const form = { ...emptyForm('text'), prompt: 'x', loras: [{ id: 'lora:k9', scale: 1 }, { id: 'lora:k4l', scale: 1 }] }
     expect(buildJob('text', form, klein4, loras).loras).toEqual([{ path: '/loras/k4l', scale: 1 }])
+  })
+})
+
+describe('removing an object on Inpainting', () => {
+  const removing = { ...emptyForm('inpaint'), inpaintAction: 'remove' as const }
+
+  it('needs no model and no prompt, only the picture and the painted mask', () => {
+    expect(emptyForm('inpaint')).toMatchObject({ inpaintAction: 'repaint', removeMethod: 'auto' })
+    expect(formProblem('inpaint', removing, undefined, false)).toMatch(/picture/)
+    expect(formProblem('inpaint', { ...removing, inputImage: '/a.png' }, undefined, false)).toMatch(/object/)
+    expect(formProblem('inpaint', { ...removing, inputImage: '/a.png' }, undefined, true)).toBe('')
+    // a model the app can not run does not matter here
+    expect(formProblem('inpaint', { ...removing, inputImage: '/a.png' }, { ...SDXL, meta: { ...SDXL.meta, unsupported: 'no' } }, true)).toBe('')
+  })
+
+  it('builds one job of the picture without a model, labelled and AI MODIFIED', () => {
+    const form = { ...removing, inputImage: '/a.png', removeMethod: 'rorem' as const, seed: 5, aiLabel: true, prompt: 'ignored', count: 4 }
+    const job = buildRemoveJob(form, { maskImage: '/m.png', inputSize: [800, 600] })
+    expect(job).toMatchObject({ page: 'inpaint', prompt: '', modelId: '', modelDir: '', width: 800, height: 600, seed: 5, inputImage: '/a.png',
+      maskImage: '/m.png', removeObject: { method: 'rorem' }, label: 'Object removed', aiLabel: { kind: 'modified' } })
+    expect(job.steps).toBeUndefined()
+    expect(job.loras).toBeUndefined()
+  })
+
+  it('offers With shadows (ObjectClear) as a fourth method, not in a build with commercially usable models only', () => {
+    expect(removeMethods().map((m) => m.id)).toEqual(['lama', 'auto', 'rorem', 'objectclear', 'compare'])
+    expect(['lama', 'auto', 'rorem', 'objectclear', 'compare'].map((m) => removeHelper(m as RemoveMethod))).toEqual(['', 'rorem', 'rorem', 'objectclear', ''])
+    try {
+      EDITION.commercialModelsOnly = true
+      expect(removeMethods().map((m) => m.id)).toEqual(['lama', 'auto', 'rorem', 'compare'])
+    } finally {
+      EDITION.commercialModelsOnly = false
+    }
+    const job = buildRemoveJob({ ...removing, inputImage: '/a.png', removeMethod: 'objectclear' }, { maskImage: '/m.png', inputSize: [800, 600] })
+    expect(job.removeObject).toEqual({ method: 'objectclear' })
+    const form = emptyForm('inpaint')
+    applyJob(form, { ...job, id: '3' }, [SDXL], [])
+    expect(form).toMatchObject({ inpaintAction: 'remove', removeMethod: 'objectclear' })
+    try {
+      EDITION.commercialModelsOnly = true
+      applyJob(form, { ...job, id: '4' }, [SDXL], [])
+      expect(form.removeMethod).toBe('auto')
+    } finally {
+      EDITION.commercialModelsOnly = false
+    }
+  })
+
+  it('comes back from an earlier job, and a repaint job switches back to Repaint', () => {
+    const form = emptyForm('inpaint')
+    applyJob(form, { id: '1', page: 'inpaint', prompt: '', modelId: '', modelDir: '', width: 800, height: 600, seed: 3, removeObject: { method: 'lama' } }, [SDXL], [])
+    expect(form).toMatchObject({ inpaintAction: 'remove', removeMethod: 'lama', seed: 3 })
+    applyJob(form, { id: '2', page: 'inpaint', prompt: 'a cat', modelId: '', modelDir: '/models/xl', width: 1024, height: 1024, seed: 1 }, [SDXL], [])
+    expect(form).toMatchObject({ inpaintAction: 'repaint', removeMethod: 'lama', modelId: 'model:xl' })
   })
 })

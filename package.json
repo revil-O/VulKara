@@ -1,7 +1,7 @@
 {
   "name": "vulkara",
   "productName": "VulKara",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "Local image and video generation for Apple Silicon Macs",
   "private": true,
   "license": "LicenseRef-PolyForm-Noncommercial-1.0.0",
@@ -19,15 +19,16 @@
     "notices": "node tools/gen_notices.mjs",
     "licenses": "python3 tools/gen_licenses.py",
     "icon": "electron tools/make_icon.mjs",
-    "package": "electron-vite build && electron-builder --config electron-builder.config.cjs --mac --arm64 --publish never",
+    "native": "mkdir -p out/native && xcrun swiftc -O -target arm64-apple-macos14.0 native/subject_mask.swift -o out/native/subject-mask",
+    "package": "electron-vite build && npm run native && electron-builder --config electron-builder.config.cjs --mac --arm64 --publish never",
     "release": "node tools/release.mjs",
-    "start:app": "electron-vite build && node tools/dev-app.mjs"
+    "start:app": "electron-vite build && npm run native && node tools/dev-app.mjs"
   },
   "devDependencies": {
     "@lucide/vue": "1.70.0",
     "@types/node": "24.19.1",
     "@vitejs/plugin-vue": "6.0.9",
-    "electron": "44.10.2",
+    "electron": "44.11.3",
     "electron-builder": "26.18.0",
     "electron-vite": "5.0.0",
     "pinia": "4.0.3",

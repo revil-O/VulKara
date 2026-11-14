@@ -172,12 +172,17 @@ export interface Job {
   restore?: RestoreOptions
   /** a photo tool (Enhance page) on the input picture instead of painting */
   photoTool?: PhotoToolJob
+  /** the painted object removed (Inpainting → Remove): LaMa, RORem, Auto by the size of the mask, or ObjectClear
+   * with its shadow and reflection; no model */
+  removeObject?: { method: 'auto' | 'lama' | 'rorem' | 'objectclear' | 'compare'; /** set by the app: Auto may take ObjectClear (not in a build with commercially usable models only) */ objectclear?: boolean }
   /** the user confirmed the consent question (intimate content from a picture) */
   consent?: boolean
   /** FLUX 3 Image Klein: the prompt upsampler writes the full caption first (text to image) */
   upsample?: boolean
   /** FLUX.2 [klein] 4B, image to image: the consistency LoRA at half strength keeps the picture */
   keepPicture?: boolean
+  /** SD 1.5 / SDXL on the Diffusers engine: the faces painted again at this strength after the picture (0.2-0.6) */
+  faceDetail?: number
   /** "AI generated .." written into the lower right corner of each picture (not videos) */
   aiLabel?: AiLabel
   label?: string

@@ -90,6 +90,7 @@ export default {
     exporting: 'A model is being exported: generate when it is finished.',
     captioning: 'A prompt is being written from a picture: generate when it is finished or stopped.',
     incomplete: 'This job is incomplete.',
+    notCommercial: 'This job uses a model with a non-commercial licence, which this version of VulKara does not offer.',
     needsFilter: 'The content filter needs the Diffusers runtime: install it in Settings → Runtimes.',
     notPassed: 'The content filter did not pass the result.',
     engineStopped: 'The engine stopped.',
@@ -165,6 +166,12 @@ export default {
     needsDiffusers: 'Selecting objects needs the Diffusers runtime: install it in Settings → Runtimes',
     selectionStopped: 'The selection stopped.',
     noSelection: 'No selection',
+  },
+  subject: {
+    missing: 'Selecting the subject is not part of this build.',
+    none: 'No subject found in this picture: paint the mask or select by click.',
+    timeout: 'Finding the subject took too long.',
+    failed: 'The subject could not be found (the log says why).',
   },
   loras: {
     sayWhat: 'Say what to look for.',

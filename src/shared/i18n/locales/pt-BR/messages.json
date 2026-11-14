@@ -116,7 +116,8 @@
    "facesRestored": "rostos restaurados",
    "coloured": "colorida",
    "sharpened": "nitidez aumentada",
-   "twiceTheSize": "o dobro do tamanho"
+   "twiceTheSize": "o dobro do tamanho",
+   "objectRemoved": "Objeto removido"
   }
  },
  "generate": {
@@ -172,9 +173,44 @@
    "downloadErnie": "Baixar (7,7 GB)",
    "missingErnie": "O aprimorador de prompt ainda não foi baixado: baixe-o com o botão ao lado da opção ou desative a opção."
   },
+  "remove": {
+   "action": "O que acontece com a parte pintada",
+   "repaint": "Repintar",
+   "remove": "Remover",
+   "intro": "Pinte sobre o objeto que você quer remover. O lugar dele é preenchido a partir do entorno: não é preciso prompt nem modelo de imagem.",
+   "method": "Método",
+   "methodHint": "Rápido: o LaMa preenche o lugar em cerca de um segundo, ideal para objetos pequenos sobre um fundo calmo. Minucioso: o RORem, um modelo treinado para remover objetos, pinta um fundo plausível em áreas grandes (cerca de 10 s e 9 GB de memória; antes ele libera o modelo de imagem carregado). Auto usa Com sombras quando o ObjectClear está baixado (ele também tira a sombra sob os carros); senão, o LaMa para máscaras pequenas e o RORem para as grandes. Com sombras: o ObjectClear também tira a sombra e um reflexo mais escuro do objeto; pinte o objeto e um reflexo claro. Outras pessoas ficam quando o Apple Vision as encontra (até quatro, sobretudo as da frente) ou o detector de rostos de Restaurar encontra o rosto delas; uma pessoa logo ao lado do objeto ainda pode ficar borrada, aí Minucioso ou Comparar é melhor (cerca de 1–1,5 min e 8 GB de memória, licença não comercial). Comparar: uma imagem com cada método deste Mac (LaMa, e RORem e ObjectClear quando baixados) para escolher a melhor; todo método inventa algo de vez em quando, mais em áreas grandes. A parte pintada é ampliada um pouco e mesclada suavemente; o resto da imagem fica como está.",
+   "fast": "Rápido",
+   "auto": "Auto",
+   "thorough": "Minucioso",
+   "shadows": "Com sombras",
+   "compare": "Comparar",
+   "send": "Remover objeto",
+   "again": "Remover de novo",
+   "againHint": "Remove mais uma vez no último resultado, com a mesma máscara: para restos ou uma sombra que ficou.",
+   "paintObject": "Pinte sobre o objeto que você quer remover.",
+   "missing": "O RORem ainda não foi baixado: baixe-o com o botão ou escolha Rápido.",
+   "missingAuto": "Sem o RORem, o Auto preenche também as áreas grandes com o LaMa.",
+   "download": "Baixar RORem ({gb} GB)",
+   "downloadAsk": "Baixar o RORem ({gb} GB)?",
+   "downloadYes": "Baixar",
+   "downloadDetail": "RORem da LetsThink, um modelo de inpainting SDXL treinado para remover objetos: {gb} GB, baixado uma vez do Hugging Face numa versão verificada. Licença Apache-2.0; sua base, o SDXL Inpainting 0.1, está sob a CreativeML Open RAIL++-M, cujas restrições de uso se aplicam.",
+   "onTheMac": "O RORem é baixado no Mac (Modelos → Modelos auxiliares); até lá o Auto preenche as áreas grandes com o LaMa.",
+   "shadowsMissing": "O ObjectClear ainda não foi baixado: baixe-o com o botão ou escolha outro método.",
+   "shadowsDownload": "Baixar o ObjectClear ({gb} GB)",
+   "shadowsDownloadAsk": "Baixar o ObjectClear ({gb} GB)?",
+   "shadowsDownloadDetail": "ObjectClear, um modelo de inpainting SDXL treinado para remover um objeto junto com a sombra e o reflexo dele: {gb} GB, baixado uma vez do Hugging Face numa versão verificada. Licença S-Lab License 1.0, só para uso não comercial; a base dele, SDXL Inpainting 0.1, está sob a CreativeML Open RAIL++-M, cujas restrições de uso se aplicam.",
+   "shadowsOnTheMac": "O ObjectClear é baixado no Mac (Modelos → Modelos auxiliares)."
+  },
   "keepPicture": {
    "label": "Manter a imagem (FLUX.2 [klein] 4B)",
    "hint": "Muda só o que o prompt pede e mantém o resto da imagem: o mesmo lugar, as mesmas pessoas, o mesmo enquadramento. Uma mudança forte de estilo (uma pintura a partir de uma foto) fica mais leve. A LoRA de consistência de lrzjason com metade da força (Apache-2.0, 0,4 GB, baixada uma vez), feita para o FLUX.2 [klein] 4B: outros modelos editam sem ela. Cerca de 0,3 GB a mais de memória enquanto o modelo trabalha."
+  },
+  "faceDetail": {
+   "label": "Refinar rostos",
+   "hint": "Depois da imagem, cada um dos quatro maiores rostos é pintado de novo em tamanho total com o mesmo modelo, prompt e seed, e devolvido com borda suave: rostos pequenos em imagens de corpo inteiro e grupos ficam mais nítidos e menos distorcidos. Um rosto que já ocupa grande parte da imagem fica como está. Numa multidão, um rosto minúsculo é pintado junto com a cabeça, então um pedestre borrado pode virar outra pessoa. Num Mac mini de 16 GB cada rosto levou cerca de 10–25 s com SD 1.5 e 40–70 s com SDXL; o detector de rostos (YuNet, MIT, 0,2 MB) é baixado uma vez.",
+   "strength": "Intensidade {pct} %",
+   "strengthHint": "Baixa mantém o rosto e só acrescenta detalhes; alta pode mudar a expressão e os traços."
   },
   "fast": {
    "label": "Rápido (8 passos)",
@@ -413,7 +449,7 @@
     "one": "{n} clique",
     "other": "{n} cliques"
    },
-   "selectHint": "Clique no que deve ser selecionado; ⌥ + clique no que não faz parte",
+   "selectHint": "Clique no que deve ser selecionado (de novo no mesmo ponto: uma parte menor); ⌥ + clique no que não faz parte",
    "undoClick": "Desfazer clique",
    "toInpaint": "Pintar no Inpainting",
    "saveMask": "Salvar máscara",
@@ -472,8 +508,14 @@
    "erase": "Apagar",
    "eraseHint": "Retirar pintura",
    "size": "Tamanho",
-   "undo": "Desfazer o último traço",
-   "clear": "Remover toda a pintura"
+   "undo": "Desfazer a última etapa",
+   "clear": "Remover toda a pintura",
+   "subject": "Selecionar motivo",
+   "subjectHint": "Encontra os motivos da imagem (Apple Vision, neste Mac) e os adiciona à máscara. Com vários motivos, um clique em um deles o retira ou o adiciona de volta",
+   "subjects": "{n} motivos encontrados: clique em um para retirá-lo da seleção ou adicioná-lo de volta (contorno pontilhado = retirado)",
+   "click": "Selecionar com clique",
+   "clickHint": "Clique na imagem: o primeiro clique seleciona o objeto inteiro, outro clique no mesmo ponto uma parte menor dele. Um clique em outro lugar adiciona, ⌥-clique retira (SAM 2.1)",
+   "clickTool": "Selecionar com clique requer a ferramenta de seleção SAM 2.1: instale-a na página Melhorar."
   },
   "pattern": {
    "title": "Padrão oculto",
@@ -1516,6 +1558,7 @@
    "showAll": "Mostrar tudo",
    "quit": "Sair do VulKara",
    "open": "Abrir VulKara",
+   "checkUpdate": "Verificar atualização…",
    "noJob": "Nenhum trabalho em andamento",
    "running": "{model} · {progress} %",
    "runningEta": "{model} · {progress} % · faltam {eta}",
@@ -1958,6 +2001,7 @@
    "exporting": "Um modelo está sendo exportado: gere quando terminar.",
    "captioning": "Um prompt está sendo escrito a partir de uma imagem: gere quando terminar ou for cancelado.",
    "incomplete": "Esta tarefa está incompleta.",
+   "notCommercial": "Esta tarefa usa um modelo com licença não comercial, que esta versão do VulKara não oferece.",
    "needsFilter": "O filtro de conteúdo requer o runtime Diffusers: instale-o em Ajustes → Runtimes.",
    "notPassed": "O filtro de conteúdo não aprovou o resultado.",
    "engineStopped": "O motor parou.",
@@ -2034,6 +2078,12 @@
    "selectionStopped": "A seleção parou.",
    "noSelection": "Nenhuma seleção"
   },
+  "subject": {
+   "missing": "Selecionar motivo não faz parte desta versão.",
+   "none": "Nenhum motivo encontrado nesta imagem: pinte a máscara ou selecione com clique.",
+   "timeout": "Encontrar o motivo demorou demais.",
+   "failed": "Não foi possível encontrar o motivo (o registro diz por quê)."
+  },
   "loras": {
    "sayWhat": "Diga o que procurar.",
    "notAsked": "Este endereço não é consultado.",
@@ -2103,11 +2153,20 @@
   "removingDust": "Removendo poeira e arranhões",
   "filling": "Preenchendo os danos",
   "checkingGuardRails": "Verificando os limites de segurança",
+  "removingObject": "Removendo o objeto",
+  "matchingColours": "Ajustando as cores",
   "colouring": "Colorindo",
   "sharpening": "Aumentando a nitidez",
   "rebuilding": "Reconstruindo detalhes",
   "findingFaces": "Procurando rostos",
   "restoringFace": "Restaurando o rosto {i} de {n}",
+  "refiningFace": "Refinando o rosto {i} de {n}",
+  "facesRefined": "Rostos refinados: {n}",
+  "extendedWithKlein4": "Estendido com o FLUX.2 [klein] 4B e seu LoRA de outpainting",
+  "facesNotRefined": "Rostos não refinados: {reason}",
+  "outpaintLoraMissing": "LoRA de outpainting indisponível: estendido com o FLUX.2 [klein] 9B",
+  "objectclearKept": "O ObjectClear manteve o objeto: preenchido de novo sem ele",
+  "klein9ExtendsLess": "O FLUX.2 [klein] 9B estende pior; sem LoRAs próprios, um FLUX.2 [klein] 4B instalado faria a extensão",
   "loadingFaceModel": "Carregando o modelo de rostos",
   "loadingFillModel": "Carregando o modelo de preenchimento (0,2 GB, baixado uma vez)",
   "loadingColourModel": "Carregando o modelo de colorização (0,9 GB, baixado uma vez)",

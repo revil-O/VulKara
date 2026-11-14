@@ -8,6 +8,7 @@
 
 import { ref } from 'vue'
 import { LOCALES, translate, value, type Args, type Key, type Lang, type LangSetting, type Language } from '@shared/i18n'
+import { engineText } from '@shared/i18n/engine'
 
 export type { Key, PlainKey } from '@shared/i18n'
 
@@ -19,6 +20,9 @@ const region = ref('en-US')
 export function t<K extends Key>(key: K, ...args: Args<K>): string {
   return translate(locale.value, key, args[0] as Record<string, string | number> | undefined)
 }
+
+/** an engine's note on a job (one line per way it was made differently) in the app's language; unknown lines stay */
+export const engineNote = (note: string): string => note.split('\n').map((line) => engineText(locale.value, line)).join('\n')
 
 /** A key built at run time (from an id) as a text, or fallback when there is no such key. */
 export function tMaybe(key: string, fallback: string): string {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
-import { mkdtempSync, readFileSync, appendFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -13,6 +13,61 @@ const job = (id: string, prompt: string, modelDir = '/models/SD-1.5'): Job => ({
 const folder = (): string => mkdtempSync(join(tmpdir(), 'vk-history-'))
 
 describe('history', () => {
+  it('finds pictures moved to another drive again by their name, once, with a backup', async () => {
+    const dir = folder()
+    const pictures = join(dir, 'pictures')
+    mkdirSync(pictures)
+    const here = join(dir, 'here.png')
+    writeFileSync(here, 'x')
+    writeFileSync(join(pictures, 'gone_1a2b.png'), 'x')
+    writeFileSync(join(pictures, 'start.png'), 'x')
+    const old = new History(() => dir)
+    old.add({ ...job('a', 'a fox'), inputImage: '/Volumes/old-drive/input/start.png' }, ['/Volumes/old-drive/pictures/gone_1a2b.png', here], 100)
+    old.favorite('a', '/Volumes/old-drive/pictures/gone_1a2b.png', true)
+    old.add(job('b', 'a cat'), ['/Volumes/old-drive/pictures/lost.png'], 200)
+    const lines: string[] = []
+    let changes = 0
+    const h = new History(() => dir, () => changes++, () => [pictures, join(dir, 'no-such-folder')], (l) => lines.push(l))
+    // shown at once with the old paths; the search runs after (a hanging network drive must not hold the app)
+    expect(h.list({}).entries[1].files[0]).toBe('/Volumes/old-drive/pictures/gone_1a2b.png')
+    await h.settled()
+    expect(changes).toBe(1)
+    const [b, a] = h.list({}).entries
+    expect(a.files).toEqual([join(pictures, 'gone_1a2b.png'), here])
+    expect(a.favorites).toEqual([join(pictures, 'gone_1a2b.png')])
+    expect(a.job.inputImage).toBe('/Volumes/old-drive/input/start.png')  // inputs keep their path: names like IMG_1234 repeat
+    expect(b.files).toEqual(['/Volumes/old-drive/pictures/lost.png'])  // nowhere to be found: left as it was
+    expect(lines).toHaveLength(1)
+    expect(h.hasFile(join(pictures, 'gone_1a2b.png'))).toBe(true)
+    // written once: a restart reads the new paths; the backup holds the old ones and is not overwritten
+    const backup = readFileSync(join(dir, `entries.jsonl.before-repair-${new Date().toISOString().slice(0, 10)}`), 'utf8')
+    expect(backup).toContain('/Volumes/old-drive/pictures/gone_1a2b.png')
+    expect(new History(() => dir).list({}).entries[1].files[0]).toBe(join(pictures, 'gone_1a2b.png'))
+    await new History(() => dir, () => {}, () => [pictures]).settled()
+    expect(readFileSync(join(dir, `entries.jsonl.before-repair-${new Date().toISOString().slice(0, 10)}`), 'utf8')).toBe(backup)
+    expect(existsSync(join(dir, 'entries.jsonl.tmp'))).toBe(false)
+  })
+
+  it('keeps a favourite set while the search for moved pictures runs, and the backup holds the old paths', async () => {
+    const dir = folder()
+    const pictures = join(dir, 'pictures')
+    mkdirSync(pictures)
+    writeFileSync(join(pictures, 'one_1a2b.png'), 'x')
+    writeFileSync(join(pictures, 'two_3c4d.png'), 'x')
+    new History(() => dir).add(job('a', 'a fox'), ['/Volumes/old/one_1a2b.png', '/Volumes/old/two_3c4d.png'], 100)
+    const h = new History(() => dir, () => {}, () => [pictures])
+    h.list({})  // the search starts
+    h.favorite('a', '/Volumes/old/two_3c4d.png', true)  // meanwhile, on the path still shown
+    await h.settled()
+    const [a] = h.list({}).entries
+    expect(a.files).toEqual([join(pictures, 'one_1a2b.png'), join(pictures, 'two_3c4d.png')])
+    expect(a.favorites).toEqual([join(pictures, 'two_3c4d.png')])
+    expect(h.hasFile(join(pictures, 'one_1a2b.png'))).toBe(true)
+    const backup = readFileSync(join(dir, `entries.jsonl.before-repair-${new Date().toISOString().slice(0, 10)}`), 'utf8')
+    expect(backup).toContain('/Volumes/old/one_1a2b.png')
+    expect(backup).not.toContain(join(pictures, 'one_1a2b.png'))
+  })
+
   it('keeps entries across restarts, newest first', () => {
     const dir = folder()
     const h = new History(() => dir)
@@ -30,8 +85,10 @@ describe('history', () => {
     const dir = folder()
     const h = new History(() => dir)
     expect(h.hasFile('/i/a.png')).toBe(false)
-    h.add({ ...job('a', 'a portrait'), inputImage: '/photos/mum.jpg', maskImage: '/data/inputs/m.png' }, ['/i/a.png'], 100)
+    h.add({ ...job('a', 'a portrait'), inputImage: '/photos/mum.jpg', maskImage: '/data/inputs/m.png',
+      photoTool: { folder: '/tools/sam', mask: '/data/inputs/selections/mask_1.png' } }, ['/i/a.png'], 100)
     expect(h.hasFile('/i/a.png') && h.hasFile('/photos/mum.jpg') && h.hasFile('/data/inputs/m.png')).toBe(true)
+    expect(h.hasFile('/data/inputs/selections/mask_1.png')).toBe(true)  // Enhance's selection: kept when old selections go
     const again = new History(() => dir)
     expect(again.hasFile('/photos/mum.jpg')).toBe(true)
     expect(again.hasFile('/photos/other.jpg')).toBe(false)

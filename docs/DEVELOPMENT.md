@@ -765,8 +765,11 @@ The script runs these steps in order:
    (the ones the tests and test pictures ran on). Runs also with `--skip-checks`; see
    [Dependency updates](#dependency-updates).
 1. Type check, tests and `tools/check_clean.py` (`--skip-checks` leaves them out).
-2. The notices of the bundled packages, `electron-vite build`, then electron-builder (an unsigned app bundle). Old
-   release output in `dist/` is removed first, except `dist/dev`, the bundle of `npm run start:app`.
+2. The notices of the bundled packages, `electron-vite build`, `npm run native` (the Apple Vision helper of **Select
+   subject**, `native/subject_mask.swift`, compiled with `xcrun swiftc` from the Xcode command line tools into
+   `out/native`; electron-builder puts it into `Resources/native`, and step 3 signs it with the app), then
+   electron-builder (an unsigned app bundle). Old release output in `dist/` is removed first, except `dist/dev`, the
+   bundle of `npm run start:app`.
 3. Signing with `@electron/osx-sign`, using the Developer ID Application certificate selected by its SHA-1
    (`VK_SIGN_IDENTITY`, else the first one in the keychain; this works even when the keychain holds two certificates
    with the same name). Hardened runtime and `build/entitlements.mac.plist`.
