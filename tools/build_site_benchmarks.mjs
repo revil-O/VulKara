@@ -106,6 +106,7 @@ const PLAN_M4 = [
   ['GonzaLomo Chroma, 768 px (test build 2026-11-03)', 'Diffusers, streamed · 38.8 s/step (7bc)', 12.4, 11.5],
   ['FLUX.1 Fill [dev], new prompt (test build 2026-11-05)', 'Diffusers, 4 bit GGUF · 254 s per picture, 8 steps (7bf)', 10.9, 10.0],
   ['Fibo 2.0 Edit Turbo, masked edit (test build 2026-11-05)', 'MLX, 8 bit · 250 s; the picture goes along as context tokens (7bg)', 13.5, 14.4],
+  ['Fibo 2.0 Edit Turbo, edit on a quiet Mac (test build 2026-11-06, before 7bx)', 'MLX, 8 bit · 252 s; the picture to edit encoded whole, as its VAE needs (7bq)', 13.53, 14.4],
   ['Restore, repair with the consistency LoRA, klein 4B', 'Diffusers · 116–130 s (7bh)', 11.7, 12.9],
   ['Restore, repair, klein 9B', 'Diffusers · 238 s; the reference tokens counted, 9.8 planned before (7bh)', 12.5, 12.6],
   ['Image to image, Keep the picture, klein 4B', 'Diffusers · 108 s (7bi)', 10.1, 12.9],
@@ -134,6 +135,7 @@ const PLAN_M4 = [
   ['FLUX.2 [klein] 9B, same prompt (Phase 3, after)', 'Diffusers · 116 s (7bt)', 9.04, 9.8],
   ['FLUX.2 [klein] 9B, new prompt per picture', 'Diffusers · 158–170 s; the 8 bit text encoder alone takes 11 GB (7bv, 7bw)', 12.42, 9.8],
   ['Fibo 2.0 Edit Turbo, edit (Phase 3, after)', 'MLX, 8 bit · 254–274 s (7bx)', 11.03, 14.4],
+  ['AI Canvas Extend, FLUX.2 [klein] 4B + outpaint LoRA', 'Diffusers · 104–126 s per picture (7cg)', 10.2, 11.6],
 ]
 
 // work done once and kept, and a stop that waited (MEASUREMENTS 7r, 7s, 7t, 7u, 7x, 7y, 7z): before, after, unit
@@ -155,6 +157,11 @@ const ONCE = [
   { ref: '7y', what: 'Engines without a job', sub: 'Z-Image Turbo (MLX) loaded: memory held after the picture, then freed after the idle time', a: 7.5, b: 1.1, unit: 'GB' },
   { ref: '7bm', what: 'FLUX.1 [schnell] 8 bit GGUF, whole picture', sub: 'Mac mini M4 16 GB, 1024 px, 4 steps: 16 bit streamed from the SSD (the app today, 7bj) against a 4 bit copy written once and held in memory (probe)', a: 248, b: 112, unit: 's' },
   { ref: '7bm', what: 'FLUX.1 [schnell] 8 bit GGUF, read per picture', sub: 'the same two routes', a: 98, b: 6.7, unit: 'GB' },
+  { ref: '7bp', what: 'FLUX.1 [schnell] 8 bit GGUF, unpacking into the stream cache', sub: 'Mac mini M4 16 GB, memory at most: the GGUF file read whole into memory, then memory-mapped; the bfloat16 check timed once and kept, so the cache is not unpacked again', a: 14.2, b: 4.9, unit: 'GB' },
+  { ref: '7ca', what: 'ObjectClear (Remove, With shadows), GPU memory at most', sub: 'Mac mini M4 16 GB, 11 pictures: the whole pipeline at once, then the fixed prompt kept as embeddings and the parts read in turn; the results the same to the pixel', a: 10.24, b: 8.38, unit: 'GB' },
+  { ref: '7cc', what: 'ObjectClear, picture changed outside the painted mask', sub: '11 photos, mean: beyond the mask only where its fill is lighter (a removed shadow), never on another face', a: 14.3, b: 6.5, unit: '%' },
+  { ref: '7cc', what: 'ObjectClear, the same on architecture', sub: '28 pictures of buildings and streets, mean', a: 11.7, b: 6.0, unit: '%' },
+  { ref: '7cd', what: 'ObjectClear, a person beside the removed one', sub: 'picture changed beyond twice the mask growth: people found by Apple Vision protected', a: 0.36, b: 0.11, unit: '%' },
   { ref: '7r', what: 'Stop while SSD streaming is prepared', sub: 'Chroma1 Flash, stopped at 21 %: seconds until the job ended', a: 84.9, b: 0, unit: 's' },
 ]
 
@@ -201,6 +208,26 @@ const CAPTION = [
   ['Florence-2 base (MIT, 0.46 GB)', 3.7, 2.2],
   ['Florence-2 large (MIT, 1.55 GB)', 3.1, 4.2],
   ['Qwen3-VL 2B (Apache-2.0, 4.26 GB)', 9.4, 7.7],
+]
+
+// the tools of 0.9.0 on the Mac mini M4 16 GB: [label, sub, s per picture, GB at most, ref]
+const TOOLS = [
+  ['Remove, LaMa (Fast)', '28 pictures, CPU', 1.5, 1.2, '7cb'],
+  ['Remove, RORem (Thorough)', '28 pictures, 512 px, 20 steps', 26.9, 10.4, '7cb'],
+  ['Remove, ObjectClear (With shadows)', '28 pictures', 32.0, 8.6, '7cb'],
+  ['Remove, Auto: ObjectClear kept the object, filled again', 'RORem after ObjectClear, 16 % mask', 66, 8.8, '7ci'],
+  ['Upscale ×4 to 2048 px, Real-ESRGAN x4plus', '512 px tile', 3.5, 4.5, '7ce'],
+  ['Upscale ×4 to 2048 px, SwinIR-M (Enhance)', '512 px tile', 11.2, 7.2, '7ce'],
+  ['Upscale ×4 to 2048 px, 4xBHI_dat2_real (Natural)', '384 px tile', 32.0, 6.2, '7ce'],
+  ['Picture to prompt, Qwen3-VL 2B, 16 bit', 'up to 300 tokens', 11.7, 5.3, '7br'],
+  ['Picture to prompt, Qwen3-VL 2B, 8 bit (not taken)', 'optimum-quanto int8', 63.7, 5.58, '7br'],
+  ['Text to image + Refine faces, SD 1.5, 4 faces', '23 s without', 70.8, 4.9, '7cf'],
+  ['Text to image + Refine faces, SDXL, 3 faces', '137 s without', 340.8, 10.2, '7cf'],
+  ['AI Canvas Extend, klein 4B, prefill and inpaint (before)', 'smeared bars stayed in 4 of 10', 126, 9.5, '7cg'],
+  ['AI Canvas Extend, klein 4B + outpaint LoRA (0.9.0)', 'all 10 without seams', 126, 10.2, '7cg'],
+  ['AI Canvas Extend, Juggernaut XL v7', '', 145, 10.2, '7cg'],
+  ['AI Canvas Extend, klein 9B, reference as it is', 'bars stayed in 7 of 10', 259, 11.7, '7ch'],
+  ['AI Canvas Extend, klein 9B, reference blanked under the mask (0.9.0)', '', 214, 11.9, '7ch'],
 ]
 
 // the fused kernel by head size, 2 × 8 heads, 4096 tokens (MEASUREMENTS 7n): [label, ms, extra GB]
@@ -367,14 +394,15 @@ function planChart(id, title, sub, data, ref) {
 
 function onceTable() {
   const rows = ONCE.map((o) => {
+    const f = (v) => fmt(v, v < 1 ? 2 : 1)
     const max = Math.max(o.a, o.b)
     const bar = (v, cls) => `<span class="mbar ${cls} ${at(`width:${pct(v, max)}%`)}"></span>`
     const less = o.a ? Math.round((1 - o.b / o.a) * 100) : 0
     return `
-          <tr data-tip="${esc(`${o.what}: ${fmt(o.a)} → ${fmt(o.b)} ${o.unit}. MEASUREMENTS ${o.ref}`)}" tabindex="0">
+          <tr data-tip="${esc(`${o.what}: ${f(o.a)} → ${f(o.b)} ${o.unit}. MEASUREMENTS ${o.ref}`)}" tabindex="0">
             <td>${esc(o.what)}<small>${esc(o.sub)}</small></td>
             <td class="bars">${bar(o.a, 'a')}${bar(o.b, 'b')}</td>
-            <td class="num">${fmt(o.a)} ${o.unit}</td><td class="num">${fmt(o.b)} ${o.unit}</td>
+            <td class="num">${f(o.a)} ${o.unit}</td><td class="num">${f(o.b)} ${o.unit}</td>
             <td class="num">−${less} %</td>
           </tr>`
   }).join('')
@@ -485,6 +513,23 @@ function captionChart() {
     </section>`
 }
 
+function toolsChart() {
+  const ax = axis(Math.max(...TOOLS.map((r) => r[2])), 4)
+  const rows = TOOLS.map(([label, sub, sec, gb, ref]) => `
+        <div class="bx-row" data-tip="${esc(`${label}: up to ${fmt(sec)} s per picture, ${fmt(gb)} GB at most. MEASUREMENTS ${ref}`)}" tabindex="0">
+          <span class="dot-label">${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+          <span class="bx-track">${grid(ax)}<span class="hbar ${at(`width:${pct(sec, ax.top)}%`)}"></span></span>
+          <span class="bx-value">${fmt(sec)} s · ${fmt(gb)} GB</span>
+        </div>`).join('')
+  return `
+    <section class="chart" id="tools">
+      <h2>Remove, upscale, refine faces, extend: on a 16 GB Mac</h2>
+      <p class="sub">The tools of 0.9.0 on a Mac mini M4 with 16 GB, through the app's engine, one job per picture (the mean or the slowest picture). The bar is the time per picture, the memory is the job's peak. ObjectClear removed shadows with the object where LaMa and RORem left a dark patch, and invented things in about 6 of 28 architecture pictures; DAT2 kept the most natural texture. klein Base 4B with the LoRA (50 steps) was as good as the distilled one but took 42–43 minutes per picture.</p>
+      <div class="bx">${ticksRow(ax, ' s')}${rows}
+      </div>${table(['Tool', 's per picture', 'GB at most', 'MEASUREMENTS'], TOOLS.map(([l, sub, sec, gb, ref]) => [esc(l + (sub ? ` (${sub})` : '')), fmt(sec), fmt(gb), ref]))}
+    </section>`
+}
+
 function seamsChart() {
   const ax = axis(Math.max(...SEAMS.map((r) => r[2])), 4)
   const rows = SEAMS.map(([tiles, when, col, mean, gb, sec]) => `
@@ -565,7 +610,7 @@ export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }
     planChart('plan', 'The memory plan against the measurement', 'Before every picture VulKara plans the memory a model needs and picks bit size, staging or streaming from it. Here the plan against what the engine used, 1024 px; the right column is the difference. Before the fixes of the same day (decoding in tiles, padded attention).', PLAN, '7m'),
     planChart('plan-after', 'Plans brought to the measurements', 'SD 1.5 planned at its own size with fused attention, ComfyUI models with the plan of a model held whole (shown in the benchmark since 0.7.5). The ComfyUI figures are the middle of two runs. Qwen-Image 2.1 streamed: the blocks kept in memory were not counted while denoising (planned 9.1 GB before). ComfyUI on 16 GB: the text encoder and the model planned apart, as ComfyUI loads them (MOSS-Image 14 GB before, NetaYume 11.6). Fibo 2.0: the activations of an edit counted (12.1 GB planned before).', PLAN_AFTER, '7p'),
     planChart('plan-m4', 'On a 16 GB Mac: Mac mini M4', 'VulKara 0.7.11 on an Apple M4 with 16 GB (the other charts: the M2, 16 GB simulated there); from MOSS-Image on, test builds after it (MEASUREMENTS 7ah, 7ba–7bl). The plan against what the engine used, 1024 px (Fibo 768 px), with the seconds per step or per picture. Fibo 2.0 on MLX started 6.3 GB short and read 18.9 GB back from the swap: slower than on the M2 (7ba). Above their plan and open: FLUX.1 [schnell] 8 bit streamed (3.9 GB), NetaYume v4 (1.8 GB), FLUX.1 Fill (0.9 GB) (7bf, 7bj).', PLAN_M4, '7af'),
-    onceTable(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
+    onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
   const tileHtml = tiles()
   const css = RULES.map((r, i) => `.bench-page .p${i}{${r}}`).join('\n') + '\n'
   const cssV = createHash('sha256').update(css).digest('hex').slice(0, 10)
