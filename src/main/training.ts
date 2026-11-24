@@ -38,6 +38,13 @@ const MLX_ARCHS = ['flux2_klein', 'krea2', 'z_image', 'ernie_image']
 /** The architectures a LoRA can be trained for. */
 export const TRAINABLE = ['sdxl', ...MLX_ARCHS]
 
+/** A model a LoRA can be trained on: a trainable architecture, and for MLX not a single denoiser file (mflux reads
+ *  the model folder, where the file's weights are not). */
+export function canTrain(m: { arch?: unknown; layout?: unknown }): boolean {
+  const arch = String(m.arch ?? '')
+  return TRAINABLE.includes(arch) && !(MLX_ARCHS.includes(arch) && m.layout === 'single_denoiser')
+}
+
 /** The pictures of a folder, each with the caption of a .txt file of the same name. */
 export function folderImages(dir: string): TrainingImage[] {
   return readdirSync(dir).filter((f) => IMAGE.test(f) && !f.startsWith('.')).sort().slice(0, 500).map((f) => {
@@ -58,8 +65,9 @@ export function trainingJob(req: TrainingRequest, workDir: string, lorasDir: str
   const baseModel = String(req.baseModel ?? '')
   const manifestFile = join(baseModel, 'model.json')
   if (!isAbsolute(baseModel) || !existsSync(manifestFile)) throw new Error(t('main.training.chooseModel'))
-  const arch = String((JSON.parse(readFileSync(manifestFile, 'utf8')) as { arch?: string }).arch ?? '')
-  if (!TRAINABLE.includes(arch)) throw new Error(t('main.training.notTrainable'))
+  const manifest = JSON.parse(readFileSync(manifestFile, 'utf8')) as { arch?: string; layout?: string }
+  const arch = String(manifest.arch ?? '')
+  if (!canTrain(manifest)) throw new Error(t('main.training.notTrainable'))
   const images = (Array.isArray(req.images) ? req.images : [])
     .filter((i) => i && IMAGE.test(String(i.path)) && existsSync(i.path))
     .map((i) => ({ path: i.path, caption: String(i.caption ?? '').slice(0, 500) }))

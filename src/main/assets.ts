@@ -9,6 +9,7 @@ import { writeDisplayName } from './manifest'
 import { lorasDir, modelsDir } from './settings'
 import type { Asset, ModelMeta } from '@shared/types'
 import { t } from './i18n'
+import { canTrain } from './training'
 
 type Raw = Record<string, unknown>
 
@@ -40,6 +41,7 @@ function meta(m: Raw, type: Asset['type'], folder: string): ModelMeta {
     bakeBlocked: bakeBlocked(m, runtime),
     // engines/diffusers/export_single.py: SD 1.x and SDXL in folder layout (baked models, imported repositories)
     exportable: (m.family === 'sd1' || m.family === 'sdxl') && (m.layout === 'repo' || m.layout === 'folder') || undefined,
+    trainable: canTrain(m) || undefined,
     unsupported: typeof m.unsupported === 'string' && m.unsupported ? m.unsupported : undefined,
     foreignMac: type === 'model' ? foreign(m, folder) : undefined,
   }

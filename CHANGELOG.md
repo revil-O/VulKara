@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.1 – 2026-11-24
+
+- **Training offers only models it can train.** A FLUX.2 [klein], Krea 2, Z-Image or ERNIE-Image model kept as one
+  file (for example a fine-tune from Civitai) was offered as the model to train on, but the MLX trainer reads the
+  model's folder, where that file's weights are not: training would have failed or used the base model's weights. Such
+  a model is no longer offered, and a request naming it is refused; models imported from a Hugging Face repository or
+  a folder train as before.
+
 ## 0.10.0 – 2026-11-24
 
 - **Installs count free space like the Finder.** The 50 GB rule for model, LoRA and helper installs and the space

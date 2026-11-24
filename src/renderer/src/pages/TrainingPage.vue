@@ -16,7 +16,6 @@ import { formatDuration } from '../util/format'
 import type { TrainingImage, TrainingState } from '@shared/api'
 import { t, type PlainKey } from '../i18n'
 
-const TRAINABLE = ['sdxl', 'flux2_klein', 'krea2', 'z_image', 'ernie_image']
 const PRESETS: { id: string; title: PlainKey; steps: number }[] = [
   { id: 'quick', title: 'training.presets.quick', steps: 100 }, { id: 'standard', title: 'training.presets.standard', steps: 500 },
   { id: 'thorough', title: 'training.presets.thorough', steps: 1200 },
@@ -43,7 +42,7 @@ const learningRate = ref(0.0001)
 const state = ref<TrainingState>({ running: false, losses: [] })
 const error = ref('')
 
-const baseModels = computed(() => assets.models.filter((m) => TRAINABLE.includes(m.meta.arch)))
+const baseModels = computed(() => assets.models.filter((m) => m.meta.trainable))
 const base = computed(() => baseModels.value.find((m) => m.id === baseId.value))
 const autoTrigger = (n: string): string => (n ? n.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') + '_zqx' : '')
 const blocked = computed(() => (queue.running ? t('training.blocked') : ''))

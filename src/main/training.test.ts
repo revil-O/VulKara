@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { Trainer, type TrainerDeps } from './training'
+import { Trainer, canTrain, trainingJob, type TrainerDeps } from './training'
 import type { TrainingState } from '@shared/api'
 
 function setup(verdict: (path: string) => { ok: boolean; reason?: string }) {
@@ -58,5 +58,28 @@ describe('training pictures and the content filter', () => {
     await t.trainer.start(t.request as never)
     expect(t.trainer.state()).toMatchObject({ running: false, stopped: true })
     expect(t.prepared()).toBe(0)
+  })
+})
+
+describe('the models a LoRA can be trained on', () => {
+  it('leaves out MLX models kept as one denoiser file', () => {
+    expect(canTrain({ arch: 'z_image', layout: 'repo' })).toBe(true)
+    expect(canTrain({ arch: 'flux2_klein', layout: 'folder' })).toBe(true)
+    expect(canTrain({ arch: 'sdxl', layout: 'single_full' })).toBe(true)
+    // a Civitai Z-Image fine-tune: mflux would read the base folder and train the stock model
+    expect(canTrain({ arch: 'z_image', layout: 'single_denoiser' })).toBe(false)
+    expect(canTrain({ arch: 'flux2_klein', layout: 'single_denoiser' })).toBe(false)
+    expect(canTrain({ arch: 'sd15', layout: 'repo' })).toBe(false)
+  })
+
+  it('refuses such a model also when a request names it', () => {
+    const root = mkdtempSync(join(tmpdir(), 'vk-train-'))
+    const model = join(root, 'model')
+    mkdirSync(model)
+    writeFileSync(join(model, 'model.json'), JSON.stringify({ arch: 'z_image', layout: 'single_denoiser' }))
+    writeFileSync(join(root, 'a.png'), 'x')
+    const req = { baseModel: model, name: 'x', trigger: 'x', images: [{ path: join(root, 'a.png'), caption: '' }],
+      resolution: 512, steps: 10, rank: 16, learningRate: 0.0001 }
+    expect(() => trainingJob(req, join(root, 'work'), join(root, 'loras'))).toThrow()
   })
 })

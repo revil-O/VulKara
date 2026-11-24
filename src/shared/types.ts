@@ -31,6 +31,8 @@ export interface ModelMeta {
   bakeBlocked?: string
   /** can be written as one original-layout checkpoint (SD 1.x, SDXL in folder layout) */
   exportable?: boolean
+  /** a LoRA can be trained on it (src/main/training.ts canTrain) */
+  trainable?: boolean
   /** why an installed model can not run (its kind has no runtime yet) */
   unsupported?: string
   /** imported on another Mac and copied here (src/main/foreign_mac.ts): that Mac's memory where known, and whether
