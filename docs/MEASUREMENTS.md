@@ -3162,6 +3162,27 @@ share of unified memory, which an Intel Mac does not have. Without a GPU the pla
 8 GB = 1.6 GB: a budget of 6.4 GB). For comparison: SD 1.5 at 512 px on an Apple chip takes 0.72–1.55 s per step
 (the epiCPhotoGasm row above), 10 to 20 times faster.
 
+## 7ct. A FLUX.1 [dev] fine-tune (GGUF Q8_0) beside a running virtual machine (2026-11-24, M2 24 GB)
+
+Reported: a picture with xeHentaiAnimeFLUX_04 (FLUX.1 [dev] fine-tune, `model.gguf` Q8_0, 12.65 GB, on an exFAT USB
+SSD) took 3031 s, the GPU busy for a few seconds and then idle for over 30 s. Beside it ran a Parallels VM since
+16:09 (6.4 GB resident + 9.4 GB compressed), Java (3.2 GB), ClamAV (2.2 GB); swap 10.7 of 12 GB used. Probe in a
+test instance with its own profile: 1024², 2 steps, guidance 3.5, seed 7, plan "transformer Q8_0, text encoder 2
+8 bit", planned peak 18.2 GB.
+
+| Run | per step | 2 steps | read | peak | pages back from the swap |
+| --- | --- | --- | --- | --- | --- |
+| VM running (app 0.10.2) | 81.6 s | 478 s | 49.2 GB | 18.7 GB | 3.68 million (≈ 59 GB) |
+| VM quit (app 0.10.5) | 47.4 s | 189 s | 24.3 GB | 16.1 GB | 1.12 million (≈ 18 GB) |
+
+The running VM made each step 1.7 times as long and doubled what was read; 28 steps at 81.6 s match the reported
+picture. Without the VM macOS still read 18 GB back from the swap (the other programs and what was swapped out
+before), so 47.4 s is not yet the speed of a quiet Mac. The memory note (`memory.short_of`) assumes that idle programs
+can move to the swap; a running VM is not idle and takes its pages back at once. Both probes ended with "the content
+filter could not check the result": `~/VulKara/annotators` is a dangling link into the earlier
+app's folder, which is gone, and `mkdir(exist_ok=True)` raises on it (the test profile's default models folder;
+the user's own profile keeps its helpers elsewhere).
+
 ## 8. Earlier references (from the user guide and the changelog)
 
 - Training on the M2 (2025–26): SDXL about 2.5 s per step at 768 px, FLUX.2 [klein] 4B about 15 s, 9B about 30 s,

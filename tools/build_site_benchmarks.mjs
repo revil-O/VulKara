@@ -324,6 +324,22 @@ const SHORT = [
   [12, 11.1, 412.0, 1221, 244.9],
 ]
 
+// the Intel-Mac build: SD 1.5 on the CPU, MacBook Pro 2017 (Core i5-7360U, 8 GB), 512 px, 20 steps (MEASUREMENTS 7cs):
+// [run, plan, s/step, s per picture, swap GB after or null]
+const INTEL = [
+  ['Plain diffusers script, float32', 'in memory', 23.4, 467, 3.9],
+  ['App, 4 GB reserve (as on Apple chips)', 'streamed from the SSD', 39.6, 856, null],
+  ['App, reserve set to 1 GB', 'in memory', 15.1, 426, 3.4],
+  ['App, CPU reserve of 1 GB (default)', 'in memory', 17.3, 494, 3.2],
+]
+
+// a FLUX.1 [dev] fine-tune (GGUF Q8_0) beside a running virtual machine, M2 24 GB, 1024 px, 2 steps (MEASUREMENTS 7ct):
+// [run, s/step, s for 2 steps, GB read, GB at most, GB back from the swap]
+const VM = [
+  ['Virtual machine running', 81.6, 478, 49.2, 18.7, 59],
+  ['Virtual machine quit', 47.4, 189, 24.3, 16.1, 18],
+]
+
 // the site's Content-Security-Policy allows no inline styles: every position becomes a class in charts.css
 let RULES = []
 const at = (css) => { RULES.push(css); return 'p' + (RULES.length - 1) }
@@ -661,6 +677,46 @@ function shortTable() {
     </section>`
 }
 
+function intelTable() {
+  const max = Math.max(...INTEL.map((r) => r[2]))
+  const rows = INTEL.map(([label, plan, step, whole, swap]) => `
+          <tr data-tip="${esc(`${label}: ${plan}, ${fmt(step)} s per step, ${whole} s for the picture${swap === null ? '' : `, ${fmt(swap)} GB in the swap after`}. MEASUREMENTS 7cs`)}" tabindex="0">
+            <td>${esc(label)}<small>${esc(plan)}</small></td>
+            <td class="bars"><span class="mbar b ${at(`width:${pct(step, max)}%`)}"></span></td>
+            <td class="num">${fmt(step)}</td><td class="num">${whole}</td><td class="num">${swap === null ? '–' : fmt(swap)}</td>
+          </tr>`).join('')
+  return `
+    <section class="chart" id="intel">
+      <h2>The Intel-Mac build on the processor</h2>
+      <p class="sub">SD 1.5 with the build for Intel Macs (PyTorch 2.2.2 on the CPU, no GPU) on a MacBook Pro 2017 with an Intel Core i5-7360U and 8 GB, 512 px, 20 steps, the same picture in every run. Streaming took 2.6 times as long as holding the model and letting macOS swap: the 4 GB reserve is meant for the GPU's share of unified memory, which an Intel Mac does not have, so without a GPU the plan keeps 1 GB free. An Apple chip takes 0.72–1.55 s per step for the same model, 10 to 20 times faster. The bars are the seconds per step.</p>
+      <table class="micro">
+        <thead><tr><th>Run</th><th>per step</th><th class="num">s/step</th><th class="num">s per picture</th><th class="num">GB in the swap</th></tr></thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+    </section>`
+}
+
+function vmTable() {
+  const max = Math.max(...VM.map((r) => r[1]))
+  const rows = VM.map(([label, step, whole, read, peak, swap]) => `
+          <tr data-tip="${esc(`${label}: ${fmt(step)} s per step, ${whole} s for 2 steps, ${fmt(read)} GB read, ${fmt(peak)} GB at most, about ${swap} GB back from the swap. MEASUREMENTS 7ct`)}" tabindex="0">
+            <td>${esc(label)}</td>
+            <td class="bars"><span class="mbar b ${at(`width:${pct(step, max)}%`)}"></span></td>
+            <td class="num">${fmt(step)}</td><td class="num">${whole}</td><td class="num">${fmt(read)}</td><td class="num">${swap}</td>
+          </tr>`).join('')
+  return `
+    <section class="chart" id="vm">
+      <h2>Beside a running virtual machine</h2>
+      <p class="sub">A FLUX.1 [dev] fine-tune as GGUF Q8_0 (12.7 GB) on the M2 with 24 GB, 1024 px, 2 steps, planned 18.2 GB, beside a virtual machine holding about 16 GB. A running machine is not idle: it takes its memory back at once, and the GPU waits for the swap, busy for a few seconds and then idle for over 30. Quitting it made each step 1.7 times as fast; other programs still held memory, so 47 s is not yet a quiet Mac. From the next version on a job notes when macOS reads more than 1 GB per step back from the swap. The bars are the seconds per step.</p>
+      <table class="micro">
+        <thead><tr><th>Run</th><th>per step</th><th class="num">s/step</th><th class="num">s for 2 steps</th><th class="num">GB read</th><th class="num">GB from the swap</th></tr></thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+    </section>`
+}
+
 /** The page and its charts.css (the positions of the marks). */
 export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }) {
   RULES = []
@@ -669,7 +725,7 @@ export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }
     planChart('plan-after', 'Plans brought to the measurements', 'SD 1.5 planned at its own size with fused attention, ComfyUI models with the plan of a model held whole (shown in the benchmark since 0.7.5). The ComfyUI figures are the middle of two runs. Qwen-Image 2.1 streamed: the blocks kept in memory were not counted while denoising (planned 9.1 GB before). ComfyUI on 16 GB: the text encoder and the model planned apart, as ComfyUI loads them (MOSS-Image 14 GB before, NetaYume 11.6). Fibo 2.0: the activations of an edit counted (12.1 GB planned before).', PLAN_AFTER, '7p'),
     planChart('plan-m4', 'On a 16 GB Mac: Mac mini M4', 'VulKara 0.7.11 on an Apple M4 with 16 GB (the other charts: the M2, 16 GB simulated there); from MOSS-Image on, test builds after it (MEASUREMENTS 7ah, 7ba–7bl). The plan against what the engine used, 1024 px (Fibo 768 px), with the seconds per step or per picture. Fibo 2.0 on MLX started 6.3 GB short and read 18.9 GB back from the swap: slower than on the M2 (7ba). Above their plan and open: FLUX.1 [schnell] 8 bit streamed (3.9 GB), NetaYume v4 (1.8 GB), FLUX.1 Fill (0.9 GB) (7bf, 7bj).', PLAN_M4, '7af'),
     planChart('plan-list', 'The recommended list on a 16 GB Mac', 'The models kept in the recommended list of 0.10.0, five pictures each on a Mac mini M4 with 16 GB in the app (Hardware → Benchmark, the model\'s own settings, 1024 px unless named), the highest peak of pictures 2–5 against the plan, with the time per picture. The target: at most 10 % over the plan and at most 2 GB swap added. epiCRealism XL v8, MoP Mix asap, MiaoMiao RealSkin, FLUX.1 [dev] and its Q4 missed it and left the list, Chroma1 HD too; four SD 1.5 models in 32 bit are saved in 16 bit and the SDXL single files turned into folders once, at the import or the first load (MEASUREMENTS 7cq, 7cr).', RECOMMENDED, '7cq'),
-    onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
+    onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), vmTable(), intelTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
   const tileHtml = tiles()
   const css = RULES.map((r, i) => `.bench-page .p${i}{${r}}`).join('\n') + '\n'
   const cssV = createHash('sha256').update(css).digest('hex').slice(0, 10)
