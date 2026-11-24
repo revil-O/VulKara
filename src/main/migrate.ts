@@ -3,7 +3,7 @@
 // One-time steps at start after an update: the installed LoRAs and models checked again with the current detection.
 
 import { spawn } from 'node:child_process'
-import { existsSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { log } from './log'
 import { processEnv } from './env'
@@ -13,6 +13,8 @@ import { processEnv } from './env'
  * now that Chroma runs, for the Chroma checkpoints the first check marked as not runnable; -3: once more, now that
  * Z-Image runs, for the labels of Z-Image LoRAs that said no model can use them.
  */
+/** starts at which a move to the trash that keeps failing (a read-only drive) is given up */
+export const RECHECK_TRIES = 3
 export const RECHECK_FLAG = 'loras-rechecked-7'  // 4: sub-bases out of model.json "variant"; 5: FLUX.2 [klein] inpaints; 6: advice as negative prompt; 7: whole models filed as LoRAs
 
 /**
@@ -45,15 +47,27 @@ export function recheckLibrary(command: { command: string; args: string[]; env?:
         return
       }
       const lines = out.split('\n').filter((l) => l.startsWith('{'))
+      let failed = false
       for (const line of lines) {
         log(`installed LoRAs / models checked again: ${line}`)
         let item: { type?: string; folder?: string; not_lora?: boolean } = {}
         try { item = JSON.parse(line) } catch { /* not a report line */ }
         if (item.type === 'lora' && item.not_lora && item.folder) {
-          await trash(item.folder).catch((err) => log(`moving ${item.folder} to the trash failed: ${String(err)}`))
+          await trash(item.folder).catch((err) => {
+            failed = true
+            log(`moving ${item.folder} to the trash failed: ${String(err)}`)
+          })
         }
       }
-      writeFileSync(flag, '')
+      // a failed move is tried again at the next start, RECHECK_TRIES starts at most (the count beside the flag)
+      const tries = join(dataDir, `${RECHECK_FLAG}.tries`)
+      const count = failed ? Number(existsSync(tries) ? readFileSync(tries, 'utf8') : 0) + 1 : 0
+      if (failed && count < RECHECK_TRIES) writeFileSync(tries, String(count))
+      else {
+        if (failed) log(`a move to the trash failed ${count} times: the start check gives up`)
+        writeFileSync(flag, '')
+        rmSync(tries, { force: true })
+      }
       if (lines.length) changed()
       resolve(true)
     })

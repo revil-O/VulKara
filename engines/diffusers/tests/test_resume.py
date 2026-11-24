@@ -124,3 +124,26 @@ def test_civitai_goes_on_with_a_known_checksum_and_starts_over_without_one(serve
     with pytest.raises(Exception):
         civitai.download(dict(info, sha256=""), str(tmp_path / "b"))
     assert os.listdir(tmp_path / "b") == []
+
+
+def test_a_stop_ends_the_download_and_the_next_job_goes_on(server, tmp_path, monkeypatch):
+    monkeypatch.setattr(pinned, "CHUNK", 100_000)
+    asked = []
+    stop = lambda: asked.append(1) or len(asked) >= 3  # stop after the third chunk
+    with pytest.raises(pinned.Stopped):
+        pinned.fetch_urls({"w.bin": "https://example.org/w.bin"}, {"w.bin": DIGEST}, str(tmp_path), stop=stop)
+    part = tmp_path / ("w.bin.%s.part" % DIGEST[:12])
+    kept = part.stat().st_size
+    assert 0 < kept < len(DATA) and not (tmp_path / "w.bin").exists()  # a part, not the whole file
+    server.seen.clear()
+    folder = pinned.fetch_urls({"w.bin": "https://example.org/w.bin"}, {"w.bin": DIGEST}, str(tmp_path))
+    assert open(os.path.join(folder, "w.bin"), "rb").read() == DATA
+    assert server.seen == ["bytes=%d-" % kept]
+
+
+def test_a_stop_while_the_connection_breaks_off_ends_before_the_next_try(server, tmp_path):
+    server.cut = [100_000] * pinned.TRIES  # every try breaks off
+    stop = lambda: len(server.seen) >= 2  # asked for before the third try
+    with pytest.raises(pinned.Stopped):
+        pinned.fetch_urls({"w.bin": "https://example.org/w.bin"}, {"w.bin": DIGEST}, str(tmp_path), stop=stop)
+    assert len(server.seen) == 2  # not all TRIES

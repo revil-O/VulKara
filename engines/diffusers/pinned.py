@@ -75,19 +75,27 @@ def fetch(repo, revision, files, folder, rename=None, token=None, report=None):
 # a few short network failures are tried again (github.com came and went for minutes on 2026-11-14), the pause
 # growing each time; what was downloaded stays, the next try asks only for the rest (MEASUREMENTS D1, 2026-11-15)
 TRIES, PAUSE = 5, 5
+CHUNK = 1 << 20  # read and stop() asked per megabyte
 
 
-def resume_into(part, open_at, report=None, sleep=None):
+class Stopped(Exception):
+    """stop() said so while downloading; the part file stays for the next job."""
+
+
+def resume_into(part, open_at, report=None, sleep=None, stop=None):
     """Downloads into the file part, going on from its size: open_at(start) -> the response for the bytes from start
     (a Range request when start > 0). A server answering 200 instead of 206 sends the whole file, which then starts
     over; 416 means part already holds all of it. A broken connection or a 5xx answer is tried again TRIES times, the
     part kept (also for a later job); other HTTP errors go to the caller. report(percent) on the way. The caller
-    checks the result (SHA-256): a part of another file can not pass."""
+    checks the result (SHA-256): a part of another file can not pass. stop() is asked after every megabyte and before
+    every try, and raises Stopped, keeping the part (a stalled connection still waits out its timeout)."""
     import http.client
     import time
     import urllib.error
     sleep = sleep or time.sleep
     for attempt in range(TRIES):
+        if stop and stop():
+            raise Stopped()  # also between tries when the connection broke off
         start = os.path.getsize(part) if os.path.exists(part) else 0
         try:
             with open_at(start) as r:
@@ -98,13 +106,15 @@ def resume_into(part, open_at, report=None, sleep=None):
                 got = start
                 with open(part, "ab" if start else "wb") as f:
                     while True:
-                        chunk = r.read(1 << 20)
+                        chunk = r.read(CHUNK)
                         if not chunk:
                             break
                         f.write(chunk)
                         got += len(chunk)
                         if report and total:
                             report(100.0 * got / total)
+                        if stop and stop():
+                            raise Stopped()
             if length and got < total:
                 raise http.client.IncompleteRead(b"", total - got)
             return got
@@ -119,7 +129,7 @@ def resume_into(part, open_at, report=None, sleep=None):
         sleep(PAUSE * (attempt + 1))
 
 
-def fetch_urls(urls, files, folder, report=None):
+def fetch_urls(urls, files, folder, report=None, stop=None):
     """Like fetch() for files published outside Hugging Face (GitHub releases): urls: name -> https URL, files:
     name -> SHA-256 (required here, there is no commit to pin). A file is downloaded to a .part file named after its
     checksum (a broken download goes on from there, resume_into), checked and renamed; a mismatch removes it and
@@ -154,7 +164,7 @@ def fetch_urls(urls, files, folder, report=None):
         def open_at(start, url=url):
             headers = {"User-Agent": "VulKara", **({"Range": "bytes=%d-" % start} if start else {})}
             return urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60)
-        resume_into(part, open_at, report=report)
+        resume_into(part, open_at, report=report, stop=stop)
         if _sha256(part) != digest:
             os.remove(part)
             raise RuntimeError("%s does not match its checksum: it was removed" % name)

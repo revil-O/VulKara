@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { AppUpdater, LATEST_URL, parseLatest, replaceableBundle, type Release } from './app_update'
+import { AppUpdater, LATEST_URL, attachDmg, detachDmg, parseLatest, replaceableBundle, type Release } from './app_update'
 
 const DMG = 'https://github.com/revil-O/VulKara/releases/download/v0.7.7/VulKara-0.7.7-arm64.dmg'
 const latest = (over: Record<string, unknown> = {}, asset: Record<string, unknown> = {}): unknown => ({
@@ -86,5 +86,42 @@ describe('AppUpdater', () => {
     await download(updater(latest()).u, join(dir, 'ok.dmg'))
     expect(readFileSync(join(dir, 'ok.dmg'))).toEqual(body)
     await expect(download(updater(latest(), Buffer.from('something else')).u, join(dir, 'bad.dmg'))).rejects.toThrow('checksum')
+  })
+})
+
+describe('mounting the update DMG', () => {
+  const recorder = (fails: string[]) => {
+    const calls: string[] = []
+    const exec = async (cmd: string, args: string[]) => {
+      calls.push([cmd.split('/').pop(), ...args].join(' '))
+      if (fails.includes(cmd.split('/').pop()!)) throw new Error(`${cmd} failed`)
+      return { out: '', err: '' }
+    }
+    return { calls, exec }
+  }
+
+  it('uses diskutil image, read-only and hidden at its own mount point', async () => {
+    const r = recorder([])
+    await attachDmg('/w/u.dmg', '/w/mnt', r.exec)
+    await detachDmg('/w/mnt', false, r.exec)
+    await detachDmg('/w/mnt', true, r.exec)
+    expect(r.calls).toEqual(['diskutil image attach --readOnly --nobrowse --mountPoint /w/mnt /w/u.dmg',
+      'diskutil eject /w/mnt', 'diskutil eject force /w/mnt'])
+  })
+
+  it('falls back to hdiutil where diskutil has no image verb', async () => {
+    const r = recorder(['diskutil'])
+    await attachDmg('/w/u.dmg', '/w/mnt', r.exec)
+    await detachDmg('/w/mnt', true, r.exec)
+    expect(r.calls.filter((c) => c.startsWith('hdiutil'))).toEqual([
+      'hdiutil attach -nobrowse -readonly -noautoopen -mountpoint /w/mnt /w/u.dmg', 'hdiutil detach -quiet -force /w/mnt'])
+    // a diskutil attach that failed half way is ejected before hdiutil tries
+    expect(r.calls.slice(0, 3)).toEqual(['diskutil image attach --readOnly --nobrowse --mountPoint /w/mnt /w/u.dmg',
+      'diskutil eject force /w/mnt', 'hdiutil attach -nobrowse -readonly -noautoopen -mountpoint /w/mnt /w/u.dmg'])
+  })
+
+  it('fails when neither can mount it', async () => {
+    const r = recorder(['diskutil', 'hdiutil'])
+    await expect(attachDmg('/w/u.dmg', '/w/mnt', r.exec)).rejects.toThrow('hdiutil failed')
   })
 })

@@ -57,6 +57,25 @@ const run = (cmd: string, args: string[]): Promise<{ out: string; err: string }>
   execFile(cmd, args, { timeout: 10 * 60_000 }, (e, out, err) => e ? reject(new Error(`${basename(cmd)}: ${(err || e.message).trim()}`)) : resolve({ out, err }))
 })
 
+type Run = typeof run
+
+/** Mounts the DMG read-only and hidden at mount: `diskutil image attach` (macOS 27 calls hdiutil's attach/detach
+ *  deprecated; same options on macOS 15, 26 and 27), hdiutil where diskutil has no "image" verb (macOS 14, unchecked). */
+export async function attachDmg(dmg: string, mount: string, exec: Run = run): Promise<void> {
+  await exec('/usr/sbin/diskutil', ['image', 'attach', '--readOnly', '--nobrowse', '--mountPoint', mount, dmg])
+    .catch(async () => {
+      // diskutil may have attached it before it failed: free the mount point first
+      await exec('/usr/sbin/diskutil', ['eject', 'force', mount]).catch(() => undefined)
+      await exec('/usr/bin/hdiutil', ['attach', '-nobrowse', '-readonly', '-noautoopen', '-mountpoint', mount, dmg])
+    })
+}
+
+/** Ejects the DMG mounted at mount (force: also while a reader still holds it), hdiutil as above. */
+export async function detachDmg(mount: string, force = false, exec: Run = run): Promise<void> {
+  await exec('/usr/sbin/diskutil', ['eject', ...(force ? ['force'] : []), mount])
+    .catch(() => exec('/usr/bin/hdiutil', ['detach', '-quiet', ...(force ? ['-force'] : []), mount]))
+}
+
 export interface UpdaterOptions {
   fetcher: FetchLike
   current: string
@@ -139,7 +158,7 @@ export class AppUpdater {
       const dmg = join(work, `VulKara-${rel.version}.dmg`)
       await this.download(rel, dmg)
       this.set({ stage: 'checking', percent: 100 })
-      await run('/usr/bin/hdiutil', ['attach', '-nobrowse', '-readonly', '-noautoopen', '-mountpoint', mount, dmg])
+      await attachDmg(dmg, mount)
       mounted = true
       const app = join(mount, 'VulKara.app')
       const version = (await run('/usr/bin/plutil', ['-extract', 'CFBundleShortVersionString', 'raw', join(app, 'Contents', 'Info.plist')])).out.trim()
@@ -150,8 +169,7 @@ export class AppUpdater {
       rmSync(staged, { recursive: true, force: true })
       await run('/usr/bin/ditto', [app, staged])
       // the copy is checked and done: a volume still held (Spotlight, XProtect) does not fail the update
-      await run('/usr/bin/hdiutil', ['detach', '-quiet', mount])
-        .catch(() => run('/usr/bin/hdiutil', ['detach', '-quiet', '-force', mount])).catch(() => undefined)
+      await detachDmg(mount).catch(() => detachDmg(mount, true)).catch(() => undefined)
       mounted = false
       // waits for this app to quit, swaps the bundles (the old one back if that fails) and starts the new one with
       // the arguments this one got (a test instance keeps its data folder)
@@ -172,7 +190,7 @@ export class AppUpdater {
       quit()
     } catch (err) {
       this.opts.log?.(`[app update] ${(err as Error).message}`)
-      if (mounted) await run('/usr/bin/hdiutil', ['detach', '-quiet', '-force', mount]).catch(() => undefined)
+      if (mounted) await detachDmg(mount, true).catch(() => undefined)
       rmSync(staged, { recursive: true, force: true })
       rmSync(work, { recursive: true, force: true })
       this.set({ stage: 'error', error: (err as Error).message })

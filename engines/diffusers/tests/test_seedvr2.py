@@ -90,7 +90,7 @@ def mflux(monkeypatch):
 def fetched(monkeypatch):
     import pinned
     calls = []
-    monkeypatch.setattr(pinned, "fetch_urls", lambda urls, files, dest, report=None: calls.append((urls, files, dest)) or dest)
+    monkeypatch.setattr(pinned, "fetch_urls", lambda urls, files, dest, report=None, stop=None: calls.append((urls, files, dest)) or dest)
     return calls
 
 

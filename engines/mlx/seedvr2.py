@@ -25,7 +25,7 @@ def target(given, factor, scale, cap):
     return w, h
 
 
-def weights(folder, variant_id, v, report=None, state=None):
+def weights(folder, variant_id, v, report=None, state=None, stop=None):
     """The variant's folder with its files, downloaded and checked on first use (pinned.fetch_urls)."""
     import pinned
     files = v.get("files") or {}
@@ -36,7 +36,7 @@ def weights(folder, variant_id, v, report=None, state=None):
         state("Downloading SeedVR2 (%.1f GB, one-time)" % (v.get("size_mb", 0) * 1024 ** 2 / 1e9))
     numbers = (lambda x: report(x) if isinstance(x, (int, float)) else None) if report else None
     pinned.fetch_urls({n: f["url"] for n, f in files.items()}, {n: f["sha256"] for n, f in files.items()}, where,
-                      report=numbers)
+                      report=numbers, stop=stop)
     return where
 
 
@@ -90,7 +90,11 @@ def run(job, images_dir, stop=None, state=None, progress=None, note=None, log=No
     with Image.open(job["input_image"]) as head:  # the size from the header, before the pixels are read
         if head.width * head.height > photo_tools.MAX_PIXELS:
             raise ValueError("The picture is too large (at most %d megapixels)" % (photo_tools.MAX_PIXELS // 1_000_000))
-    where = weights(folder, variant_id, v, report=progress, state=state)
+    import pinned
+    try:
+        where = weights(folder, variant_id, v, report=progress, state=state, stop=stop)
+    except pinned.Stopped:
+        return None  # the downloaded part stays: the next job goes on from it
     if stop and stop():
         return None
     # upright as the app shows it, in sRGB whatever profile it carries; mflux reads a file

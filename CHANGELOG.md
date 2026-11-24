@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.2 – 2026-11-24
+
+- **Stop works while SeedVR2 downloads.** Upscale ×4 → Detailed downloads SeedVR2 once (7.3 GB); a Stop during that
+  download now ends the job within a megabyte while data arrives, and before the next try when the connection broke
+  off, instead of after the whole download. What was downloaded stays, and the next job goes on from there.
+- **The start check tries a failed move again.** A whole model filed as a LoRA is moved to the trash once at the start
+  (0.10.0); when that move failed, the check counted as done and the model stayed in the LoRA list. It now runs again
+  at the next start, three starts at most (a folder on a read-only drive can not be moved).
+- **Only 32-bit models are saved in 16 bit.** An SD 1.x or 2.x file counted as 32 bit as soon as one of its tensors
+  was; it now takes most of the file's bytes being 32-bit floats, so a 16-bit file that keeps a few 32-bit buffers stays
+  as it is instead of being converted and removed.
+- **The in-app update mounts with `diskutil image`.** macOS 27 calls `hdiutil attach` and `detach` deprecated; the
+  update now mounts the new version's DMG read-only with `diskutil image attach` and ejects it with `diskutil eject`
+  (the same options on macOS 15, 26 and 27), and falls back to `hdiutil` where `diskutil` has no `image` command.
+
 ## 0.10.1 – 2026-11-24
 
 - **Training offers only models it can train.** A FLUX.2 [klein], Krea 2, Z-Image or ERNIE-Image model kept as one

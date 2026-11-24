@@ -1788,10 +1788,17 @@ def migrate_fp8(model_dir, progress_cb=None):
 
 
 def _fp32(path):
+    """Whether most of a safetensors file's bytes are 32-bit floats (read from its header): a 16-bit file that keeps a
+    few F32 buffers is not one."""
     try:
-        return "F32" in convert_gguf.safetensors_dtypes(path)
-    except (OSError, ValueError, registry.UnsupportedModel):
+        size = {}
+        for k, v in registry.read_safetensors_json(path).items():
+            if k != "__metadata__":
+                start, end = v["data_offsets"]
+                size[v["dtype"]] = size.get(v["dtype"], 0) + end - start
+    except (OSError, ValueError, KeyError, TypeError, registry.UnsupportedModel):
         return False
+    return size.get("F32", 0) * 2 > sum(size.values())
 
 
 def migrate_single_file(model_dir, status=None):

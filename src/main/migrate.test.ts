@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
-const { recheckLibrary, RECHECK_FLAG } = await import('./migrate')
+const { recheckLibrary, RECHECK_FLAG, RECHECK_TRIES } = await import('./migrate')
 
 describe('the one-time check of the installed LoRAs and models', () => {
   // "--" before the --apply the check adds: node takes what follows as the script's arguments
@@ -38,5 +38,27 @@ describe('the one-time check of the installed LoRAs and models', () => {
     const script = lines.map((l) => `console.log(${JSON.stringify(JSON.stringify(l))})`).join(';')
     expect(await recheckLibrary(node(script), {}, data, () => {}, trash)).toBe(true)
     expect(trash.mock.calls).toEqual([['/l/GhostMix-v2']])
+  })
+
+  it('tries a failed move to the trash again at the next start', async () => {
+    const data = mkdtempSync(join(tmpdir(), 'vk-recheck-'))
+    const line = JSON.stringify(JSON.stringify({ type: 'lora', folder: '/l/GhostMix-v2', not_lora: true }))
+    expect(await recheckLibrary(node(`console.log(${line})`), {}, data, () => {}, noTrash)).toBe(true)
+    expect(existsSync(join(data, RECHECK_FLAG))).toBe(false)  // not done: runs again
+    const trash = vi.fn(() => Promise.resolve())
+    expect(await recheckLibrary(node(`console.log(${line})`), {}, data, () => {}, trash)).toBe(true)
+    expect(trash).toHaveBeenCalledTimes(1)
+    expect(existsSync(join(data, RECHECK_FLAG))).toBe(true)
+  })
+
+  it('gives a move that keeps failing up after a few starts', async () => {
+    const data = mkdtempSync(join(tmpdir(), 'vk-recheck-'))
+    const line = JSON.stringify(JSON.stringify({ type: 'lora', folder: '/readonly/x', not_lora: true }))
+    for (let i = 1; i <= RECHECK_TRIES; i++) {
+      expect(existsSync(join(data, RECHECK_FLAG))).toBe(false)
+      await recheckLibrary(node(`console.log(${line})`), {}, data, () => {}, noTrash)
+    }
+    expect(existsSync(join(data, RECHECK_FLAG))).toBe(true)  // the third failed start ends it
+    expect(existsSync(join(data, `${RECHECK_FLAG}.tries`))).toBe(false)
   })
 })

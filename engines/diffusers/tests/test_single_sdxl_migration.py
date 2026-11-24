@@ -131,6 +131,20 @@ def test_a_32_bit_sd1_file_becomes_a_folder_a_16_bit_one_stays(tmp_path, monkeyp
     assert json.loads((d / "model.json").read_text())["layout"] == "repo"
 
 
+def test_a_16_bit_file_with_a_few_32_bit_buffers_stays(tmp_path, monkeypatch):
+    import numpy as np
+    from safetensors.numpy import save_file
+    d = _model(tmp_path)
+    m = json.loads((d / "model.json").read_text())
+    m.update(arch="sd15", components={"unet": 0.86, "text_encoder": 0.12, "vae": 0.08})
+    (d / "model.json").write_text(json.dumps(m))
+    # the weights in 16 bit, a small buffer in 32 (as some exporters keep them): no conversion, the file stays
+    save_file({"w": np.ones((64, 64), np.float16), "alphas": np.ones(16, np.float32)}, str(d / "model.safetensors"))
+    calls = _fake_diffusers(monkeypatch)
+    assert not importer.migrate_single_file(str(d)) and calls == []
+    assert (d / "model.safetensors").is_file()
+
+
 def _folder(tmp_path, weights_dir="weights"):
     import numpy as np
     d = tmp_path / "RV"
