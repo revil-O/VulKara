@@ -15,6 +15,8 @@ import os
 import re
 import sys
 
+import compat
+
 def _unet_layer_map(sdxl):
     """(original prefix, diffusers prefix) pairs of the UNet's blocks."""
     out = []
@@ -159,6 +161,7 @@ def _load(folder):
             out.update(load_file(os.path.join(folder, f), device="cpu"))
         return out
     for f in (x for x in files if x.endswith(".bin")):
+        compat.refuse_pickle(f)
         out.update(torch.load(os.path.join(folder, f), map_location="cpu", weights_only=True))
     if not out:
         raise ValueError("No weights in %s" % folder)

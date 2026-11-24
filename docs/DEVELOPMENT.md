@@ -812,6 +812,12 @@ A dependency changes only like this, before the release build:
 3. Lock it: `python3 tools/lock_runtimes.py <runtime>` freezes the accepted runtime into `constraints.txt` and the
    pins. Review the diff (what moved, which majors), note the change in `CHANGELOG.md`, commit.
 
+The Intel-Mac build (`VK_ARCH=x64`, `src/shared/edition.ts`) installs `requirements-x64.txt` and
+`constraints-x64.txt` of the Diffusers engine instead (PyTorch has no Intel-Mac wheels after 2.2.2; the reasons per
+package are in the file's comments). They are accepted and locked the same way, on an Intel Mac:
+`tools/lock_runtimes.py` writes the `-x64` files there (`VK_RUNTIMES` points it at another runtimes folder), and
+`tools/check_pins.py` checks their pins everywhere but the installed set only on that processor.
+
 uv, Python and ComfyUI are pinned in `src/main/runtimes.ts` (`UV_VERSION` with the SHA-256 of its archives,
 `PYTHON` to the patch, `COMFY_RELEASE` with its content hash; `tools/pin_runtimes.py` computes the hashes). The
 Python version is part of a runtime's fingerprint: a runtime on another Python is made again at the next start
@@ -848,8 +854,11 @@ exist for a runtime (candidates for the next accepted update):
 - **Social preview** of the repository: `docs/images/social_preview.png` (1280 × 640, made by
   `marketing/make_social_preview.py` in the working repository).
 - **A published release** (`.github/workflows/release.yml`): `tools/announce_release.mjs` posts the version, the first
-  entry of the notes and the link on Mastodon and Bluesky; the Homebrew cask of `revil-O/homebrew-tap` gets the new
-  version and checksum. Each part runs only when its secrets are set; `node tools/announce_release.mjs --dry-run` with
+  entry of the notes and the link on Mastodon and Bluesky; the Homebrew cask of `revil-O/homebrew-tap` is written whole
+  from `tools/homebrew/vulkara.rb` with the new version and the checksums of both DMGs (`arch arm: "arm64", intel:
+  "x64"`), so a release must carry `VulKara-<version>-arm64.dmg` and `VulKara-<version>-x64.dmg` (built with `node
+  tools/release.mjs` and `VK_ARCH=x64 node tools/release.mjs`; the in-app update also looks for its own processor's
+  DMG). Change the cask in that template, not in the tap. Each part runs only when its secrets are set; `node tools/announce_release.mjs --dry-run` with
   `TAG`, `RELEASE_URL` and `BODY` shows the text. Started by hand (Actions → Release → Run workflow, a tag such as
   `v0.5.1`) it only sets the cask; when the cask already has that version it checks that `TAP_TOKEN` may push to the
   tap. Both workflows run only on GitHub, not on the Gitea mirror.

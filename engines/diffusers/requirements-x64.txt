@@ -1,0 +1,23 @@
+# diffusers engine of the Intel-Mac build (src/shared/edition.ts): PyTorch has no Intel-Mac wheels after 2.2.2, and
+# the rest follows from it (plans/INTEL_MACHBARKEIT.md). SD 1.x, SD 2.x and SDXL; no optimum-quanto (needs torch 2.6).
+torch==2.2.2  # the last PyTorch for Intel Macs
+torchvision==0.17.2
+diffusers==0.35.2  # 0.36+ needs torch.xpu (newer PyTorch), 0.41 a huggingface-hub transformers 4 does not allow
+transformers==4.57.6  # 5.x needs torch 2.4
+accelerate==1.15.0
+huggingface_hub==0.36.2
+safetensors==0.8.0
+gguf==0.19.0
+sentencepiece==0.2.2  # 0.2.3 has no Intel-Mac wheel
+protobuf==7.36.2
+psutil==7.2.2
+pillow==13.0.0
+numpy==1.26.4  # torch 2.2.2 is built against NumPy 1
+ninja==1.13.2
+peft==0.21.2
+onnxruntime==1.23.2  # the last with Intel-Mac wheels
+spandrel==0.4.2
+spandrel_extra_arches==0.2.0
+opencv-python-headless==4.11.0.86  # 5.x needs NumPy 2
+scipy==1.16.3
+torchsde==0.2.6

@@ -428,6 +428,13 @@ The language of the app is chosen at the top right of the Start page or in **Set
 | Storage | 5 GB | 50 GB or more for several models; external drives work; a fast internal SSD for the streaming cache |
 | System | macOS 14 (Sonoma) or newer | current macOS |
 
+**Intel Macs** get a build of their own (`VulKara-<version>-x64.dmg`) with SD 1.x, SD 2.x and SDXL on the processor
+(no GPU: SD 1.5 about 15–17 s per step on a 2017 MacBook Pro with 8 GB); MLX, ComfyUI and newer models such as FLUX
+are not available there. Its PyTorch 2.2.2 is the last for Intel Macs and has known vulnerabilities that can not be
+fixed; the build therefore reads no PyTorch pickle files (`.ckpt`, `.pt`, `.pth`, `.bin`), only `.safetensors` and
+`.gguf`, runs no code that comes with a model, and refuses a model folder that holds Python files. Use models from
+sources you trust.
+
 Nothing has to be installed first: no Python, no Xcode command line tools, and Homebrew only if you install with it. VulKara downloads its own
 Python (with uv, at a checked version) and only ready-built packages into its runtimes folder; the Python of the
 Mac is never used or changed.

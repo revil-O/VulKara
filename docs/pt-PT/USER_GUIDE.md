@@ -85,6 +85,14 @@ opção de **Definições → Aspeto → Idioma**.
 SDXL, 32 GB ou mais para os modelos FLUX grandes) e espaço livre no SSD para os runtimes (cerca de 1–1,5 GB cada) e
 para os modelos (2–35 GB cada).
 
+**Os Mac com Intel** têm uma versão própria (`VulKara-<versão>-x64.dmg`, também macOS 14 ou posterior). Calcula
+SD 1.x, SD 2.x e SDXL no processador, sem GPU (SD 1.5 a 512 px: cerca de 15–17 s por passo num MacBook Pro de 2017 com
+8 GB); MLX, ComfyUI, treino e modelos mais recentes como FLUX, Chroma ou Z-Image não estão disponíveis aí. O seu
+PyTorch 2.2.2 é o último para Mac com Intel e tem vulnerabilidades conhecidas que já não podem ser corrigidas: por isso
+a versão Intel não lê ficheiros pickle do PyTorch (`.ckpt`, `.pt`, `.pth`, `.bin`), só `.safetensors` e `.gguf`, não
+executa código que venha com um modelo e recusa uma pasta de modelo que contenha ficheiros Python. Utilize modelos de
+fontes em que confia.
+
 ## 2. A janela
 
 | Parte | O que faz |

@@ -10,6 +10,8 @@ import os
 import re
 import struct
 
+import compat
+
 
 class UnsupportedModel(ValueError):
     pass
@@ -577,10 +579,19 @@ def _version(text):
     return tuple(int(x) for x in re.findall(r"\d+", text)[:3])
 
 
+# the families PyTorch 2.2 (the Intel build) runs
+OLD_TORCH_FAMILIES = ("sd1", "sd2", "sdxl")
+
+
 def runtime_too_old(arch):
     """A message when the runtime lacks a package the architecture needs or has an older one ("packages":
     {name: minimum version}), else None. Installed runtimes keep their packages until they are updated."""
     from importlib.metadata import PackageNotFoundError, version
+    if ARCHS[arch].get("family") not in OLD_TORCH_FAMILIES:
+        if compat.old_torch():
+            # the Intel build (PyTorch 2.2): FLUX and newer need torch.nn.RMSNorm (PyTorch 2.4)
+            return ("%s needs PyTorch 2.4 or newer, which Intel Macs do not get; this build runs SD 1.x, SD 2.x and "
+                    "SDXL models" % ARCHS[arch]["label"])
     for package, need in (ARCHS[arch].get("packages") or {}).items():
         try:
             have = version(package)

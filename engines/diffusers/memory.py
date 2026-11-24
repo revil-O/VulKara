@@ -8,9 +8,12 @@ encoders are "staged" they are only loaded to encode a new prompt and freed befo
 denoising. The denoiser stays loaded meanwhile (reloading it per prompt would cost far
 more time), so during encoding both are resident, just without the activations.
 """
+import compat
+
 # macOS and the app itself need a reserve; on small Macs it is a fixed amount, on big ones a share
 RESERVE_FRACTION = 0.2
 MIN_RESERVE_GB = 4.0
+CPU_MIN_RESERVE_GB = 1.0
 RUNTIME_OVERHEAD_GB = 1.0  # python + torch + app
 # SD 1.5 at 1024 px measured 1.9 GB over its weights with fused attention (docs/MEASUREMENTS.md 7n)
 ACTIVATIONS_GB = {"sd1": 1.9, "sd2": 4.0, "sdxl": 1.5, "sd3": 2.0, "flux1": 2.5, "flux2": 3.0, "flux3": 2.5, "krea2": 3.0, "ideogram4": 2.5,
@@ -70,8 +73,14 @@ def _reserve_override():
         return 0.0
 
 
+def _min_reserve():
+    # the 4 GB keep room beside the GPU's share of unified memory; on the CPU (Intel Macs) there is none, and
+    # streaming instead took 2.6 times as long there (SD 1.5, 8 GB: 39.6 instead of 15.1 s per step)
+    return CPU_MIN_RESERVE_GB if compat.cpu_only() else MIN_RESERVE_GB
+
+
 def budget_gb(ram_gb):
-    reserve = _reserve_override() or max(MIN_RESERVE_GB, ram_gb * RESERVE_FRACTION)
+    reserve = _reserve_override() or max(_min_reserve(), ram_gb * RESERVE_FRACTION)
     return ram_gb - reserve
 
 
@@ -79,7 +88,7 @@ def ram_needed_gb(peak_gb):
     """Inverse of budget_gb: the smallest RAM whose budget holds peak_gb."""
     if _reserve_override():
         return peak_gb + _reserve_override()
-    return max(peak_gb + MIN_RESERVE_GB, peak_gb / (1 - RESERVE_FRACTION))
+    return max(peak_gb + _min_reserve(), peak_gb / (1 - RESERVE_FRACTION))
 
 
 def _scale(side_or_pixels):
@@ -187,6 +196,9 @@ def plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=N
     else:
         denoiser_opts = [quant]
     te_opts = (text_quant_opts or AUTO_ORDER) if quant == "auto" else [quant]
+    if not compat.QUANTO:  # the Intel build: 16 bit only (or streamed)
+        denoiser_opts = [q if q in ("none", "gguf") else "none" for q in denoiser_opts]
+        te_opts = ["none"]
 
     def seconds_gb(dq):
         return sum(_gb(components[n], "q8" if dq == "gguf" else dq) for n in seconds)

@@ -179,7 +179,9 @@ def attention_map(probs, heads, height, width):
     m = probs.view(-1, heads, height // 2, width // 2).mean(dim=1, keepdim=True)
     m = F.interpolate(m, size=(height, width), mode="bilinear", align_corners=False)
     lo, hi = m.amin(dim=(2, 3), keepdim=True), m.amax(dim=(2, 3), keepdim=True)
-    return ((m - lo) / (hi - lo + 1e-8))[:, 0]
+    # a flat map stays 0: stretching its rounding noise (Intel CPUs) would make a pattern of nothing
+    span = hi - lo
+    return torch.where(span > 1e-6, (m - lo) / span.clamp_min(1e-6), torch.zeros_like(m))[:, 0]
 
 
 def _embeds_file(folder):

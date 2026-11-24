@@ -15,6 +15,7 @@ import { mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 
 import { dirname, join } from 'node:path'
 import type { RuntimeComponentUpdate, RuntimeUpdate, RuntimeUpdates } from '@shared/api'
 import type { PlainKey } from '@shared/i18n'
+import { pinFile } from '@shared/edition'
 import { t } from './i18n'
 
 export type VersionSource =
@@ -239,7 +240,7 @@ const GITHUB_REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
 export function targetsOf(rt: CheckableRuntime, opts: { runtimeDir: string; enginesDir: string; installed: boolean }): RuntimeTargets {
   let requirements = ''
   try {
-    requirements = readFileSync(join(opts.enginesDir, rt.engine, 'requirements.txt'), 'utf8')
+    requirements = readFileSync(join(opts.enginesDir, rt.engine, pinFile('requirements')), 'utf8')
   } catch {
     // no requirements: any version is allowed
   }

@@ -13,7 +13,7 @@ import os
 import re
 import sys
 
-from lock_runtimes import DEV_ONLY, ENGINE, RUNTIMES, freeze, norm
+from lock_runtimes import DEV_ONLY, ENGINE, RUNTIMES, SUFFIX, freeze, norm
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PIN = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)(\[[^\]]*\])?==([^\s;#]+)\s*(;[^#]*)?(#.*)?$")
@@ -35,18 +35,22 @@ def pins_of(path, findings, kind):
 
 def check():
     findings = []
-    for rt, engine in ENGINE.items():
+    for (rt, engine), suffix in [(e, s) for e in ENGINE.items() for s in ("", "-x64")]:
         folder = os.path.join(ROOT, "engines", engine)
-        req, lock = os.path.join(folder, "requirements.txt"), os.path.join(folder, "constraints.txt")
+        req, lock = os.path.join(folder, f"requirements{suffix}.txt"), os.path.join(folder, f"constraints{suffix}.txt")
         rel = os.path.relpath(folder, ROOT)
+        if suffix and not os.path.exists(req):
+            continue  # no Intel set: the runtime is not offered on Intel Macs
         if not os.path.exists(lock):
-            findings.append(f"{rel}: no constraints.txt (python3 tools/lock_runtimes.py {rt})")
+            findings.append(f"{rel}: no constraints{suffix}.txt (python3 tools/lock_runtimes.py {rt})")
             continue
         direct = pins_of(req, findings, "requirement")
         locked = pins_of(lock, findings, "lock")
         for name, version in direct.items():
             if locked.get(name) != version:
-                findings.append(f"{rel}: {name}=={version} in requirements.txt, {locked.get(name, 'missing')} in the lock")
+                findings.append(f"{rel}: {name}=={version} in requirements{suffix}.txt, {locked.get(name, 'missing')} in the lock")
+        if suffix != SUFFIX:
+            continue  # the other processor's set is accepted on that Mac (tools/lock_runtimes.py there)
         installed = freeze(rt)
         if installed is None:
             findings.append(f"{rel}: the {rt} runtime is not installed here, so its lock is not verified (install it in "

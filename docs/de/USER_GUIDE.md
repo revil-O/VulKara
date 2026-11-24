@@ -88,6 +88,14 @@ Wahl wie **Einstellungen → Darstellung → Sprache**.
 SDXL, 32 GB oder mehr für die großen FLUX-Modelle) und freier Platz auf der SSD für die Runtimes (je etwa 1–1,5 GB)
 und für die Modelle (je 2–35 GB).
 
+**Intel-Macs** bekommen eine eigene Fassung (`VulKara-<Version>-x64.dmg`, ebenfalls ab macOS 14). Sie rechnet SD 1.x,
+SD 2.x und SDXL auf dem Prozessor, ohne Grafikchip (SD 1.5 bei 512 px: etwa 15–17 s pro Schritt auf einem MacBook Pro
+von 2017 mit 8 GB); MLX, ComfyUI, Training und neuere Modelle wie FLUX, Chroma oder Z-Image gibt es dort nicht. Ihr
+PyTorch 2.2.2 ist das letzte für Intel-Macs und hat bekannte Sicherheitslücken, die sich nicht mehr beheben lassen:
+Die Intel-Fassung liest deshalb keine PyTorch-Pickle-Dateien (`.ckpt`, `.pt`, `.pth`, `.bin`), nur `.safetensors` und
+`.gguf`, führt keinen Code aus, der mit einem Modell kommt, und lehnt einen Modellordner mit Python-Dateien ab. Nimm
+Modelle aus Quellen, denen du vertraust.
+
 ## 2. Das Fenster
 
 | Bereich | Was er tut |

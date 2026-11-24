@@ -13,6 +13,7 @@ import { basename, dirname, join } from 'node:path'
 import { finished } from 'node:stream/promises'
 import { compare, type FetchLike } from './runtime_updates'
 import type { AppUpdateState } from '@shared/api'
+import { EDITION } from '@shared/edition'
 
 export const LATEST_URL = 'https://api.github.com/repos/revil-O/VulKara/releases/latest'
 const DOWNLOADS = 'https://github.com/revil-O/VulKara/releases/download/'
@@ -30,7 +31,7 @@ export function parseLatest(data: unknown, current: string): Release | undefined
   const d = data as { tag_name?: unknown; draft?: unknown; prerelease?: unknown; assets?: unknown }
   const version = String(d?.tag_name ?? '').replace(/^v/, '')
   if (!/^\d+\.\d+\.\d+$/.test(version) || d.draft || d.prerelease || compare(version, current) <= 0) return undefined
-  const name = `VulKara-${version}-arm64.dmg`
+  const name = `VulKara-${version}-${EDITION.arch}.dmg`  // the Intel-Mac build takes the x64 DMG
   const asset = (Array.isArray(d.assets) ? d.assets : []).find((a) => a?.name === name) as
     { digest?: unknown; browser_download_url?: unknown; size?: unknown } | undefined
   const sha = /^sha256:([0-9a-f]{64})$/.exec(String(asset?.digest ?? ''))

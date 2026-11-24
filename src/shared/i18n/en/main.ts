@@ -50,6 +50,7 @@ export default {
     busyInstall: 'A job, import or training is running: install runtimes when it is finished.',
     busyRemove: 'A job, import or training is running: remove runtimes when it is finished.',
     diffusersDescription: 'PyTorch and diffusers on the GPU: SD 1.x/2.x, SDXL, SD 3.5, FLUX.1, FLUX.2, GGUF and FP8 files, LoRAs, ControlNet. Also runs the content filter.',
+    diffusersDescriptionIntel: 'PyTorch and diffusers on the processor (Intel Macs): SD 1.x/2.x and SDXL, LoRAs, ControlNet. Also runs the content filter.',
     mlxDescription: "Apple's MLX framework via mflux: usually faster and leaner for FLUX models; Krea 2 and Ideogram 4.",
     comfyDescription: 'Optional. Runs model types the other runtimes do not support yet (Anima, Wan video) from their original files, as a background process.',
     comfyGraphs: 'ComfyUI is an open-source engine in which a picture is produced by a graph of nodes: load the model, encode the prompt, denoise step by step, decode. VulKara builds these graphs itself; the ComfyUI web interface is never opened.',
@@ -98,6 +99,8 @@ export default {
   },
   engines: {
     needsComfy: 'This model runs with the ComfyUI runtime: install it in Settings → Runtimes',
+    needsAppleChip: 'This model runs with MLX, which exists for Macs with an Apple chip only',
+    needsAppleChipComfy: 'This model runs with ComfyUI, which VulKara offers for Macs with an Apple chip only',
     notInstalled: 'The {id} runtime is not installed: install it in Settings → Runtimes',
     stopped: 'The {id} engine stopped: {reason}',
     modelGone: 'The model of this job is not installed any more.',

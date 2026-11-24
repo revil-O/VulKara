@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
 import { describe, expect, it } from 'vitest'
-import { CURATED, GROUPS, curatedHits, importRequest, installedAs, licencePage, memoryFit } from './curated'
+import { CURATED, GROUPS, curatedHits, importRequest, installedAs, licencePage, memoryFit, offers } from './curated'
+import { editionFor } from '@shared/edition'
 import type { Asset } from '@shared/types'
 
 const asset = (name: string, source?: Asset['source']): Asset => ({
@@ -61,5 +62,11 @@ describe('recommended models', () => {
     expect([q4.file, q4.recommended, q4.title]).toEqual(['flux1-schnell-Q4_K_S.gguf', true, 'FLUX.1 [schnell] (4 bit)'])
     expect(refs('')).toEqual([])
     expect(refs('stable diffusion 3.5 large', 'civitai')).toEqual([])
+  })
+
+  it('the Intel build recommends only SD 1.x, SD 2.x and SDXL, the Apple-chip build all of them', () => {
+    const intel = CURATED.filter((m) => offers(editionFor('x64'), m))
+    expect(new Set(intel.map((m) => m.family))).toEqual(new Set(['SD 1.x', 'SD 2.x', 'SDXL']))
+    expect(CURATED.every((m) => offers(editionFor('arm64'), m))).toBe(true)
   })
 })

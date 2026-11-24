@@ -4,7 +4,7 @@
 
 import list from '@shared/data/curated_models.json'
 import licences from '@shared/data/licenses.json'
-import { EDITION, commerciallyUsable } from '@shared/edition'
+import { EDITION, INTEL_FAMILIES, commerciallyUsable, type Edition } from '@shared/edition'
 import type { ImportRequest } from '@shared/api'
 import type { LoraHit } from '@shared/lora_bases'
 import type { Asset } from '@shared/types'
@@ -37,10 +37,14 @@ export interface CuratedModel {
 
 const ALL = list as CuratedModel[]
 
+/** Does an edition offer this recommendation? */
+export const offers = (e: Edition, m: CuratedModel): boolean => (!e.commercialModelsOnly || commerciallyUsable(licences.models.find((l) => l.id === m.id)))
+  && (e.explicitContent === 'choice' || !m.nsfw)
+  && (e.comfyui || !COMFY_ONLY.includes(m.family))
+  && (e.arch === 'arm64' || INTEL_FAMILIES.includes(m.family))
+
 /** The recommended models this edition offers. */
-export const CURATED = ALL.filter((m) => (!EDITION.commercialModelsOnly || commerciallyUsable(licences.models.find((l) => l.id === m.id)))
-  && (EDITION.explicitContent === 'choice' || !m.nsfw)
-  && (EDITION.comfyui || !COMFY_ONLY.includes(m.family)))
+export const CURATED = ALL.filter((m) => offers(EDITION, m))
 
 // the title in the app's language at the moment it is read
 export const GROUPS: { id: CuratedModel['group']; readonly title: string }[] = [

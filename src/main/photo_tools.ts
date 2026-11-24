@@ -15,6 +15,7 @@ import { processEnv } from './env'
 import { lineSplitter } from './tool_process'
 import { mainLanguage, t } from './i18n'
 import { toolText, variantText } from '@shared/i18n/data'
+import { EDITION } from '@shared/edition'
 
 type Raw = Record<string, unknown>
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
@@ -36,7 +37,7 @@ export function recommendedTools(enginesDir: string, toolsDir: string): Recommen
     description: toolText(lang, str(t.id), 'description', str(t.description)),
     scale: Number(t.scale) || undefined, maxSide: Number(t.max_side) || undefined,
     variants: t.variants && typeof t.variants === 'object'
-      ? Object.entries(t.variants as Record<string, Raw>).map(([id, v]) => ({
+      ? Object.entries(t.variants as Record<string, Raw>).filter(([, v]) => EDITION.mlx || v.engine !== 'mlx').map(([id, v]) => ({
         id, label: variantText(lang, str(t.id), id, 'label', str(v.label) || id),
         description: variantText(lang, str(t.id), id, 'description', str(v.description)), sizeMb: Number(v.size_mb) || 0,
         maxOutput: Number(v.max_output) || undefined,

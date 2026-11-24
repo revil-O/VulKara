@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { Trainer, canTrain, trainingJob, type TrainerDeps } from './training'
+import { EDITION } from '@shared/edition'
 import type { TrainingState } from '@shared/api'
 
 function setup(verdict: (path: string) => { ok: boolean; reason?: string }) {
@@ -70,6 +71,18 @@ describe('the models a LoRA can be trained on', () => {
     expect(canTrain({ arch: 'z_image', layout: 'single_denoiser' })).toBe(false)
     expect(canTrain({ arch: 'flux2_klein', layout: 'single_denoiser' })).toBe(false)
     expect(canTrain({ arch: 'sd15', layout: 'repo' })).toBe(false)
+  })
+
+  it('trains only SDXL on the Intel build, which has no MLX', () => {
+    const mlx = EDITION.mlx
+    try {
+      EDITION.mlx = false
+      expect(canTrain({ arch: 'sdxl', layout: 'repo' })).toBe(true)
+      expect(canTrain({ arch: 'z_image', layout: 'repo' })).toBe(false)
+      expect(canTrain({ arch: 'flux2_klein', layout: 'folder' })).toBe(false)
+    } finally {
+      EDITION.mlx = mlx
+    }
   })
 
   it('refuses such a model also when a request names it', () => {

@@ -28,7 +28,12 @@ def enabled():
 
 def _versions():
     import importlib.metadata as md
-    return {p: md.version(p) for p in ("torch", "optimum-quanto", "transformers", "diffusers")}
+    def version(p):
+        try:
+            return md.version(p)
+        except md.PackageNotFoundError:  # the Intel build has no optimum-quanto
+            return "-"
+    return {p: version(p) for p in ("torch", "optimum-quanto", "transformers", "diffusers")}
 
 
 def _source_signature(folder, comp):

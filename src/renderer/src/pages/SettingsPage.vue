@@ -225,7 +225,8 @@ const THEMES: { id: 'system' | 'light' | 'dark'; title: PlainKey; icon: typeof M
       <section>
         <h2>{{ t('settings.engine.title') }}</h2>
         <div class="card list">
-          <label class="row">
+          <!-- the Intel build has one runtime, no 8/4 bit (optimum-quanto) and no ComfyUI -->
+          <label v-if="EDITION.mlx" class="row">
             <div class="grow">
               <strong>{{ t('settings.engine.runtime') }}</strong>
               <p class="dim">{{ t('settings.engine.runtimeHint') }}</p>
@@ -236,7 +237,7 @@ const THEMES: { id: 'system' | 'light' | 'dark'; title: PlainKey; icon: typeof M
               <option value="mlx">MLX</option>
             </select>
           </label>
-          <label class="row">
+          <label v-if="EDITION.arch === 'arm64'" class="row">
             <div class="grow">
               <strong>{{ t('settings.engine.quant') }}</strong>
               <p class="dim">{{ t('settings.engine.quantHint') }}</p>
@@ -251,7 +252,7 @@ const THEMES: { id: 'system' | 'light' | 'dark'; title: PlainKey; icon: typeof M
           <label class="row">
             <div class="grow">
               <strong>{{ t('settings.engine.reserve') }}</strong>
-              <p class="dim">{{ t('settings.engine.reserveHint') }}</p>
+              <p class="dim">{{ t(EDITION.arch === 'arm64' ? 'settings.engine.reserveHint' : 'settings.engine.reserveHintIntel') }}</p>
             </div>
             <input
               type="number" min="0" max="256" :value="settings.values.memoryReserveGb"
@@ -270,7 +271,7 @@ const THEMES: { id: 'system' | 'light' | 'dark'; title: PlainKey; icon: typeof M
               <option value="off">{{ t('settings.engine.never') }}</option>
             </select>
           </label>
-          <label class="row">
+          <label v-if="EDITION.comfyui" class="row">
             <div class="grow">
               <strong>{{ t('settings.engine.comfyStreaming') }} <HintBadge start :text="t('settings.engine.comfyStreamingDetails')" /></strong>
               <p class="dim">{{ t('settings.engine.comfyStreamingHint') }}</p>

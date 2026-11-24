@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.10.5 – 2026-11-24
+
+- **Preparation for a build for Intel Macs.** `VK_ARCH=x64` builds an edition without MLX and ComfyUI (Apple's MLX
+  exists for Apple chips only, and Intel Macs get PyTorch up to 2.2.2): Settings, Training and the photo tools offer
+  no MLX choice there, a model that only MLX runs is refused with a message, and the recommended list keeps SD 1.x,
+  SD 2.x and SDXL. Its Diffusers runtime has its own locked set (`engines/diffusers/requirements-x64.txt`,
+  `constraints-x64.txt`: PyTorch 2.2.2, diffusers 0.35.2, transformers 4.57.6, no optimum-quanto), plans in 16 bit
+  only and reads no PyTorch pickle files of the user's (`.ckpt`, `.pt`, `.pth`, `.bin`), which PyTorch before 2.6
+  can not read safely (CVE-2025-32434); `.safetensors` and `.gguf` work. Settings show no runtime choice, no 8 or
+  4 bit and no ComfyUI option there, and the runtime is described for the processor. Without a GPU the memory plan
+  keeps at least 1 GB free instead of 4 GB (no GPU shares the memory): SD 1.5 on an Intel MacBook Pro with 8 GB ran
+  in memory at 15.1 s per step instead of streamed at 39.6 s, the same picture. The in-app update takes the DMG of
+  its own processor (`VulKara-<version>-x64.dmg` on Intel Macs). A FLUX, Chroma, Z-Image or other newer model is
+  refused there before its download with a message (they need PyTorch 2.4), not at its first picture. Its older
+  packages have known vulnerabilities that can not be fixed there (PyTorch 2.2.2 is the last for Intel Macs); the
+  build reaches none of the affected paths as far as checked: no pickle files, no code from a model, and on top a
+  tokenizer's chat template is dropped before saving (transformers before 5.10, CVE-2026-9856) and a folder with Python
+  files is refused before every load, also behind links and as `.PY` (diffusers before 0.38,
+  CVE-2026-44513/-44827/-45804); every diffusers load there takes `.safetensors` only, so a component with just a
+  `.bin` file is refused instead of read as a pickle. A model of the ComfyUI runtime is refused there with a message.
+  The build is recognised by its processor (x86_64), so the MLX and ComfyUI runtimes on Apple chips keep their
+  8- and 4-bit plans and MLX loads no PyTorch for the check. Each release carries both DMGs, and
+  the Homebrew cask picks the one for the Mac's processor (written from `tools/homebrew/vulkara.rb` by the release
+  workflow). The Apple-chip build is unchanged.
+- **ObjectClear's attention map of an even picture stays empty.** The stretch to the full range turned rounding
+  noise of a flat map into a pattern; a map without contrast is now 0.
+
 ## 0.10.2 – 2026-11-24
 
 - **Stop works while SeedVR2 downloads.** Upscale ×4 → Detailed downloads SeedVR2 once (7.3 GB); a Stop during that

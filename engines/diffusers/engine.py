@@ -15,6 +15,7 @@ import uuid
 from pathlib import Path
 
 import colour
+import compat
 import controlnet
 import lora_convert
 import memory
@@ -843,7 +844,7 @@ class LoadedModel:
         if gb <= free:
             protocol.status("Loading ControlNet")
             model = cls.from_pretrained(str(folder), dtype=self.dtype)
-        elif cn_spec["params_b"] * memory.BYTES_PER_PARAM["q8"] <= free:
+        elif compat.QUANTO and cn_spec["params_b"] * memory.BYTES_PER_PARAM["q8"] <= free:
             gb = cn_spec["params_b"] * memory.BYTES_PER_PARAM["q8"]
             def make_empty():
                 with _meta_weights():

@@ -12,6 +12,7 @@ import type { TrainingImage, TrainingRequest, TrainingState } from '@shared/api'
 import { processEnv } from './env'
 import { lineSplitter } from './tool_process'
 import { prohibitedPrompt } from '@shared/content_policy'
+import { EDITION } from '@shared/edition'
 import { engineLine, mainLanguage, t } from './i18n'
 
 export interface TrainerDeps {
@@ -39,10 +40,11 @@ const MLX_ARCHS = ['flux2_klein', 'krea2', 'z_image', 'ernie_image']
 export const TRAINABLE = ['sdxl', ...MLX_ARCHS]
 
 /** A model a LoRA can be trained on: a trainable architecture, and for MLX not a single denoiser file (mflux reads
- *  the model folder, where the file's weights are not). */
+ *  the model folder, where the file's weights are not) and not on the Intel build, which has no MLX. */
 export function canTrain(m: { arch?: unknown; layout?: unknown }): boolean {
   const arch = String(m.arch ?? '')
-  return TRAINABLE.includes(arch) && !(MLX_ARCHS.includes(arch) && m.layout === 'single_denoiser')
+  if (!MLX_ARCHS.includes(arch)) return TRAINABLE.includes(arch)
+  return EDITION.mlx && m.layout !== 'single_denoiser'
 }
 
 /** The pictures of a folder, each with the caption of a .txt file of the same name. */

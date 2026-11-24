@@ -22,6 +22,7 @@ import time
 
 import numpy as np
 
+import compat
 import paths
 
 MANIFEST = "tool.json"
@@ -99,6 +100,8 @@ def _torch_model(path):
     except ImportError:
         raise RuntimeError("This tool runs with PyTorch (spandrel), which this Diffusers runtime does not have yet: "
                            "update it in Settings → Runtimes")
+    if not path.lower().endswith(".safetensors"):
+        compat.refuse_pickle(path)
     try:
         desc = spandrel.ModelLoader().load_from_file(path)
     except Exception as e:

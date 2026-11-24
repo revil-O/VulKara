@@ -1,7 +1,7 @@
 {
   "name": "vulkara",
   "productName": "VulKara",
-  "version": "0.10.2",
+  "version": "0.10.5",
   "description": "Local image and video generation for Apple Silicon Macs",
   "private": true,
   "license": "LicenseRef-PolyForm-Noncommercial-1.0.0",
@@ -19,8 +19,8 @@
     "notices": "node tools/gen_notices.mjs",
     "licenses": "python3 tools/gen_licenses.py",
     "icon": "electron tools/make_icon.mjs",
-    "native": "mkdir -p out/native && xcrun swiftc -O -target arm64-apple-macos14.0 native/subject_mask.swift -o out/native/subject-mask",
-    "package": "electron-vite build && npm run native && electron-builder --config electron-builder.config.cjs --mac --arm64 --publish never",
+    "native": "mkdir -p out/native && xcrun swiftc -O -target $([ \"$VK_ARCH\" = x64 ] && echo x86_64 || echo arm64)-apple-macos14.0 native/subject_mask.swift -o out/native/subject-mask",
+    "package": "electron-vite build && npm run native && electron-builder --config electron-builder.config.cjs --mac --${VK_ARCH:-arm64} --publish never",
     "release": "node tools/release.mjs",
     "start:app": "electron-vite build && npm run native && node tools/dev-app.mjs"
   },

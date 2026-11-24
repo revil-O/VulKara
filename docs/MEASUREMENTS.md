@@ -3141,6 +3141,27 @@ pictures each, same method:
 - Pictures checked (contact sheets, 16): lighthouses without faults.
 - The token check of the same build in the test instance: Hugging Face "valid", Civitai "valid" (civitai.com/api/v1/me).
 
+## 7cs. The Intel-Mac build: SD 1.5 on the CPU (2026-11-23, MacBook Pro 2017, Intel Core i5-7360U, 8 GB)
+
+The Intel-Mac build (`VK_ARCH=x64`, plans/INTEL_MACHBARKEIT.md) on a MacBookPro14,1: two cores / four threads, Intel
+Iris Plus 640 (no MPS: PyTorch runs on the CPU in float32), 8 GB, macOS 15.8.3 through the OpenCore Legacy Patcher,
+a Docker VM of about 2 GB running beside it. Runtime: torch 2.2.2, diffusers 0.35.2, transformers 4.57.6
+(`constraints-x64.txt`). SD 1.5 (`stable-diffusion-v1-5`), "a red fox sitting in a snowy forest, photo", 512 × 512,
+20 steps, guidance 7, seed 42, no face detail; the same picture in every run.
+
+| Run | Plan | per step | picture | swap after |
+| --- | --- | --- | --- | --- |
+| plain diffusers script (no app), float32 | in memory | 23.4 s | 467 s (+ 84 s first load) | 3.9 GB |
+| app, reserve 4 GB (as on Apple chips) | unet 16 bit, streamed from the SSD | 39.6 s | 856 s | not read |
+| app, SSD streaming off | refused: "needs about 8 GB, this Mac has 8 GB" | – | – | – |
+| app, reserve set to 1 GB (Settings) | unet 16 bit, in memory | 15.1 s | 426 s | 3.4 GB |
+| app with the CPU reserve of 1 GB (default, final build) | unet 16 bit, in memory | 17.3 s | 494 s | 3.2 GB |
+
+Streaming took 2.6 times as long as holding the model and letting macOS swap: the 4 GB reserve is meant for the GPU's
+share of unified memory, which an Intel Mac does not have. Without a GPU the plan now keeps at least 1 GB (20 % of
+8 GB = 1.6 GB: a budget of 6.4 GB). For comparison: SD 1.5 at 512 px on an Apple chip takes 0.72–1.55 s per step
+(the epiCPhotoGasm row above), 10 to 20 times faster.
+
 ## 8. Earlier references (from the user guide and the changelog)
 
 - Training on the M2 (2025–26): SDXL about 2.5 s per step at 768 px, FLUX.2 [klein] 4B about 15 s, 9B about 30 s,

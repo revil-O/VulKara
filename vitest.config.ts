@@ -10,6 +10,6 @@ export default defineConfig({
       '@': resolve('src/renderer/src'),
     },
   },
-  define: { __VK_EDITION__: JSON.stringify('personal'), __VK_BUILD__: JSON.stringify('test') },
+  define: { __VK_EDITION__: JSON.stringify('personal'), __VK_BUILD__: JSON.stringify('test'), __VK_ARCH__: JSON.stringify('arm64') },
   test: { include: ['src/**/*.test.ts'], environment: 'node' },
 })

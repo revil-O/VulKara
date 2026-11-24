@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Oliver Schmidt
 // A release build: checks, builds, packages, signs and (when possible) notarizes the app and its DMG.
 //
-//   node tools/release.mjs [--skip-checks]
+//   node tools/release.mjs [--skip-checks]          VK_ARCH=x64 makes the Intel-Mac build (src/shared/edition.ts)
 //
 // 0. the runtimes' Python packages are locked and the lock is the set tested on this Mac (tools/check_pins.py);
 //    runs also with --skip-checks
@@ -26,7 +26,8 @@ import { notarize } from '@electron/notarize'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const DIST = join(ROOT, 'dist')
-const APP = join(DIST, 'mac-arm64', 'VulKara.app')
+const ARCH = process.env.VK_ARCH === 'x64' ? 'x64' : 'arm64'
+const APP = join(DIST, ARCH === 'x64' ? 'mac' : 'mac-arm64', 'VulKara.app')
 const ENTITLEMENTS = join(ROOT, 'build', 'entitlements.mac.plist')
 const PROFILE = process.env.APPLE_KEYCHAIN_PROFILE || 'VulKara'
 const skipChecks = process.argv.includes('--skip-checks')
@@ -66,7 +67,7 @@ step('build', bin('electron-vite'), ['build'])
 step('Apple Vision helper (Select subject)', 'npm', ['run', 'native'])
 // only what a release made: dist/dev holds the bundle that `npm run start:app` runs from
 for (const f of existsSync(DIST) ? readdirSync(DIST) : []) if (f !== 'dev') rmSync(join(DIST, f), { recursive: true, force: true })
-step('app bundle', bin('electron-builder'), ['--config', 'electron-builder.config.cjs', '--mac', 'dir', '--arm64', '--publish', 'never'])
+step('app bundle', bin('electron-builder'), ['--config', 'electron-builder.config.cjs', '--mac', 'dir', `--${ARCH}`, '--publish', 'never'])
 
 const id = identity()
 console.log(`\n▸ signing with ${id}`)
@@ -87,7 +88,7 @@ if (notarizing) {
   await notarize({ appPath: APP, keychainProfile: PROFILE })  // staples as well
 }
 
-step('DMG', bin('electron-builder'), ['--config', 'electron-builder.config.cjs', '--mac', 'dmg', '--arm64', '--prepackaged', APP, '--publish', 'never'])
+step('DMG', bin('electron-builder'), ['--config', 'electron-builder.config.cjs', '--mac', 'dmg', `--${ARCH}`, '--prepackaged', APP, '--publish', 'never'])
 const dmg = readdirSync(DIST).filter((f) => f.endsWith('.dmg')).map((f) => join(DIST, f)).sort().pop()
 step('sign the DMG', 'codesign', ['--sign', id, '--timestamp', dmg])
 if (notarizing) {

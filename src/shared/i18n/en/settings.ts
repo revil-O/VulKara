@@ -57,6 +57,7 @@ export default {
     bit4: '4 bit',
     reserve: 'Memory kept free for other apps',
     reserveHint: '0 = automatic (20 %, at least 4 GB).',
+    reserveHintIntel: '0 = automatic (20 %, at least 1 GB).',
     streaming: 'Load large models piece by piece from the SSD',
     streamingHint: 'Lets models run that do not fit into memory, at lower speed.',
     comfyStreaming: 'ComfyUI: load GGUF models piece by piece from the SSD',

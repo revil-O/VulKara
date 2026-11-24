@@ -21,6 +21,7 @@ import { processEnv } from './env'
 import { lineSplitter } from './tool_process'
 import { getToken } from './secrets'
 import { t } from './i18n'
+import { EDITION } from '@shared/edition'
 
 const EVENT_PREFIX = '@vk '
 
@@ -165,10 +166,16 @@ export function engineFor(job: Record<string, unknown>): RuntimeId {
   if (job.remove_object) return 'diffusers'  // LaMa (ONNX) or RORem (SDXL inpainting) with the Diffusers runtime
   const m = readManifest(String(job.model_dir ?? ''))
   if (!m) throw new Error(t('main.engines.modelGone'))
-  if (m.runtime === 'comfyui') return 'comfyui'
-  if (m.arch && MLX_ONLY.includes(m.arch)) return 'mlx'
+  if (m.runtime === 'comfyui') {
+    if (!EDITION.comfyui) throw new Error(t('main.engines.needsAppleChipComfy'))  // the Intel build
+    return 'comfyui'
+  }
+  if (m.arch && MLX_ONLY.includes(m.arch)) {
+    if (!EDITION.mlx) throw new Error(t('main.engines.needsAppleChip'))  // the Intel build
+    return 'mlx'
+  }
   const preferred = getSettings().runtime
-  const mlxCan = !!m.arch && MLX_ALSO.includes(m.arch) && m.layout === 'repo' && !job.input_image && !job.controlnet_image
+  const mlxCan = EDITION.mlx && !!m.arch && MLX_ALSO.includes(m.arch) && m.layout === 'repo' && !job.input_image && !job.controlnet_image
   const roomy = !tooLargeForMlx.has(String(job.model_dir ?? ''))
   if (mlxCan && roomy && (preferred === 'mlx' || (preferred === 'auto' && runtimePython('mlx')))) return 'mlx'
   return 'diffusers'

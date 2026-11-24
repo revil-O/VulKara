@@ -25,6 +25,7 @@ from pathlib import Path
 
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")  # progress is reported by _ProgressWatcher
 
+import compat  # noqa: E402
 import convert_gguf  # noqa: E402
 import memory  # noqa: E402
 import paths  # noqa: E402
@@ -142,9 +143,10 @@ def _repo_plan_files(files, model_index):
         for c in with_weights)
     for c in comps:
         in_folder = [f for f in files if f.startswith(c + "/")]
-        wanted += [f for f in in_folder if not f.endswith(WEIGHT_EXTS + CODE_EXTS) and ".safetensors.index" not in f]
+        # lower(): APFS and exFAT ignore case, so x.PY or x.BIN would still load as code or pickle
+        wanted += [f for f in in_folder if not f.lower().endswith(WEIGHT_EXTS + CODE_EXTS) and ".safetensors.index" not in f]
         chosen, variant = _pick_weight_files(files, c, prefer_fp16=all_fp16)
-        if not chosen and c in _component_names(model_index) and any(f.endswith(WEIGHT_EXTS) for f in in_folder):
+        if not chosen and c in _component_names(model_index) and any(f.lower().endswith(WEIGHT_EXTS) for f in in_folder):
             raise registry.UnsupportedModel(
                 "Component '%s' has no .safetensors weights (pickle formats are not loaded for safety)" % c)
         wanted += chosen
@@ -1239,10 +1241,12 @@ def run_import(source, ref, name, file=None, quant="auto", dry_run=False, force=
     if source == "civitai":
         return import_civitai(ref, name, quant=quant, dry_run=dry_run, force=force, token=token, root=root)
     if source == "file" and ref.lower().endswith((".ckpt", ".pt", ".pth")):
+        compat.refuse_pickle(ref)
         return import_ckpt(ref, name, quant=quant, dry_run=dry_run, force=force, token=token, root=root,
                            meta_override=meta_override)
     if source == "hf" and file and file.lower().endswith(".ckpt"):
         # a .ckpt in a repo: downloaded, then read as plain weights like a local one
+        compat.refuse_pickle(file)
         from huggingface_hub import HfApi, hf_hub_download
         size = {s.rfilename: s.size for s in HfApi(token=token).model_info(ref, files_metadata=True).siblings}.get(file) or 0
         if dry_run:
@@ -1260,6 +1264,8 @@ def run_import(source, ref, name, file=None, quant="auto", dry_run=False, force=
             return import_ckpt(local, name, quant=quant, force=force, token=token, root=root, meta_override=meta)
         finally:
             shutil.rmtree(work / safe_name(name or file), ignore_errors=True)
+    if source == "dir":
+        compat.refuse_code(ref)
     if source == "dir" and is_diffusers_model_dir(ref):
         return register_in_place(ref, dry_run=dry_run)
     progress("Inspecting")
@@ -1355,6 +1361,7 @@ def ckpt_to_safetensors(src, dst):
     containers only, a file that wants to run code is refused instead of being executed."""
     import torch
     from safetensors.torch import save_file
+    compat.refuse_pickle(src)
     try:
         obj = torch.load(src, map_location="cpu", weights_only=True, mmap=True)
     except Exception as e:
@@ -1831,6 +1838,7 @@ def migrate_single_file(model_dir, status=None):
         import torch
         pipe = getattr(diffusers, spec["pipeline"]).from_single_file(
             src, config=os.path.join(model_dir, m["base_dir"]), dtype=torch.float16, **spec.get("pipeline_kwargs", {}))
+        compat.drop_chat_templates(pipe)
         pipe.save_pretrained(tmp, safe_serialization=True)
         del pipe
         parts = [c for c in m["components"] if not _has_weights(Path(tmp) / c)]

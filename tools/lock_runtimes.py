@@ -12,15 +12,21 @@ made with it. The lock is what users get; nothing newer reaches them before it w
 docs/DEVELOPMENT.md, "Dependency updates".
 
     python3 tools/lock_runtimes.py [diffusers mlx comfyui]     default: all installed runtimes
+
+On an Intel Mac it writes the Intel build's set (constraints-x64.txt, requirements-x64.txt); VK_RUNTIMES points it
+at another runtimes folder.
 """
 import datetime
 import os
+import platform
 import re
 import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RUNTIMES = os.path.expanduser("~/Library/Application Support/VulKara/runtimes")
+RUNTIMES = os.environ.get("VK_RUNTIMES") or os.path.expanduser("~/Library/Application Support/VulKara/runtimes")
+# an Intel Mac locks the Intel build's own set (src/shared/edition.ts pinFile)
+SUFFIX = "-x64" if platform.machine() == "x86_64" else ""
 ENGINE = {"diffusers": "diffusers", "mlx": "mlx", "comfyui": "comfy"}
 # tools of the developer, never part of a runtime (pytest gets installed to run the engine tests)
 DEV_ONLY = {"pytest", "iniconfig", "pluggy"}
@@ -80,9 +86,9 @@ def main(names):
             "# dependency update (docs/DEVELOPMENT.md, Dependency updates), never by hand.",
         ]
         body = [f"{n}=={v}" for _, (n, v) in sorted(pins.items())]
-        open(os.path.join(engine, "constraints.txt"), "w", encoding="utf-8").write("\n".join(head + body) + "\n")
-        pin_requirements(os.path.join(engine, "requirements.txt"), pins)
-        print(f"{rt}: {len(pins)} packages locked -> engines/{ENGINE[rt]}/constraints.txt")
+        open(os.path.join(engine, f"constraints{SUFFIX}.txt"), "w", encoding="utf-8").write("\n".join(head + body) + "\n")
+        pin_requirements(os.path.join(engine, f"requirements{SUFFIX}.txt"), pins)
+        print(f"{rt}: {len(pins)} packages locked -> engines/{ENGINE[rt]}/constraints{SUFFIX}.txt")
 
 
 if __name__ == "__main__":

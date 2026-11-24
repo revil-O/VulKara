@@ -7,8 +7,22 @@ import sys
 os.environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + os.environ.get("PATH", "")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import compat  # noqa: E402
 
-import pytest
+compat.install()
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _apple_chip_packages(request, monkeypatch):
+    """The engine's logic is tested as the Apple-chip build has it (quanto plans, its own test pickles read) also on
+    the Intel build's older packages; test_compat checks what compat.py changes there."""
+    if request.module.__name__ != "test_compat":
+        monkeypatch.setattr(compat, "QUANTO", True)
+        monkeypatch.setattr(compat, "pickle_safe", lambda: True)
+        monkeypatch.setattr(compat, "cpu_only", lambda: False)
+        monkeypatch.setattr(compat, "old_torch", lambda: False)
 
 
 @pytest.fixture(autouse=True)

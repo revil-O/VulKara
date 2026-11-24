@@ -25,6 +25,9 @@ os.environ["PATH"] = os.path.dirname(sys.executable) + os.pathsep + os.environ.g
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import protocol  # noqa: E402
+import compat  # noqa: E402
+
+compat.install()
 
 
 def serve(stream=None):

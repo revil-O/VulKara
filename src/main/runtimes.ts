@@ -12,7 +12,7 @@ import { enginesDir } from './paths'
 import { runtimesDir } from './settings'
 import type { RuntimeInfo } from '@shared/api'
 import { targetsOf, type RuntimeTargets, type VersionSource } from './runtime_updates'
-import { EDITION } from '@shared/edition'
+import { EDITION, pinFile } from '@shared/edition'
 import { processEnv } from './env'
 import { sha256File, treeHash } from './archive_hash'
 import { t } from './i18n'
@@ -52,9 +52,9 @@ const PYTHON = '3.11.18'
 
 const CATALOG: Runtime[] = [
   {
-    id: 'diffusers', name: 'Diffusers (Apple GPU)', engine: 'diffusers', versionPackage: 'diffusers', python: PYTHON,
+    id: 'diffusers', name: EDITION.mlx ? 'Diffusers (Apple GPU)' : 'Diffusers', engine: 'diffusers', versionPackage: 'diffusers', python: PYTHON,
     versions: [{ kind: 'pypi', package: 'diffusers' }, { kind: 'pypi', package: 'spandrel' }, { kind: 'pypi', package: 'spandrel_extra_arches' }],
-    description: () => t('main.runtimes.diffusersDescription'),
+    description: () => t(EDITION.mlx ? 'main.runtimes.diffusersDescription' : 'main.runtimes.diffusersDescriptionIntel'),
   },
   {
     id: 'mlx', name: 'MLX', engine: 'mlx', versionPackage: 'mflux', python: PYTHON,
@@ -120,7 +120,7 @@ export function venvPython(venv: string): string | undefined {
 }
 
 function lockOf(rt: Runtime): string {
-  const lock = join(enginesDir(), rt.engine, 'constraints.txt')
+  const lock = join(enginesDir(), rt.engine, pinFile('constraints'))
   if (!existsSync(lock)) return ''
   const comfy = [rt.python, rt.comfyRelease ?? '', ...(rt.extensions ?? []).map((e) => e.commit)].join(',')
   return createHash('sha256').update(readFileSync(lock)).update(comfy).digest('hex')
@@ -160,7 +160,7 @@ export function dirSize(dir: string): number {
   return total
 }
 
-const offered = (): Runtime[] => CATALOG.filter((rt) => rt.id !== 'comfyui' || EDITION.comfyui)
+const offered = (): Runtime[] => CATALOG.filter((rt) => (rt.id !== 'comfyui' || EDITION.comfyui) && (rt.id !== 'mlx' || EDITION.mlx))
 
 /** For the update check: every offered runtime, whether it is installed, and what its definition asks to check. */
 export function updateTargets(): RuntimeTargets[] {
@@ -314,7 +314,7 @@ async function installNow(id: RuntimeId, progress: Progress): Promise<{ version:
   if (!existsSync(join(venv, 'bin', 'python')))
     await run(uv, ['venv', '--python', rt.python, '--python-preference', 'only-managed', venv], undefined, uvEnv)
 
-  const requirements = ['-r', join(src, 'requirements.txt')]
+  const requirements = ['-r', join(src, pinFile('requirements'))]
   if (rt.comfyRelease) {
     const comfy = join(dir, 'ComfyUI')
     const marker = join(comfy, 'comfyui_version.py')
@@ -338,7 +338,7 @@ async function installNow(id: RuntimeId, progress: Progress): Promise<{ version:
   // the tested set and nothing else: every package at its locked version, also the ones that only come in through
   // other packages and ComfyUI's own. A sync also takes out what is not in it, so a runtime an untested release had
   // reached (Pillow 13) is whole again without deleting it; unchanged packages stay, the rest comes from the cache.
-  const lock = join(src, 'constraints.txt')
+  const lock = join(src, pinFile('constraints'))
   // the key packages move to the newest version their requirements allow (only without a lock)
   const upgrade = (rt.versions ?? []).flatMap((s) => (s.kind === 'pypi' ? ['--upgrade-package', s.package] : []))
   const packages = existsSync(lock) ? ['sync', lock] : ['install', ...upgrade, ...requirements]

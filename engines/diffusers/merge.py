@@ -15,6 +15,7 @@ import shutil
 import time
 from pathlib import Path
 
+import compat
 import paths
 import protocol
 import registry
@@ -218,6 +219,7 @@ def merge(spec_path, models_dir=None):
         if kept and kept[1]:
             # the text encoders were not loaded: saved without them, then their folders taken over from the base
             src, skipped = kept
+            compat.drop_chat_templates(pipe)
             pipe.save_pretrained(str(weights), safe_serialization=True)
             index = _read(os.path.join(src, "model_index.json"))
             for comp in skipped:
@@ -226,6 +228,7 @@ def merge(spec_path, models_dir=None):
             with open(weights / "model_index.json", "w") as f:
                 json.dump(index, f, indent=2)
         else:
+            compat.drop_chat_templates(pipe)
             pipe.save_pretrained(str(weights), safe_serialization=True)
         del pipe
         manifest = _manifest(m, base_dir, work, loras, importer, name)

@@ -1,5 +1,6 @@
 <!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 · Copyright (C) 2026 Oliver Schmidt -->
 <script setup lang="ts">
+import { EDITION } from '@shared/edition'
 // Models and LoRAs: what is installed, what is recommended, and adding more from Hugging Face, Civitai or disk.
 // Nothing is part of the app; every model is downloaded or imported here.
 import { computed, nextTick, onActivated, onBeforeUnmount, reactive, ref, watch } from 'vue'
@@ -573,7 +574,8 @@ async function startImport(force = false): Promise<void> {
           <input v-if="add.source === 'hf'" v-model="add.file" type="text" :placeholder="t('models.add.fileInRepo')" spellcheck="false" @input="reset" />
           <div class="line">
             <input v-model="add.name" type="text" :placeholder="t('models.add.name')" spellcheck="false" />
-            <select v-model="add.quant" :title="t('models.add.quantHint')" @change="reset">
+            <!-- the Intel build stores and runs 16 bit only (no optimum-quanto) -->
+            <select v-if="EDITION.arch === 'arm64'" v-model="add.quant" :title="t('models.add.quantHint')" @change="reset">
               <option value="auto">{{ t('models.add.compressWhenNeeded') }}</option>
               <option value="none">{{ t('models.add.doNotCompress') }}</option>
               <option value="q8">{{ t('models.add.bit8') }}</option>

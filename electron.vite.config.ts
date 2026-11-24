@@ -20,19 +20,24 @@ function buildLabel(): string {
   return hash ? `${hash}${git('status --porcelain --untracked-files=no -- .') ? '+' : ''} ${at}` : at
 }
 
+// the processor the app is built for: VK_ARCH=x64 makes the Intel-Mac build (src/shared/edition.ts)
+const ARCH = { __VK_ARCH__: JSON.stringify(process.env.VK_ARCH === 'x64' ? 'x64' : 'arm64') }
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
-    define: { __VK_BUILD__: JSON.stringify(buildLabel()) },
+    define: { __VK_BUILD__: JSON.stringify(buildLabel()), ...ARCH },
     resolve: { alias: { '@shared': resolve('src/shared') } },
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
+    define: ARCH,
     resolve: { alias: { '@shared': resolve('src/shared') } },
     // a sandboxed preload script has to be CommonJS
     build: { rollupOptions: { output: { format: 'cjs', entryFileNames: '[name].cjs' } } },
   },
   renderer: {
+    define: ARCH,
     plugins: [
       vue(),
       // the development server's live reload needs a websocket; the built pages connect to nothing of the kind

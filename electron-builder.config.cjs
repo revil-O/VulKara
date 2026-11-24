@@ -37,7 +37,8 @@ module.exports = {
     grantFileProtocolExtraPrivileges: false,
   },
   mac: {
-    target: [{ target: 'dmg', arch: ['arm64'] }],
+    // VK_ARCH=x64: the Intel-Mac build (src/shared/edition.ts)
+    target: [{ target: 'dmg', arch: [process.env.VK_ARCH === 'x64' ? 'x64' : 'arm64'] }],
     category: 'public.app-category.graphics-design',
     icon: 'build/icon.icns',
     minimumSystemVersion: '14.0',  // torch, mlx and onnxruntime of the runtimes have wheels from macOS 14 on

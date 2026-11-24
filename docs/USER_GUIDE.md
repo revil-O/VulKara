@@ -87,6 +87,13 @@ choice as **Settings → Appearance → Language**.
 32 GB or more for the large FLUX models), and free space on the SSD for the runtimes (about 1–1.5 GB each) and for
 the models (2–35 GB each).
 
+**Intel Macs** get a build of their own (`VulKara-<version>-x64.dmg`, also macOS 14 or newer). It runs SD 1.x, SD 2.x
+and SDXL on the processor, without a GPU (SD 1.5 at 512 px: about 15–17 s per step on a 2017 MacBook Pro with 8 GB);
+MLX, ComfyUI, training and newer models such as FLUX, Chroma or Z-Image are not available there. Its PyTorch 2.2.2 is
+the last one for Intel Macs and has known vulnerabilities that can not be fixed: the Intel build therefore reads no
+PyTorch pickle files (`.ckpt`, `.pt`, `.pth`, `.bin`), only `.safetensors` and `.gguf`, runs no code that comes with a
+model and refuses a model folder that holds Python files. Use models from sources you trust.
+
 ## 2. The window
 
 | Part | What it does |
