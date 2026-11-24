@@ -8,6 +8,7 @@ import { useAssetsStore } from '../stores/assets'
 import { useImportsStore } from '../stores/imports'
 import { cleanError } from '../stores/runtimes'
 import { useSettingsStore } from '../stores/settings'
+import { curatedHits } from '../util/curated'
 import { openLink } from '../util/links'
 import { BASE_GROUPS, isInstalled, loraBase, type FindKind, type LoraHit } from '@shared/lora_bases'
 import type { ImportInfo, ImportJob, ImportRequest } from '@shared/api'
@@ -69,6 +70,12 @@ async function search(more = false): Promise<void> {
   try {
     const page = await window.vk.loras.search({ base: base.value, source: source.value, kind: props.kind, query: query.value, cursor: more ? cursor.value : undefined })
     if (id !== run) return
+    // models of the recommended list the search names come first, however the site's own search spells them
+    if (!more && props.kind === 'model' && base.value === 'all') {
+      const rec = curatedHits(query.value, source.value, settings.values.allowExplicit)
+      const refs = new Set(rec.map((h) => h.ref))
+      page.hits = [...rec, ...page.hits.filter((h) => !refs.has(h.ref))]
+    }
     const known = new Set(hits.value.map(key))
     hits.value = [...hits.value, ...page.hits.filter((h) => !known.has(key(h)))]
     cursor.value = page.cursor
@@ -216,6 +223,7 @@ function close(): void {
             </div>
             <div class="body">
               <strong class="selectable">{{ h.title }}</strong>
+              <span v-if="h.recommended" class="tag rec">{{ t('models.tabs.recommended') }}</span>
               <p class="dim">
                 <template v-if="h.author">{{ t('lora.finder.by', { author: h.author }) }}</template><template v-if="h.version"> · {{ h.version }}</template>
               </p>
@@ -444,6 +452,10 @@ header {
   overflow: hidden;
 }
 
+.tag.rec {
+  align-self: flex-start;
+  color: var(--accent);
+}
 .tag.stream {
   display: inline-flex;
   align-items: center;

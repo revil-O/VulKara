@@ -6,9 +6,9 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 const dir = mkdtempSync(join(tmpdir(), 'vk-settings-'))
-vi.mock('electron', () => ({ app: { getPath: () => dir } }))
+vi.mock('electron', () => ({ app: { getPath: () => dir, isPackaged: false, getAppPath: () => dir } }))
 
-const { getSettings, isValidSetting, setSetting, settableByPage } = await import('./settings')
+const { engineEnv, getSettings, isValidSetting, setSetting, settableByPage } = await import('./settings')
 
 describe('settings', () => {
   it('takes only the settings there are, with values they can have', () => {
@@ -39,5 +39,10 @@ describe('settings', () => {
     expect(settableByPage('remoteToken', 'mine')).toBe(false)
     expect(isValidSetting('remotePort', 80)).toBe(false)  // below 1024: a port that needs root
     expect(isValidSetting('remotePort', 8787)).toBe(true)
+  })
+
+  it('sends mflux\'s own downloads to the helpers folder', () => {
+    setSetting('helpersDir', join(dir, 'helpers'))
+    expect(engineEnv().MFLUX_CACHE_DIR).toBe(join(dir, 'helpers', 'mflux'))
   })
 })

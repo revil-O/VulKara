@@ -1,5 +1,128 @@
 # Changelog
 
+## 0.10.0 – 2026-11-24
+
+- **Installs count free space like the Finder.** The 50 GB rule for model, LoRA and helper installs and the space
+  checks of an import now count purgeable space as well (local Time Machine snapshots, caches), which macOS frees for
+  a download the user asked for (Apple's "important usage" figure). Before, a Mac whose Finder showed 142 GB free was
+  refused with "only 44 GB free". Caches the app writes on its own keep the stricter figure.
+- **A pasted access token is checked.** Settings → Access tokens takes only the token of what was pasted ("Bearer ",
+  "HF_TOKEN=", quotes go) and refuses what is no Hugging Face token with a message, instead of storing it: a token
+  pasted together with more text was stored, and Hugging Face refused every gated download with 401. A saved token
+  (Hugging Face, Civitai) is then checked online and marked accepted or refused.
+- **The model finder finds the recommended models and more of Hugging Face.** Models of the recommended list that a
+  search names come first, marked Recommended. "sd 3.5 large" also asks Hugging Face for "stable diffusion 3.5
+  large", which its search needs. Repositories of GGUF files (FLUX.1 [schnell] in 4 bit) and the MLX runtime's
+  repositories (mflux, LTX-2.3, FLUX 3 Klein) are listed; a VAE or text encoder file is no longer offered as the model.
+- **The recommended list keeps only models measured on a Mac mini M4 with 16 GB.** Each one made five pictures there
+  within 10 % of its memory plan and with at most 2 GB of swap. Ten models leave the list: epiCRealism XL v8,
+  MoP Mix (asap), MiaoMiao RealSkin, FLUX.1 [dev] (16 and 4 bit), Chroma1-HD (about 39 minutes per picture),
+  and Wan 2.2 I2V 14B, Wan 2.2 TI2V 5B, FLUX 3 Image Klein in 16 bit and Fibo 2.0 Edit Turbo for ComfyUI (they need
+  more than 16 GB). Installed copies stay, and all of them can still be imported by name.
+- **The memory plan of SD 2.x models matches what they use.** SD 2.1 at 768 px took 5.8 GB in every picture on a
+  Mac mini M4, the plan reckoned 4.1 GB; it now reckons 5.8 GB (9 GB of memory for SD 2.1 in the recommended list).
+  Loading uses the new plan at once; the memory shown for a model imported before changes when it is imported again.
+- **SD 3.5 Large is streamed on 16 GB Macs instead of held in 8 bit.** Held in 8 bit it left 0.4 GB of the memory
+  budget on a Mac mini M4 with 16 GB and swapped 5 GB at every load; its 16-bit transformer streamed from the SSD
+  swaps none at nearly the same speed (21.7 instead of 21.1 s per step) and in full quality. It reads about 320 GB
+  from the SSD per picture, which a slow external disk feels. Macs with more memory keep the 8-bit plan.
+- **Chroma is streamed on small Macs instead of shrunk to 4 bit.** On a Mac mini M4 with 16 GB the plan held
+  Chroma's transformer in 4 bit: Chroma1-Flash then painted coarse coloured noise, and loading Chroma1-HD swapped
+  4.4 GB. Its 16-bit transformer is now streamed from the SSD: clean pictures without swap and even a little faster
+  (Flash 320–352 s per picture at 1024 px instead of 344–539 s); Chroma1-Flash stays in the recommended list.
+- **SD 1.x and 2.x models in 32 bit are saved in 16 bit once.** Realistic Vision 5.1, Counterfeit V2.5, DucHaiten
+  AIart and ReV Animated come in 32 bit (4–5 GB); the app ran them in 16 bit anyway and converted them while the
+  first picture loaded, 20–29 % over the memory plan. They are now saved in 16 bit at the import, or at their first
+  use when imported before: half the disk space. A folder of your own that the app uses in place stays untouched.
+- **A checkpoint with a merged LoRA's leftovers is imported as a model.** GhostMix v2 from the recommended list (a
+  full SD 1.5 checkpoint that still holds 216 tensors of a LoRA merged into it) was filed under LoRAs as a 2.4 GB
+  "LoRA" and could not be used as a model. A file now counts as a LoRA only when most of its tensors are LoRA tensors.
+  Such a "LoRA" already installed is moved to the trash once at the next start; import GhostMix again from the
+  recommended list.
+- **A refused Hugging Face token is named as such.** When Hugging Face refuses a gated model although an access token
+  is stored, the import now says that the token was refused (accept the licence with the same account, use a token
+  that may read gated repositories) instead of asking to store a token. The import's log notes whether a token was
+  given, never the token.
+- **SDXL checkpoint files become Diffusers folders.** A single SDXL file (most Civitai checkpoints) is turned into a
+  Diffusers folder once, at import or, for one imported before, when it is first loaded (about a minute; the folder
+  takes 6.5 GB instead of the file's 6.9). Moving a model from the file to the GPU added 1.2–2.8 GB swap on the 16 GB
+  Mac mini, from the folder 0.6–2.3 GB (seven models, 2.06 GB on average before, 1.53 after; MEASUREMENTS 7cr); the
+  pictures stay the same. The file is removed only once the folder is written and checked; when the disk has no room
+  for it (the file's size and 5 GB to spare), or the conversion fails, the model stays as it was; one stopped halfway is
+  done again at the next load. A link to the user's own file is removed, the file itself
+  stays. Such models can now also be exported like other folder models.
+- **Four SDXL models in the recommended list, measured on a Mac mini M4 with 16 GB.** Juggernaut XL v9 (photos,
+  from Hugging Face, so no Civitai token any more; it takes the place of v7), RealVisXL V5.0 (photos), Animagine XL 4.0
+  and NoobAI-XL 1.1 (anime, prompts as Danbooru tags). Each about 8.8 GB at 1024 px, 102-235 s per picture with the
+  maker's settings and at most 1.2 GB of swap added (MEASUREMENTS 7cq). Licences: CreativeML Open RAIL-M / RAIL++-M,
+  NoobAI under the Fair AI Public License 1.0-SD; pictures of all four may be used commercially.
+- **The maker's settings are read from tables too.** A model card that lists its settings in a Markdown table
+  (Juggernaut XL v9: Steps 30–40, CFG 3–7) gave 15 steps, taken from the row of the hires fix; it now gives 35 steps
+  and CFG 5, and the hires fix is left out also when its line says "Hi-Res". A guidance marked as recommended inside a
+  range ("CFG 4-7 (5 Recommended)", Animagine XL 4.0) is taken as it is instead of the middle of the range. Models
+  imported before keep their settings; to take the new ones, remove the model and import it again.
+- **Prompt helpers count as downloaded only when complete.** The FLUX 3 prompt upsampler, ERNIE-Image's prompt
+  enhancer and Qwen3-VL (prompt from a picture) showed as there once half of their files were on the disk, so the
+  download button went away during a download and a job then said they were missing. Now only the mark the download
+  writes when every file is checked counts, for the revision pinned now (as for RORem and ObjectClear).
+- **Video with sound: LTX-2.3.** The Video page (until now *Image to video*) gets Lightricks' LTX-2.3 on the MLX
+  runtime: a 1–5 s clip at 24 fps with a sound track, from the prompt alone or from a start picture (*With sound* off
+  makes it silent). It runs ltx-2-mlx (dgrauet, MIT; pinned commit, installed into the MLX runtime with a content
+  check, it is not on PyPI) in its distilled two-stage path, from dgrauet's 4 bit MLX files (20.5 GB, Models →
+  Recommended); Gemma 3 12B reads the prompt as a helper model (8.1 GB, pinned and checked, downloaded with the button
+  next to Generate). Gemma and its connector are loaded one after the other and the transformer streams from the
+  mapped file, so a clip needs 8 GB at most (14.4 GB with ltx-2-mlx's own command); the video is written with Apple's
+  H.264 encoder through PyAV (no ffmpeg program needed), with the AI notice in its metadata; a failed encode leaves no
+  half-written file in the pictures folder. On the 16 GB Mac mini two
+  seconds at 896 × 512 took about 5 minutes, five seconds about 10, at 8 to 9.6 GB. Steps and guidance are fixed for
+  it, so their sliders are hidden. The MLX engine and trainer now start with `AGX_RELAX_CDM_CTXSTORE_TIMEOUT=1`, the
+  MLX maintainers' remedy for macOS stopping long GPU work while the display is in use (two LTX-2.3 clips failed that
+  way in the test). LTX-2 Community License: free below US$10 million yearly revenue.
+- **LoRA training for ERNIE-Image.** Training takes ERNIE-Image Turbo and ERNIE-Image (Base) as the model to train on
+  (MLX runtime, mflux, both Apache-2.0, no helper adapter), in 4 bit on 16 GB and in 8 bit from 24 GB. On the 16 GB
+  Mac mini 100 steps at 512 px took 37 min (about 21 s per step) at a peak of 11 GB; the LoRA works on MLX.
+- **LoRA training for Z-Image.** Training takes Z-Image Turbo and Z-Image (Base) as the model to train on (MLX runtime,
+  mflux). For Turbo a helper adapter (ostris' `zimage_turbo_training_adapter` v2, Apache-2.0, 0.3 GB) is downloaded
+  once into the helpers folder, pinned to its revision and checked against its SHA-256; it keeps Turbo's few steps for
+  a short run, and a note says so (a **!** above *Standard*). The base is trained in 4 bit on 16 GB and in 8 bit from
+  24 GB, from measured memory instead of the general estimate. On the 16 GB Mac mini 100 steps at 512 px took 31 min
+  (about 17 s per step) at a peak of 10 GB without swap; the LoRA works on MLX and on Diffusers.
+- **mflux keeps its downloads in the helpers folder.** The MLX engine and the trainer point mflux's cache
+  (`MFLUX_CACHE_DIR`) to the helpers folder; before, mflux put its own downloads (training adapters, small encoder
+  files) into `~/Library/Caches/mflux` on the internal disk.
+- **LoRA training needs less memory on Macs below 32 GB.** The MLX trainer (FLUX.2 [klein], Krea 2) bounds MLX's
+  buffer cache: on the 16 GB Mac mini klein 4B trains at the same 15 s per step with a peak of 8.4 GB instead of
+  11.5 GB, and the swap no longer grows.
+- **Several pictures at once on Enhance and Restore.** *Several pictures …* in the empty picture field (or more than
+  one picture dropped onto it) makes a batch of up to 100 pictures, also every picture of a chosen folder; the page's
+  settings count for each, *Apply to all* queues one job per picture, *Cancel the rest* takes out the waiting ones.
+  A picture a tool can not take fails on its own, the rest goes on. Not in a batch: Select objects (clicks on each
+  picture), a painted mask and Restore's preview. On the 16 GB Mac mini: Denoise 12 pictures in 66 s, Remove
+  background with Apple Vision 13 in 6 s, Restore with the AI repair 6 pictures with the model loaded once (153 s for
+  the first, about 120 s for the others).
+- **Broken downloads go on where they stopped.** Photo tools and their variants (SeedVR2's 7.3 GB among them), the
+  helpers from GitHub and models and LoRAs from Civitai keep what was downloaded when the connection breaks, the job
+  is stopped or the app quits; the next try asks only for the rest (an HTTP range) and checks the whole file against
+  its SHA-256 as before. Short network failures are tried again a few times with a growing pause. A part of an older
+  version of a file is never continued, and a Civitai file without a checksum still starts over. Downloads from
+  Hugging Face are left to its own library, which repeats short failures itself but starts over after a stop. Tested
+  on the Mac mini: the SeedVR2 VAE stopped at 136 MB went on from there and passed its checksum.
+- **Remove background: Apple Vision (fast).** A second character for Enhance → Remove background uses the subject
+  finder built into macOS (the helper Select subject already uses): about 0.2 s instead of 5 s and 0.2 GB instead of
+  about 9 GB, nothing to download. With one clear subject it cuts as well as BiRefNet (a slightly softer edge); with
+  several things it keeps everything in the foreground where BiRefNet takes the most striking one; in a picture
+  without a clear subject it finds nothing and says to take Standard (MEASUREMENTS 7cm). BiRefNet stays the standard.
+- **Upscale ×4: Detailed (AI, very slow).** A third character under Enhance → Upscale ×4 uses SeedVR2-3B by
+  ByteDance Seed (Apache-2.0, 7.3 GB, downloaded on first use), run by the MLX runtime that mflux already brings: it
+  rebuilds faces, foliage and fine structure clearly better than SwinIR and Natural, but it invents detail (new
+  lettering on number plates, extra windows), so a **!** beside Character warns, and it is not meant for documents,
+  text or evidence. With mflux's memory saver it needs at most 11.3 GB on a 16 GB Mac (the same picture as without
+  it); a 512 px photo becomes 1024 px in about 40 s and 2048 px in about 2 minutes, and the result is at most 2048 px
+  on the longer side. A picture model loaded before is freed while it runs (MEASUREMENTS 7cl). Long choices on the
+  Enhance page now break into two lines instead of running over their tile.
+- **The message for a model that can not paint into a mask** now names FLUX.2 [klein] among the models that
+  can.
+
 ## 0.9.0 – 2026-11-14
 
 - **Security update: Electron 44.11.3.** From 44.10.2: Electron's backported fixes from Chromium, V8, ANGLE, Dawn, Skia,

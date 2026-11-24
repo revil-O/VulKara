@@ -42,6 +42,8 @@ export interface GenerateForm {
   /** video: length in seconds and the shorter side */
   videoSeconds: number
   videoResolution: VideoResolution
+  /** video with sound (models that make it: takesSound) */
+  videoSound: boolean
   /** illusion: how strongly the hidden pattern shows through */
   patternStrength: number
   /** control picture: its kind ('' for none), the file, whether it is a photo to prepare first, its weight */
@@ -110,7 +112,7 @@ export function emptyForm(mode: Mode): GenerateForm {
   return {
     prompt: '', negativePrompt: '', style: '', modelId: '', width: 512, height: 512, steps: 25, guidance: 7, seed: null, count: 1,
     sampler: 'Default', sigmaSchedule: 'Default', loras: [], strength: mode === 'inpaint' ? 1 : 0.6, inputImage: '', references: [], customSize: false,
-    videoSeconds: 2, videoResolution: '480p', patternStrength: 1.1,
+    videoSeconds: 2, videoResolution: '480p', videoSound: true, patternStrength: 1.1,
     controlType: '', controlImage: '', controlPreprocess: true, controlWeight: 1, upsample: true, keepPicture: false, faceDetail: false, faceDetailStrength: 0.4, fast: false,
     inpaintAction: 'repaint', removeMethod: 'auto', aiLabel: false, aiLabelSize: 'medium', aiLabelIcon: 'auto', aiLabelTone: 'auto', aiLabelSubtle: false,
   }
@@ -209,7 +211,9 @@ export function formProblem(mode: Mode, form: GenerateForm, model: Asset | undef
   if (!model) return t('generate.problem.chooseModel')
   // a model the app recognised but can not run yet (manifest field unsupported) says so before anything is sent
   if (model.meta.unsupported) return model.meta.unsupported
-  if (MODES[mode].input && !form.inputImage) return mode === 'video' ? t('generate.problem.chooseStartPicture') : t('generate.problem.choosePicture')
+  const textToVideo = mode === 'video' && takesTextToVideo(model.meta)
+  if (MODES[mode].input && !form.inputImage && !textToVideo) return mode === 'video' ? t('generate.problem.chooseStartPicture') : t('generate.problem.choosePicture')
+  if (textToVideo && !form.prompt.trim()) return t('generate.problem.describeVideo')
   if (MODES[mode].mask && !hasMask) return t('generate.problem.paintMask')
   if (MODES[mode].promptNeeded && !form.prompt.trim()) return t('generate.problem.describe')
   if (MODES[mode].control && form.controlType && !form.controlImage) return t('generate.problem.chooseControl')
@@ -248,6 +252,14 @@ export const takesFaceDetail = (meta: Asset['meta'] | undefined): boolean =>
 export const takesUpsampler = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'flux3_klein' || meta?.arch === 'ernie_image'
 
 /** The helper model that writes the caption for a model (Models → Helper models). */
+/** Video models that also start from the prompt alone, the start picture optional (LTX-2.3). */
+export const takesTextToVideo = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'ltx23'
+/** Models whose steps and guidance are fixed (LTX-2.3's distilled 8 + 3 steps without guidance): no sliders. */
+export const fixedSampling = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'ltx23'
+/** Models that make a video with sound (LTX-2.3). */
+export const takesSound = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'ltx23'
+/** The helper model a model needs before it can run (LTX-2.3's text encoder), '' for none. */
+export const requiredHelper = (meta: Asset['meta'] | undefined): string => (meta?.arch === 'ltx23' ? 'ltx23_gemma' : '')
 export const upsamplerHelper = (meta: Asset['meta'] | undefined): string => (meta?.arch === 'ernie_image' ? 'ernie_pe' : 'flux3_pup')
 
 /** Fibo 2.0 edits the input picture together with further ones (<image_2> …), on Image to image. */
@@ -282,7 +294,8 @@ export function buildJob(mode: Mode, form: GenerateForm, model: Asset, loras: As
   if (mode === 'video') {
     job.inputImage = form.inputImage
     job.videoSeconds = form.videoSeconds
-    ;[job.width, job.height] = videoSize(opts.inputSize, form.videoResolution)
+    if (!form.videoSound && takesSound(model.meta)) job.videoMute = true
+    ;[job.width, job.height] = videoSize(form.inputImage ? opts.inputSize : undefined, form.videoResolution)
   } else if (mode === 'illusion') {
     if (model.meta.family === 'sd1') {
       const f = Math.min(1, SD1_ILLUSION_MAX / Math.max(form.width, form.height))
@@ -355,6 +368,7 @@ export function applyJob(form: GenerateForm, job: Job, models: Asset[], loras: A
   // a method this build does not offer (ObjectClear in a build with commercially usable models only) falls back to Auto
   if (job.removeObject) form.removeMethod = removeMethods().some((m) => m.id === job.removeObject!.method) ? job.removeObject.method : 'auto'
   if (job.videoSeconds) form.videoSeconds = job.videoSeconds
+  form.videoSound = !job.videoMute
   if (job.controlnet?.type === 'Illusion') {
     form.patternStrength = job.controlnet.weight
   } else if (job.controlnet) {

@@ -5,7 +5,7 @@ import { ALL_BASES, BASE_GROUPS, LORA_BASES, loraBase } from '@shared/lora_bases
 import type { Asset } from '@shared/types'
 import {
   allowedHost, civitaiThumb, civitaiUrl, clearSearchCache, decodeCursor, encodeCursor, hfNextCursor, hfUrl, parseCivitai,
-  parseHf, pickLoraFile, pickModelFile, previewPicture, readLimited, searchLoras, type FetchLike,
+  parseHf, pickLoraFile, pickModelFile, previewPicture, readLimited, searchLoras, spellSd, type FetchLike,
 } from './lora_search'
 
 const sdxl = loraBase('sdxl')!
@@ -240,6 +240,45 @@ describe('models', () => {
       hfModel('a/adapter', { tags: ['IP-Adapter'], siblings: [{ rfilename: 'model_index.json' }] }),
     ], sdxl, true, [], 'model')
     expect(hits.map((h) => [h.ref, h.file])).toEqual([['a/whole', undefined], ['a/single', 'single.safetensors']])
+  })
+
+  it('offers GGUF checkpoints (Q4_K_S first) and never a VAE or text encoder as the model', () => {
+    // city96/FLUX.1-schnell-gguf: the recommended FLUX.1 [schnell] 4 bit
+    expect(pickModelFile(['README.md', 'flux1-schnell-F16.gguf', 'flux1-schnell-Q4_K_S.gguf', 'flux1-schnell-Q8_0.gguf']))
+      .toEqual({ file: 'flux1-schnell-Q4_K_S.gguf', files: ['flux1-schnell-F16.gguf', 'flux1-schnell-Q4_K_S.gguf', 'flux1-schnell-Q8_0.gguf'] })
+    // second-state/FLUX.1-schnell-GGUF: ae.safetensors (the VAE) was offered as the model
+    expect(pickModelFile(['ae.safetensors', 'clip_l-Q8_0.gguf', 't5xxl-Q4_K_M.gguf', 'flux1-schnell-Q4_0.gguf'])?.file)
+      .toBe('flux1-schnell-Q4_0.gguf')
+    expect(pickModelFile(['clip_g.safetensors', 'clip_l.safetensors', 't5xxl_fp16.safetensors'])).toBeNull()
+    // a checkpoint with its VAE baked in keeps its name
+    expect(pickModelFile(['dreamshaper_8_vae.safetensors'])?.file).toBe('dreamshaper_8_vae.safetensors')
+  })
+
+  it('takes the repositories of the MLX runtime whole', () => {
+    expect(pickModelFile(['README.md', 'mflux_model.json', 'transformer/0.safetensors'], ['mflux', 'mlx'])).toEqual({})  // Fibo 2.0
+    expect(pickModelFile(['split_model.json', 'config.json', 'connector.safetensors'], ['mlx'])).toEqual({})  // LTX-2.3
+    expect(pickModelFile(['config.json', 'LICENSE.md', 'transformer/model.safetensors'], ['mlx'])).toEqual({})  // FLUX 3 Klein
+    // config.json alone (no MLX repository): not a model the import reads
+    expect(pickModelFile(['config.json', 'README.md'])).toBeNull()
+    // an mflux FLUX.1 save (manifest.json): the import does not read it
+    expect(pickModelFile(['manifest.json', 'transformer/0.safetensors'], ['mflux', 'mlx'])).toBeNull()
+  })
+
+  it('also asks Hugging Face with "sd" written out, those hits first', async () => {
+    expect(spellSd('sd 3.5 large')).toBe('stable diffusion 3.5 large')
+    expect(spellSd('SD3.5 Large')).toBe('stable diffusion 3.5 Large')
+    expect(spellSd('sdxl turbo')).toBeUndefined()
+    expect(spellSd('castle')).toBeUndefined()
+    const asked: string[] = []
+    const fetcher: FetchLike = async (url) => {
+      const q = new URL(url).searchParams.get('search')!
+      asked.push(q)
+      const id = q.startsWith('stable') ? 'stabilityai/stable-diffusion-3.5-large' : 'calcuis/sd3.5-large'
+      return response([hfModel(id, { tags: [], siblings: [{ rfilename: 'model_index.json' }] })], { url })
+    }
+    const page = await searchLoras({ base: 'all', source: 'hf', kind: 'model', query: 'sd 3.5 large' }, { fetcher, safe: true, assets: [] })
+    expect(page.hits.map((h) => h.ref)).toEqual(['stabilityai/stable-diffusion-3.5-large', 'calcuis/sd3.5-large'])
+    expect(asked).toEqual(['sd 3.5 large', 'stable diffusion 3.5 large'])
   })
 
   it('keeps model and LoRA answers apart', async () => {

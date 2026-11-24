@@ -125,6 +125,8 @@ export function engineEnv(): Record<string, string> {
     TRANSFORMERS_VERBOSITY: 'error', DIFFUSERS_VERBOSITY: 'error', PYTHONWARNINGS: 'ignore',
     // compiled Python files go to the data folder, never into the signed app
     PYTHONPYCACHEPREFIX: join(dataDir(), 'pycache'),
+    // mflux's own downloads (training adapters, small encoders) go to the helpers, not ~/Library/Caches (7cn)
+    MFLUX_CACHE_DIR: join(helpersDir(), 'mflux'),
   }
   if (s.hashLookups) env.VK_HASH_LOOKUPS = '1'
   if (!s.allowExplicit) env.VK_SAFE_MODE = '1'

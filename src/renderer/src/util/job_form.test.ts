@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
 import { describe, expect, it } from 'vitest'
-import { TURBO, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, buildRemoveJob, emptyForm, removeHelper, removeMethods, keepsPicture, takesFaceDetail, formPage, formProblem, lorasFor, modelsFor, takesTurbo, takesUpsampler, upsamplerHelper, type RemoveMethod } from './job_form'
+import { TURBO, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, buildRemoveJob, emptyForm, removeHelper, removeMethods, keepsPicture, takesFaceDetail, formPage, formProblem, lorasFor, modelsFor, takesTurbo, takesUpsampler, upsamplerHelper, takesSound, takesTextToVideo, requiredHelper, fixedSampling, type RemoveMethod } from './job_form'
 import type { Asset, ModelMeta } from '@shared/types'
 import { EDITION } from '@shared/edition'
 
@@ -243,6 +243,26 @@ describe('generate form', () => {
     expect(job).toMatchObject({ page: 'video', inputImage: '/in.png', videoSeconds: 3, width: 480, height: 864, steps: 4 })
     expect(job.style).toBeUndefined()
     expect(job.strength).toBeUndefined()
+  })
+
+  it('builds an LTX-2.3 video from the prompt alone or a start picture, with or without sound', () => {
+    const ltx = model('ltx', { arch: 'ltx23', family: 'ltx', runtime: 'mlx', kind: 'video', negativePrompt: false, defaults: { num_steps: 11, guidance_scale: 1, width: 768, height: 512 } })
+    const wan = model('wan', { kind: 'video', family: 'wan' })
+    expect([takesTextToVideo(ltx.meta), takesTextToVideo(wan.meta), takesSound(ltx.meta), takesSound(wan.meta)]).toEqual([true, false, true, false])
+    expect([fixedSampling(ltx.meta), fixedSampling(wan.meta)]).toEqual([true, false])
+    expect([requiredHelper(ltx.meta), requiredHelper(wan.meta)]).toEqual(['ltx23_gemma', ''])
+    const form = { ...emptyForm('video'), prompt: 'a fox trots through snow' }
+    applyModel(form, ltx, [])
+    expect(formProblem('video', form, ltx, false)).toBe('')  // no start picture needed
+    expect(formProblem('video', { ...form, prompt: ' ' }, ltx, false)).toMatch(/Describe the video/)
+    expect(formProblem('video', form, wan, false)).toMatch(/starts with/)  // Wan still starts from a picture
+    const job = buildJob('video', form, ltx, [], { inputSize: [1024, 1024] })  // a size left from a removed picture
+    expect([job.width, job.height, job.videoMute]).toEqual([864, 480, undefined])
+    expect(buildJob('video', { ...form, videoSound: false }, ltx, []).videoMute).toBe(true)
+    expect(buildJob('video', { ...form, videoSound: false }, wan, []).videoMute).toBeUndefined()  // Wan has no sound
+    const back = emptyForm('video')
+    applyJob(back, { ...job, id: '9', videoMute: true }, [ltx], [])
+    expect(back.videoSound).toBe(false)
   })
 
   it('builds an illusion job with the pattern as control picture', () => {

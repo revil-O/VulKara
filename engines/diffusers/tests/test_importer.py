@@ -120,6 +120,7 @@ def test_installs_need_50_gb_free_on_the_models_disk(tmp_path, monkeypatch):
     import pytest
     import importer
     monkeypatch.setattr(importer, "MIN_INSTALL_FREE_GB", 50.0)
+    monkeypatch.setattr(importer, "_important_free", lambda folder: None)  # macOS gives no figure: shutil's counts
     usage = collections.namedtuple("usage", "total used free")
     monkeypatch.setattr(shutil, "disk_usage", lambda p: usage(0, 0, 49 * 1024 ** 3))
     with pytest.raises(importer.NotEnoughSpace, match="Only 49 GB free"):
@@ -127,6 +128,27 @@ def test_installs_need_50_gb_free_on_the_models_disk(tmp_path, monkeypatch):
     # 50 GB free is enough
     monkeypatch.setattr(shutil, "disk_usage", lambda p: usage(0, 0, 50 * 1024 ** 3))
     importer.ensure_install_room(str(tmp_path))
+
+
+def test_purgeable_space_counts_for_installs(tmp_path, monkeypatch):
+    # Intel Mac 2026-11-23: 44 GB free by statfs, 142 GB by the Finder (local Time Machine snapshots)
+    import collections
+    import shutil
+    import importer
+    monkeypatch.setattr(importer, "MIN_INSTALL_FREE_GB", 50.0)
+    usage = collections.namedtuple("usage", "total used free")
+    monkeypatch.setattr(shutil, "disk_usage", lambda p: usage(0, 0, 44 * 1024 ** 3))
+    monkeypatch.setattr(importer, "_important_free", lambda folder: 142 * 1024 ** 3)
+    importer.ensure_install_room(str(tmp_path))
+    assert importer.free_bytes(str(tmp_path)) == 142 * 1024 ** 3
+
+
+def test_macos_answers_the_important_free_space(tmp_path):
+    import shutil
+    import importer
+    got = importer._important_free(str(tmp_path))
+    assert isinstance(got, int) and got > 0
+    assert importer.free_bytes(str(tmp_path)) >= shutil.disk_usage(str(tmp_path)).free - 1024 ** 3
 
 
 def test_an_mflux_repository_downloads_only_what_mflux_reads():
@@ -139,3 +161,23 @@ def test_an_mflux_repository_downloads_only_what_mflux_reads():
         ["model_index.json", "transformer/0.safetensors", "text_encoder/config.json", "text_encoder/LICENSE",
          "tokenizer/tokenizer.json", "tokenizer/chat_template.jinja", "fonts/DejaVuSans.ttf",
          "fonts/Aileron-Regular.otf", "fonts/LICENSE-DejaVu.txt", "LICENSE.md", "NOTICE.md"])
+
+
+def test_a_gated_refusal_with_a_token_is_reported_as_the_token(monkeypatch):
+    import pytest
+    GatedRepoError = type("GatedRepoError", (Exception,), {})
+    sent = []
+
+    def refuse(*a, **kw):
+        raise GatedRepoError("401 Client Error.")
+
+    monkeypatch.setattr(importer, "run_import", refuse)
+    monkeypatch.setattr(importer, "emit", lambda tag, payload: sent.append(payload["code"]))
+    for token, code in (("hf_x", "TokenRejected"), (None, "GatedRepoError")):
+        if token:
+            monkeypatch.setenv("HF_TOKEN", token)
+        else:
+            monkeypatch.delenv("HF_TOKEN", raising=False)
+        with pytest.raises(GatedRepoError):
+            importer.main(["--source", "hf", "--ref", "black-forest-labs/FLUX.1-schnell"])
+        assert sent[-1] == code

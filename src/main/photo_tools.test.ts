@@ -29,7 +29,13 @@ describe('photo tools', () => {
     const scunet = recommended.find((t) => t.id === 'scunet-real')
     expect(scunet).toMatchObject({ defaultLabel: 'Natural', quality: false })
     expect(scunet?.variants).toEqual([expect.objectContaining({ id: 'sharp', label: 'Sharp', sizeMb: 72 })])
-    expect(recommended.find((t) => t.id === 'swinir-real-x4')?.variants).toEqual([expect.objectContaining({ id: 'natural', label: 'Natural (slow)', sizeMb: 140 })])
+    // Apple Vision: no download, so no size
+    expect(recommended.find((t) => t.id === 'birefnet-lite')?.variants).toEqual([expect.objectContaining({ id: 'vision', label: 'Apple Vision (fast)', sizeMb: 0 })])
+    expect(recommended.find((t) => t.id === 'swinir-real-x4')?.variants).toEqual([
+      expect.objectContaining({ id: 'natural', label: 'Natural (slow)', sizeMb: 140, maxOutput: undefined, warning: undefined }),
+      // SeedVR2: its own limit and a warning, both carried to the Enhance page
+      expect.objectContaining({ id: 'detailed', label: 'Detailed (AI, very slow)', sizeMb: 6947, maxOutput: 2048, warning: expect.stringContaining('Invents detail') }),
+    ])
     expect(installedTools(join(tools, 'missing'))).toEqual([])
   })
 })

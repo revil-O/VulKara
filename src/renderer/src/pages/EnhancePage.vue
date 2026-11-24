@@ -12,6 +12,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { Download, Eraser, FileUp, Paintbrush, Play, Scissors, Trash2 } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import ImageInput from '../components/ImageInput.vue'
+import BatchPanel from '../components/BatchPanel.vue'
+import { isRemote } from '../remote_vk'
 import ZoomPan from '../components/ZoomPan.vue'
 import JobGallery from '../components/JobGallery.vue'
 import HintBadge from '../components/HintBadge.vue'
@@ -45,6 +47,7 @@ const variant = ref('default')
 const quality = ref(0)
 // only the exact catalog entry (an older install under another id may work differently, e.g. ONNX)
 const options = computed(() => recommended.value.find((r) => r.id === tool.value?.recommended))
+const chosenVariant = computed(() => options.value?.variants?.find((v) => v.id === variant.value))
 const output = ref<'cutout' | 'mask'>('cutout')
 const error = ref('')
 const jobs = computed(() => queue.ofPage('enhance'))
@@ -126,7 +129,8 @@ const variantInfo = computed(() => {
   const o = options.value
   if (!o?.variants) return ''
   const own = t('edit.enhance.variantOwn', { label: o.defaultLabel ?? t('edit.enhance.standard') })
-  return [own, ...o.variants.map((v) => t('edit.enhance.variantOther', { label: v.label, description: v.description, size: v.sizeMb }))].join(' ')
+  // a variant without a download (Apple Vision) says so instead of "0 MB"
+  return [own, ...o.variants.map((v) => t(v.sizeMb ? 'edit.enhance.variantOther' : 'edit.enhance.variantBuiltIn', { label: v.label, description: v.description, size: v.sizeMb }))].join(' ')
 })
 
 function infoOf(tl: PhotoTool | RecommendedTool): string {
@@ -170,16 +174,22 @@ async function remove(tl: PhotoTool): Promise<void> {
   }
 }
 
-const target = computed((): [number, number] | undefined => {
-  if (!size.value || !tool.value) return size.value
+/** The result's size for a picture of size sz with the chosen tool and settings. */
+function targetOf(sz: [number, number] | undefined): [number, number] | undefined {
+  if (!sz || !tool.value) return sz
   const tl = tool.value
-  if (tl.kind !== 'image' || tl.scale <= 1) return size.value
+  if (tl.kind !== 'image' || tl.scale <= 1) return sz
   // a picture over the tool's limit is made smaller to it first; the result then at most the tool's scale of that
-  const k = tl.maxSide && Math.max(...size.value) > tl.maxSide ? tl.maxSide / Math.max(...size.value) : 1
+  const k = tl.maxSide && Math.max(...sz) > tl.maxSide ? tl.maxSide / Math.max(...sz) : 1
   const most = (v: number): number => Math.round(v * k) * tl.scale
   const want = (v: number): number => Math.round(v * Math.min(factor.value, tl.scale))
-  return [Math.min(want(size.value[0]), most(size.value[0])), Math.min(want(size.value[1]), most(size.value[1]))]
-})
+  const out: [number, number] = [Math.min(want(sz[0]), most(sz[0])), Math.min(want(sz[1]), most(sz[1]))]
+  // a variant with a limit of its own (SeedVR2: 2048 on a 16 GB Mac) makes the result smaller to it, as the engine does
+  const cap = chosenVariant.value?.maxOutput
+  const c = cap && Math.max(...out) > cap ? cap / Math.max(...out) : 1
+  return c < 1 ? [Math.max(1, Math.round(out[0] * c)), Math.max(1, Math.round(out[1] * c))] : out
+}
+const target = computed(() => targetOf(size.value))
 const result = computed(() => (target.value && tool.value ? `${target.value[0]} × ${target.value[1]}` : ''))
 
 async function run(out: 'cutout' | 'mask' = output.value): Promise<void> {
@@ -190,17 +200,29 @@ async function run(out: 'cutout' | 'mask' = output.value): Promise<void> {
   if (tl?.kind !== 'image' && tl?.maxSide && size.value && Math.max(...size.value) > tl.maxSide) error.value = t('edit.enhance.tooLarge', { name: fullName(tl), side: tl.maxSide })
   if (error.value || !tl) return
   try {
-    await queue.add({
-      page: 'enhance', prompt: '', modelId: '', modelDir: '', width: target.value?.[0] ?? 0, height: target.value?.[1] ?? 0, seed: 0,
-      // the label in English, as every label a job keeps (labels.ts shows it in the app's language)
-      inputImage: input.value, label: englishToolName(catalogOf(tl)?.id) ?? fullName(tl),
-      photoTool: { folder: tl.folder, strength: strength.value / 100, factor: tl.scale > 1 ? factor.value : undefined,
-        variant: variant.value !== 'default' ? variant.value : undefined, quality: options.value?.quality && quality.value ? quality.value : undefined, output: out, mask: selection.value?.mask },
-    })
+    await queue.add(jobFor(tl, input.value, size.value, out, selection.value?.mask))
   } catch (err) {
     error.value = cleanError(err)
   }
 }
+
+/** The job of one picture with the page's settings (also each picture of a batch). */
+function jobFor(tl: PhotoTool, path: string, sz: [number, number] | undefined, out: 'cutout' | 'mask', mask?: string): Omit<Job, 'id'> {
+  const to = targetOf(sz)
+  return {
+    page: 'enhance', prompt: '', modelId: '', modelDir: '', width: to?.[0] ?? 0, height: to?.[1] ?? 0, seed: 0,
+    // the label in English, as every label a job keeps (labels.ts shows it in the app's language)
+    inputImage: path, label: englishToolName(catalogOf(tl)?.id) ?? fullName(tl),
+    photoTool: { folder: tl.folder, strength: strength.value / 100, factor: tl.scale > 1 ? factor.value : undefined,
+      variant: variant.value !== 'default' ? variant.value : undefined, quality: options.value?.quality && quality.value ? quality.value : undefined, output: out, mask },
+  }
+}
+
+// a batch: the pictures, and why it can not run with the chosen tool
+const batch = ref<string[]>([])
+const remote = isRemote()
+const batchBlocked = computed(() => !tool.value ? t('edit.enhance.chooseTool') : tool.value.kind === 'segment' ? t('edit.batch.notSelect') : undefined)
+const makeJob = (path: string, sz: [number, number]): Omit<Job, 'id'> => jobFor(tool.value!, path, sz, output.value)
 
 // a click on the picture: left = belongs to it, with ⌥ = does not
 async function click(event: MouseEvent): Promise<void> {
@@ -278,7 +300,9 @@ function open(q: QueuedJob, file: string): void {
 <template>
   <PageFrame :title="t('edit.enhance.title')" :subtitle="t('edit.enhance.subtitle')">
     <div class="page-grid">
-      <ImageInput v-model="input" @size="(w, h) => (size = [w, h])">
+      <BatchPanel v-if="batch.length" v-model="batch" :make="makeJob" :blocked="batchBlocked" />
+      <template v-else>
+      <ImageInput v-model="input" :many="!remote" @size="(w, h) => (size = [w, h])" @many="batch = $event">
         <template v-if="tool?.kind === 'segment'" #default="{ src, loaded }">
           <ZoomPan><div class="pick" :class="{ busy: selecting }">
             <img :src="src" draggable="false" @load="loaded" @click="click" />
@@ -312,6 +336,7 @@ function open(q: QueuedJob, file: string): void {
           </button>
         </div>
       </div>
+      </template>
       <JobGallery :jobs="jobs" @open="open" />
     </div>
 
@@ -336,7 +361,7 @@ function open(q: QueuedJob, file: string): void {
           <FactorPicker v-model="factor" :max="tool.scale" />
         </div>
         <div v-if="options?.variants?.length" class="field">
-          <span class="title">{{ t('edit.enhance.character') }} <HintBadge start :text="variantInfo" /></span>
+          <span class="title">{{ t('edit.enhance.character') }} <HintBadge start :text="variantInfo" /><HintBadge v-if="chosenVariant?.warning" start notice :text="chosenVariant.warning" /></span>
           <div class="presets wide">
             <button class="preset" :class="{ on: variant === 'default' }" @click="variant = 'default'">{{ options.defaultLabel ?? t('edit.enhance.standard') }}</button>
             <button v-for="v in options.variants" :key="v.id" class="preset" :class="{ on: variant === v.id }" @click="variant = v.id">{{ v.label }}</button>
@@ -555,6 +580,11 @@ div.tool + div.tool::before {
 
 .preset {
   white-space: nowrap;
+}
+
+/* a long word choice (Detailed (AI, very slow)) breaks into two lines instead of running over its tile */
+.presets.wide .preset {
+  white-space: normal;
 }
 
 .preset:hover {

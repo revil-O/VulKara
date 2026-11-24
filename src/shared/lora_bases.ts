@@ -147,6 +147,8 @@ export interface LoraHit {
   needsToken?: boolean
   gated?: boolean
   installed: boolean
+  /** a model of the recommended list (shown first in the model finder) */
+  recommended?: boolean
 }
 
 export interface LoraSearchRequest {

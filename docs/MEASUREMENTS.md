@@ -2685,6 +2685,462 @@ In the app (test build, queue lock held): Auto on the same mask, seed 1: "Object
 without it", then RORem (16 %), 66 s, peak 8.8 GB, both bottles gone; seed 2: ObjectClear kept its result, 35 s,
 7.1 GB, both bottles gone. Only three failures are known, all on this picture; other kinds of pictures are open.
 
+## 7cj. ObjectClear beside an unpainted person: soft edge and effects (2026-11-15, Mac mini M4 16 GB)
+
+Follow-up of 7cd (the woman beside the painted man in the conference picture, 1024², grown by 15 px). On
+ObjectClear's cached raw output of all 41 cases of 7cc/7cd (the engine's 0.9.0 code, only the rule differing; queue
+lock held, no okAI or LmAI job; no person map, as in 7cc). Her area: the box left of the mask (60 × 145 px) without
+the painted part; "changed" = more than 8 of 255 in any channel.
+
+| Rule | Her area changed | Mean diff there | Changed beyond the grown mask (mean, 41 cases) |
+| --- | --- | --- | --- |
+| 0.9.0 | 63.6 % | 37.3 | 3.53 % |
+| LaMa's fill in the soft edge beyond the painted mask | 63.4 % | 38.5 | 3.51 % |
+| no soft edge (the original right up to the painted mask) | 18.4 % | 16.1 | 2.38 % |
+
+Most of the damage does not come from the soft edge: ObjectClear repaints her as another figure in its own 512 px
+picture, its effects map covers her upper body, and as the repaint is lighter than her dark jacket, `shadows()` takes
+it as a removed shadow. LaMa in the soft edge changes nothing (LaMa repaints that strip too); without the soft edge her
+face stays, but a hard seam and a light patch of ObjectClear's fill on her chest remain, so neither is usable.
+
+Also tried: a part of the effects counts only where the detail stays (a shadow changes the light, not the texture),
+measured as the correlation of the high-pass lightness, fill against original, per part. It does not separate: the
+removed shadows of 7bz/7ca 0.02–0.07 (ObjectClear's fill has little detail at 512 px), her parts 0.29–0.34. Left
+out; for a person right beside the object Thorough or Compare stays the choice (7cd: RORem left her as she was).
+
+## 7ck. Cross-attention K/V of the prompt once per picture (L2, 2026-11-15, Mac mini M4 16 GB)
+
+The idea from protoart-studio (`kv_cache.py`, no figure given): the prompt is the same in
+every step, so the `to_k`/`to_v` projections of each cross-attention layer could be computed once per picture. Own
+probe on the UNet alone (diffusers 0.41.0, torch 2.14.1, MPS, float16, batch 2 as with guidance, same random latents
+and prompt states, 20 steps, warm-up first, best of three alternating runs; queue lock held, no okAI or LmAI job, swap
+225 MB unchanged): each layer's `to_k`/`to_v` replaced by one that keeps its output while its input is the same tensor.
+
+| Model | Cross-attention layers | Without | With | Faster | Same result |
+| --- | --- | --- | --- | --- | --- |
+| Juggernaut-XL-v7 (SDXL), 1024² | 70 | 76.77 s | 76.06 s | 0.9 % | bit-equal |
+| epiCPhotoGasm (SD 1.5), 512² | 16 | 20.49 s | 20.45 s | 0.2 % | bit-equal |
+
+As estimated beforehand (77 prompt tokens against 4096 or 16384 picture tokens: the projections are about 1–2 % of
+the UNet's work), far below the 5 % the todo asked for. Not built in.
+
+## 7cl. SeedVR2-3B through mflux against Real-ESRGAN and DAT2 (U1, 2026-11-15, Mac mini M4 16 GB)
+
+SeedVR2-3B (Apache-2.0) as mflux 0.24 runs it (`SeedVR2`, `ModelConfig.seedvr2_3b()`): only the two files it needs,
+`seedvr2_ema_3b_fp16.safetensors` and `ema_vae_fp16.safetensors` of `numz/SeedVR2_comfyUI` at revision 09ced710
+(6.8 GB, 77 s download, test cache on FangX). The five 512 px web-like photos of 7ce (JPEG quality 60) to 2048 px,
+seed 42, softness 0; queue lock held, no okAI or LmAI job; peak = MLX's `get_peak_memory` per picture.
+
+| Model | Per picture | Peak | Swap after |
+| --- | --- | --- | --- |
+| Real-ESRGAN x4plus (7ce) | 3.5 s | 4.5 GB | – |
+| 4xBHI_dat2_real (7ce) | 32.0 s | 6.2 GB | – |
+| SeedVR2-3B, 8 bit | 118.4–121.0 s | 15.52 GB | 0.22 → 2.31 GB |
+| SeedVR2-3B, 16 bit | 127.6–148.8 s | 18.08 GB | 2.22 GB |
+
+Seen at full size (crops 512² of the 2048 px results against bicubic, Real-ESRGAN and DAT2): SeedVR2 is the best of
+the three on every picture. Faces become faces (the conference men's eyes and glasses, the woman crossing the street,
+where Real-ESRGAN and DAT2 made masks), the noisy grey foliage becomes leaves and clapboards instead of a grid, the
+limousine's windows and door lines are clean. It invents, too: the taxi's number plate is new lettering, and the
+high-rise's left façade has more window strips than the photo shows. On a 16 GB Mac at 2048 px it is not usable as it
+is: four times DAT2's time, and its peak fills the memory and pushed 2 GB into swap (the model card's ~21 s on an M2
+Ultra does not carry over).
+
+Smaller outputs and mflux's low-ram saver (`MemorySaver`: 1 GB MLX cache limit, the transformer freed before
+decoding, the VAE tiled where mflux allows it), 8 bit, a fresh model per picture with the saver (as one app job),
+the same five photos; queue lock held, swap 0.4–1.8 GB throughout, not growing:
+
+| Output | Plain | Low-ram |
+| --- | --- | --- |
+| 1024 px | 31.3–39.0 s, 15.46 GB | 36.0–38.1 s, 11.24 GB |
+| 1536 px | 67.9–72.8 s, 15.49 GB | 75.0–75.1 s, 11.26 GB |
+| 2048 px | 118.4–121.0 s, 15.52 GB | 126.8–127.0 s, 11.29 GB |
+
+The low-ram picture at 2048 px is bit-equal to the plain one; the peak drops by 4.2 GB to within a 16 GB Mac's Metal
+budget (12.7 GB) for about 7 % more time. The peak hardly depends on the output size; the time grows with the pixels.
+At 1536 px the conference men's faces look as good as at 2048 px (crop scaled to the same size).
+
+In the app (test build 2026-11-15, Enhance → Upscale ×4 → Detailed, queue lock held throughout, swap 0.27 → 0.26 GB):
+the first job downloaded both files through the app (75 s) and took 207 s in all; 512 → 2048 px 132 s after the
+download, 512 → 1024 px 38 s, 1024 → 2048 px (×4 asked, made smaller to the limit with a note) 128 s; peak 10.3–11.1 GB.
+The app's 2048 px result is bit-equal to the probe's low-ram one. A stop while loading ended the job after 27 s (the
+loading is not interrupted), one in the upscaling phase after 1 s; the next job ran normally (38 s).
+
+## 7cm. Cutting out: Apple Vision against BiRefNet lite (N1, 2026-11-15, Mac mini M4 16 GB)
+
+Apple Vision's `VNGenerateForegroundInstanceMaskRequest` through the app's own helper (`subject-mask`, as Select
+subject uses it, all instances) against the photo tool *Remove background* (BiRefNet lite, ONNX fp16 on the CPU,
+`photo_tools.apply`, output mask). Each run in its own process as a job runs (`/usr/bin/time -l`), after one warm-up;
+15 pictures: the five example pictures, the bottles, the conference picture of 7cd and eight of the RORem test set
+(1024 px); queue lock held, no okAI or LmAI job, swap 0.26 GB unchanged.
+
+| | Apple Vision | BiRefNet lite |
+| --- | --- | --- |
+| Time per picture | 0.12–0.33 s (median 0.15) | 5.23–5.67 s |
+| Peak of the process | 0.04–0.06 GB | 9.93–9.94 GB |
+| Download | none (macOS 14) | 0.1 GB once |
+| Subject found | 12 of 15; none in three scenes without a subject (cabin, street, lighthouse: exit 4) | always something |
+
+Masks (threshold 0.5) where both found one: one clear subject (astronaut, fox, bottles, mushroom, flower, the two
+towers) IoU 0.95–0.99, both cut cleanly; Vision's edge is a little softer (1–3 % of the picture between 5 and 95 %
+against 0.4–1.5 %), at full size a faint dark rim on the fox's white tail, BiRefNet's crisper. Several things or a
+scene: Vision keeps every foreground instance (the plate with the cheese and the glasses beside the wine, the whole
+crowd, all eight horse pictures), BiRefNet the most striking one (only a lamp post of a street with high-rises, three
+of the crowd's faces); IoU 0.004–0.87. Both made a dark blob of the conference table's shadow. Neither is better on
+every picture; Vision is 35 times faster and needs no memory to speak of.
+
+In the app (test build 2026-11-15, Enhance → Remove background → Apple Vision (fast), queue lock held): the fox cut out
+in 3.9 s with the engine's start, the bottles' mask in 0.2 s, footprint 0.18 GB; BiRefNet on the fox 6.8 s, 9.35 GB.
+The cabin (no subject) ended at once with "Apple Vision found no subject in this picture: try Standard (BiRefNet)".
+
+## 7cn. LoRA training on 16 GB: mflux's memory options, and Z-Image Turbo (T1, 2026-11-16, Mac mini M4 16 GB)
+
+The app's trainer (engines/mlx/train.py: mflux 0.24, quantized base, gradient checkpointing) on 6 AI example pictures,
+512 px, rank 16, 12 steps, one run after another under the queue lock. Peak is the process footprint (sampled every
+0.5 s), swap as vm.swapusage before and after. On 16 GB the trainer picks a 4 bit base for klein 4B (`choose_bits`).
+
+| Run | Base | s per step | Whole run | Peak | Swap before → after |
+|---|---|---|---|---|---|
+| klein 4B as the app trains today | 4 bit | 15.1 | 217 s | 11.49 GB | 0.21 → 1.63 GB |
+| klein 4B, `cache_limit_gb: 2` | 4 bit | 15.4 | 216 s | 8.54 GB | 1.01 → 0.60 GB |
+| klein 4B, `low_ram: true` | 4 bit | 15.1 | 215 s | 9.79 GB | 0.60 → 0.59 GB |
+| Z-Image Turbo (mflux example targets, ostris training adapter v2) | 8 bit | 18.1 | 285 s | 13.25 GB | 0.59 → 3.41 GB |
+
+| klein 4B as the app trains now (`cache_limit_gb: 2` on Macs below 32 GB, train.py `cache_limit`) | 4 bit | 15.2 | 214 s | 8.37 GB | 0.89 → 0.83 GB |
+| Z-Image Turbo, `cache_limit_gb: 2` | 8 bit | 18.1 | 283 s | 13.24 GB | 0.83 → 2.22 GB |
+| Z-Image Turbo, `cache_limit_gb: 2` | 4 bit | 17.1 | 264 s | 10.24 GB | 0.95 → 0.94 GB |
+| ERNIE-Image-Turbo, `cache_limit_gb: 2` (mflux example targets, no adapter) | 4 bit | 21.4 | 309 s | 10.90 GB | 1.18 → 1.12 GB |
+| ERNIE-Image-Turbo, `cache_limit_gb: 2` | 8 bit | 23.3 | 360 s | 14.32 GB | 1.12 → 3.71 GB |
+
+- MLX's buffer cache is what grows: bounding it (`cache_limit_gb`) takes 3 GB off the peak at the same speed and the
+  swap no longer grows; `low_ram` (pictures encoded to disk first) saves less (1.7 GB).
+- The per-step time on the M4 equals the M2's (about 15 s, section 8).
+- Z-Image Turbo trains with mflux 0.24 as it is; at 8 bit it is too heavy for 16 GB (2.2-2.8 GB swap, the cache limit
+  does not lower its peak); at 4 bit with the cache limit it fits (10.2 GB, no swap, 17.1 s per step). mflux fetches its
+  training adapter (ostris/zimage_turbo_training_adapter, Apache-2.0, 338 MB) into `~/Library/Caches/mflux/loras`, not
+  into HF_HOME (`MFLUX_CACHE_DIR` moves it); removed after the run.
+- ERNIE-Image-Turbo (Apache-2.0, as ERNIE-Image) trains with mflux 0.24 without a helper adapter; 4 bit fits 16 GB
+  without swap, 8 bit needs 24 GB. The memory plan with ERNIE's generating activations (2.5 GB) over the base
+  estimates 11.2 GB for 4 bit and 16.5 for 8 (measured 10.9 and 14.3): 16 GB → 4 bit, 24 GB → 8 bit.
+- In the app (test build 2026-11-16, Training → Z-Image-Turbo, 6 AI example pictures, *Quick test*, queue lock held):
+  4 bit with the cache limit as planned (`choose_bits`, `cache_limit`), 100 steps (102 with the last epoch) in 1844 s,
+  about 17.3 s per step, peak of the training process 10.0 GB; the adapter came pinned into the helpers folder and
+  nothing went to `~/Library/Caches/mflux`. The LoRA (`family: z_image`, 35 M parameters) made a picture at 768 px with
+  8 steps on MLX (9.7 s per step, peak 8.6-12.2 GB) and on Diffusers (101 s, Metal 12.0 GB). Swap rose only while
+  the Diffusers engine loaded after the MLX one (+1.4 GB for a few seconds, back afterwards; 5.3 GB the first time,
+  with its one-time preparation of the model), not while training.
+- ERNIE in the app (test build 2026-11-16, Training → ERNIE-Image-Turbo, the same 6 pictures, *Quick test*): 4 bit with
+  the cache limit, timesteps 1-8 as in mflux's example, 100 steps (102) in 2195 s, about 21.4 s per step, peak of the
+  training process 11.0 GB; swap 0.95 GB at the start, at most 1.93 GB over training and the picture after it (not
+  told apart). The LoRA (`family: ernie`, 506 of 506 keys) made a picture at 768 px with 8 steps on MLX in 122 s (peak
+  8.3 GB); against the same seed without it the picture turned soft and the fox's eyes closed: the LoRA took the look
+  of the 6 AI example pictures, as expected from such a set.
+- The Base models in the app (test build 2026-11-17, imported through Models: Z-Image-Base in 123 s, ERNIE-Image-Base
+  in 143 s; Training, the same 6 pictures, 512 px, *Quick test*, rank 16; peak of the training process from `top`,
+  1 GB steps; swap before → after training and the picture):
+
+  | Base model | Training (100 steps, 102 with the last epoch) | s per step | Peak training | Picture 768 px with the LoRA (MLX) | Peak picture | Swap |
+  |---|---|---|---|---|---|---|
+  | Z-Image-Base (4 bit, cache limit) | 1667 s | 15.8 | about 10 GB | 39 steps, guidance 4: 779 s | 12.2 GB | 0.48 → 0.96 GB |
+  | ERNIE-Image-Base (4 bit, cache limit, timesteps 5-45) | 2237 s | 21.4 | about 11 GB | 50 steps, guidance 4: 1599 s | 10.2 GB | 0.96 → 0.88 GB |
+
+  Both fit 16 GB as the Turbo models do, at the same per-step time. The pictures take long because the Base models
+  ask for 39 and 50 steps with guidance (two passes per step). ERNIE's fox is clean; Z-Image-Base writes the trigger word as small text
+  into the bottom right corner. The same prompt and seed without the LoRA (789 s, 12.0 GB) shows that text too, only
+  fainter: the unknown word in the prompt causes it, the LoRA from 100 steps on 6 pictures makes it sharper and adds a
+  thin line along the top edge. The fox itself is clean in all three pictures.
+
+## 7co. Creative upscaling as SDXL tiles with the Tile ControlNet (K1, 2026-11-16, Mac mini M4 16 GB)
+
+The five 512 px photos of 7cl, first to 2048 px with DAT2 (7ce), then painted again in 9 tiles of 1024 px (¼ overlap,
+Gaussian weights with sigma half a tile, as protoart's tiled.py) through the app's Diffusers engine: one img2img job
+per tile with epiCRealism XL v8, ControlNet Union ProMax in tile mode, 20 steps, CFG 6, seed 42, a neutral photo
+prompt; the engine's memory plan put the ControlNet in 8 bit (1.3 GB). Queue lock held; a first probe that loaded
+everything in 16 bit without the plan reached 18 GB and swapped, it was stopped.
+
+| Strength, ControlNet weight | Per picture (9 tiles) | Peak | Swap |
+| --- | --- | --- | --- |
+| 0.3, 1.0 | 385-409 s | 11.13-11.20 GB | flat |
+| 0.45, 1.0 | 550-574 s | 11.13-11.19 GB | flat |
+| 0.6, 0.5 (two pictures) | 714-736 s | 11.13-11.20 GB | flat |
+
+Seen at full size (512² crops against DAT2 alone and SeedVR2's 2048 px low-ram result of 7cl): at 0.3 and 0.45 with
+the ControlNet at full weight the tiles keep so close to the blurred DAT2 picture that hardly anything changes (the
+woman crossing the street keeps her mask-like face, the dark facade's windows stay smears). Loosened (0.6, weight 0.5)
+the brick shows texture and the woman gets a face, but another, younger one, and the taxi's sign new lettering;
+SeedVR2 rebuilds the face closer to the photo and draws the windows and the grille cleanly in about a fifth of the
+time (132 s in the app). No tile seams were seen. Only photos were tried, no generated pictures.
+
+## 7cp. LTX-2.3 text to video with sound: ltx-2-mlx against ComfyUI GGUF (2026-11-17, Mac mini M4 16 GB)
+
+One clip of 2 s with sound (768×512, 49 frames at 24 fps, seed 42, the same prompt: a fox in snow at sunrise with
+footsteps and birdsong), both through the distilled two-stage path of upstream: 8 steps at half size, the latent ×2
+with the spatial upscaler 1.1, 3 refining steps, CFG 1, the same sigmas. Queue lock held, test folders on FangX, the
+time from start (loading and text encoding included) to the saved mp4.
+
+| Route | Weights | Time | Peak | Swap |
+| --- | --- | --- | --- | --- |
+| A: ltx-2-mlx 0.18.0 (MIT), `--distilled` | dgrauet/ltx-2.3-mlx-q4 (int4, 19 GB of files) + Gemma 3 12B MLX 4 bit (7.5 GB) | 333 s | 14.36 GB | +0.5 GB |
+| B: the app's ComfyUI 0.44 runtime | unsloth Q4_K_S GGUF (13.1 GB) + Comfy-Org Gemma 3 12B fp4_mixed (9.4 GB), VAEs, connectors | 1037 s | 21.13 GB | +0.55 GB |
+
+- Route A again the same evening (one queue job, in this order; the first run of the day above had cold files):
+
+  | Run | Time | Peak | Swap |
+  | --- | --- | --- | --- |
+  | 5 s (121 frames) with sound | 494 s | 14.49 GB | flat (0.3 → 0.5 GB) |
+  | 2 s from a start picture (`--image`, the square fox.jpg cropped to 3:2) | 256 s | 14.49 GB | flat |
+  | 2 s, `--low-ram` (transformer blocks streamed from mmap) | 229 s | 14.38 GB | flat |
+
+  The peak does not come from the transformer (low-ram leaves it unchanged); the VAE decode stayed at 7.7 GB (2 s)
+  and 8.9 GB (5 s) of Metal. The 5 s clip keeps the fox steady over all 121 frames; the start picture is kept and
+  the fox starts to walk; low-ram gave the same clip as without.
+- The app's own path (`engines/mlx/ltx23.py`, run in the LTX test venv with no `ffmpeg` on PATH): ltx-2-mlx's
+  prompt encoder loads Gemma and the connector together (8.0 + 6.3 GB, the 14.4 GB peak above); loaded one after the
+  other, with Gemma freed once its hidden states are computed, and the transformer streamed (`low_ram_streaming`),
+  2 s at 768 × 512 took 249 s at a peak of **8.0 GB** in all (decoding 6.9 GB), swap flat; the mp4 written with PyAV
+  (H.264 + AAC 48 kHz stereo, AI notice in the metadata). PyAV's wheels carry FFmpeg with libx264/libx265 (GPL): the
+  app encodes with Apple's `h264_videotoolbox` instead (synthetic 49 frames + tone: 49 frames, 2.04 s, AAC stereo).
+- In the app (test instance, test DMG, 2026-11-17): MLX runtime brought to the new lock at start (ltx-2-mlx archive at
+  its commit, content hash checked; av and mlx-arsenal added, 2 s), LTX-2.3 installed from Models → Recommended (20.5 GB
+  in 3 min, plan 11.8 GB, fits 16 GB), Gemma from the button on the Video page (7.5 GB in 1.5 min, pinned and checked).
+
+  | Run in the app | Size | Time | Peak |
+  | --- | --- | --- | --- |
+  | 2 s from the prompt, with sound (6 runs, 3 of them with the page captured every 3 s) | 896 × 512 | 305-333 s | 8.3-9.1 GB |
+  | 5 s from the prompt, with sound | 896 × 512 | 581 s | 9.6 GB |
+  | 5 s from a start picture (through the page) | 704 × 704 | 618 s | 8.0 GB |
+  | 2 s at 720p without sound | 1280 × 704 | 470 s | 8.3 GB |
+  | 5 s at 720p with sound (the example clip, seeds 2026 / 7 / 42) | 1280 × 704 | 1090-1151 s | 11.1-11.6 GB |
+
+  Two runs (2 s and 5 s, right after a failed start-picture run while pages were switched) ended in Metal's GPU
+  watchdog (`kIOGPUCommandBufferCallbackErrorTimeout`, ml-explore/mlx#3267, closed by MLX as won't fix; its maintainer
+  advises `AGX_RELAX_CDM_CTXSTORE_TIMEOUT=1`). Not seen again: 6 of 6 runs without the variable, 5 of 5 with it (same
+  times, 310-345 s for 2 s); the app sets it for the MLX engine and trainer. The start picture first failed: ltx-2-mlx
+  compresses it with the ffmpeg program as well; the app does that one frame through PyAV like Lightricks' pipeline.
+- A: stage 1 9-22 s per step, stage 2 42-50 s per step, decoding with sound 15 s (its own tiling, Metal peak 7.7 GB).
+  It calls the `ffmpeg` program (14 places in its code, `find_ffmpeg`); the app has none, it writes videos through
+  PyAV. Its lock pins 62 packages, 13 with known OSV advisories (pillow 12.1.1, transformers 5.3.0, urllib3 2.6.3,
+  requests 2.32.5 and others): test venv only, an app runtime would need its own pins.
+- B: started with the app's flags but without its memory node (no LOW_VRAM streaming), so ComfyUI loaded Gemma
+  (11.2 GB) and the transformer (12.8 GB) completely; most of the footprint stayed in mapped file pages, the swap grew
+  little. Gemma as unsloth GGUF did not load: ComfyUI-GGUF builds Gemma's tokenizer with `protobuf`, which the app's
+  ComfyUI runtime does not have (`sentencepiece` 0.2.2 is pinned); Comfy-Org's safetensors carry the tokenizer.
+- Seen frame by frame and as a spectrum: A's fox is well formed and steady in warm backlight, the sound shows bird-like
+  tonal lines. B's fox is well formed too but the picture has a strong blue cast and the fox leaves the frame at the
+  end; the sound shows footstep clicks. One seed each, not a quality ranking.
+- Licences: LTX-2 Community License (free below USD 10 M yearly revenue; redistribution with the licence), Gemma Terms
+  of Use (2026-04-01: recipients get the agreement and the use restrictions, a Notice file for non-hosted copies,
+  Google claims no rights in outputs, may restrict usage remotely).
+- Downloads: huggingface_hub's Xet transfer (hf_xet 1.4.2) stalled twice with open connections and 0 bytes in, without
+  any timeout; plain HTTP (`HF_HUB_DISABLE_XET=1`) with `HF_HUB_DOWNLOAD_TIMEOUT` ran through at 60-90 MB/s.
+
+## 7cq. Four SDXL models for the recommended list (Neue Modellliste, 2026-11-18, Mac mini M4 16 GB)
+
+Candidates from the list of 2026-11-03 (plans/LOCALLY_UNCENSORED_STUDY.md 4), licences read at the source (Hugging Face
+API and the licence texts): Animagine XL 4.0 (cagliostrolab, CreativeML Open RAIL++-M), RealVisXL V5.0 (SG161222, Open
+RAIL++-M), NoobAI-XL 1.1 (Laxhar, Fair AI Public License 1.0-SD: derivatives under the same licence, outputs free),
+Juggernaut XL v9 (RunDiffusion, CreativeML OpenRAIL-M; on Hugging Face, so without the Civitai token v7 needs). Not
+measured: SD Turbo (SD 2.1 at 512 px, SDXL Turbo is listed already), WAI-illustrious-SDXL (left out for now).
+Imported through Models (Hugging Face, Diffusers folders, 6.5 GB each, 83-163 s), then as 7bs: Hardware → Benchmark over
+CDP, five pictures, the model's own settings, 1024², the benchmark prompt and seed, one model per queue lock, no other
+job on the mini. Test DMG 0.9.0 369b0af+ (Animagine's first series 99b9276+).
+
+| Model | Maker settings (as imported) | s/step | First picture | Pictures 2–5 | Peak (first / 2–5) | Plan | Over plan | Swap added (max) | Target |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Animagine-XL-4.0 | 28 steps, CFG 5, Euler a | 3.90 | 133 s | 114–114 s | 8.77 / 8.73–8.78 GB | 9.4 GB | -7 % | 1.23 GB | met |
+| RealVisXL-V5.0 | 30 steps, CFG 6 (the card names none), DPM++ SDE Karras, its negative | 7.68 | 254 s | 235–235 s | 8.78 / 8.74–8.79 GB | 9.4 GB | -6 % | 1.13 GB | met |
+| NoobAI-XL-1.1 | 25 steps, CFG 5, Euler a, its negative | 3.90 | 122 s | 102–102 s | 8.77 / 8.74–8.77 GB | 9.4 GB | -7 % | 1.01 GB | met |
+| Juggernaut-XL-v9 | 35 steps, CFG 5, DPM++ 2M Karras | 3.90 | 162 s | 141–141 s | 8.77 / 8.74–8.78 GB | 9.4 GB | -7 % | 0.92 GB | met |
+
+- The first import read two cards wrong (maker_settings.py): Juggernaut v9 lists its settings in a Markdown table and
+  got 15 steps from the row of the hires fix (measured so too: 63 s per picture), Animagine got CFG 5.5 (the middle of
+  "4-7 (5 Recommended)"; 114 s, the same as with 5). Fixed (tables read, "Hi-Res" cut, the recommended CFG of a range),
+  the two settings read again with `main.py maker_settings` and measured again: the table above.
+- RealVisXL takes twice as long per step: DPM++ SDE evaluates the model twice per step.
+- Juggernaut v9 needs what v7 needed (7bs: 140 s, 8.76 GB) but added less swap (0.92 against 2.03 GB, with which v7
+  missed the target).
+- One person picture each (832 × 1216, seed 7, the maker's settings and prompt style: tags for Animagine and NoobAI,
+  a sentence for the photo models), 114-242 s, peak 9.9 GB: hands, fingers and faces right in all four; RealVisXL
+  painted two cups for "a cup … with both hands".
+
+## 7cr. The recommended models not measured in a series yet (Empfehlungsliste bereinigen, 2026-11-18, Mac mini M4 16 GB)
+
+The recommended models installed on the mini without a five-picture series (plans/EMPFEHLUNGSLISTE_BEREINIGEN.md
+groups B–D), measured as 7cq: Hardware → Benchmark over CDP, five pictures, the model's own settings, 1024² (SD 1.x
+512²), the benchmark prompt and seed, one model per queue lock, no other job on the mini. Test DMG 0.9.0 a375066+.
+
+| Model | Settings | s/step | First picture | Pictures 2–5 | Peak (first / 2–5) | Plan | Over plan | Swap added (max) | Target |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| CyberRealistic-Final | maker: 30 steps, CFG 5, DPM++ SDE Karras | 1.04 | 42 s | 32–32 s | 3.80 / 3.78–3.78 GB | 3.6 GB | +6 % | 0.00 GB | met |
+| CyberRealistic-Pony-v18 | maker: 30, CFG 5, DPM++ SDE Karras | 7.57 | 259 s | 231–232 s | 8.76 / 8.74–8.78 GB | 9.4 GB | -7 % | 1.35 GB | met |
+| epiCRealism-XL-v8 | 30, CFG 6 (the page names none) | 3.86 | 145 s | 120–120 s | 8.76 / 8.73–8.77 GB | 9.4 GB | -7 % | 2.74 GB | missed |
+| JANKU Illustrious XL | maker: 30, CFG 5, Euler a | 3.83 | 149 s | 119–120 s | 8.91 / 8.72–8.82 GB | 9.4 GB | -5 % | 2.51 GB | missed |
+| Retrordinary | maker: 38, CFG 5.5 | 3.89 | 177 s | 152–152 s | 8.97 / 8.72–8.77 GB | 9.4 GB | -5 % | 2.81 GB | missed |
+| LUSTIFY-apexV8 | 30, CFG 6 (the page names none) | 3.86 | 144 s | 120–120 s | 8.91 / 8.72–8.77 GB | 9.4 GB | -5 % | 1.22 GB | met |
+| MoP-Mix-asap | maker: 33, CFG 4.5, DPM++ 2M SDE Karras | 3.85 | 156 s | 131–131 s | 8.91 / 8.72–8.77 GB | 9.4 GB | -5 % | 1.81 GB | met |
+| MoP-Mix-fustercluck | maker: 11, CFG 1, LCM | 1.98 | 51 s | 26–26 s | 8.91 / 8.73–8.78 GB | 9.4 GB | -5 % | 2.72 GB | missed |
+| FLUX.2-klein-9B | 4, CFG 1 | 27.23 | 132 s | 114–114 s | 8.99 / 8.99–10.03 GB | 9.8 GB | +2 % | 0.00 GB | met |
+| MOSS-Image-8step-DMD | 8 | 18.70 | 218 s | 207–208 s | 8.75 / 8.41–8.69 GB | 9.2 GB | -5 % | 0.81 GB | met |
+| MOSS-Image | 50 | 37.85 | 1965 s | 1953–1955 s | 8.44 / 8.41–8.42 GB | 9.2 GB | -8 % | 1.32 GB | met |
+| SD3.5-Medium | 40 | 8.03 | 342 s | 325–325 s | 5.26 / 5.31–5.31 GB | 10.4 GB | -49 % | 0.00 GB | met |
+| MiaoMiao-RealSkin-Anima | maker: 30, CFG 5 | 11.90 | 390 s | 361–379 s | 8.83 / 8.05–10.03 GB | 9.1 GB | +10 % (10.2) | 0.10 GB | missed |
+| FLUX.1-dev | 50 | 17.01 | 895 s | 839–896 s | 9.96 / 10.00–10.01 GB | 10.9 GB | -8 % | 2.95 GB | missed |
+| flux1-dev-Q4_K_S | 28 | 26.39 | 877 s | 687–783 s | 11.82 / 10.13–10.45 GB | 10.6 GB | +12 % | 2.43 GB | missed |
+| GonzaLomo-Chroma (streamed) | 30 | 58.36 | 1682 s | 1755–1908 s | 8.00 / 8.01–8.01 GB | 11.5 GB | -30 % | 0.00 GB | met |
+
+Inpainting (the page measures text to image only): five jobs each as 7bf, the fox → "a brown rabbit sitting in the
+snow", Change 100 %, seeds 7–11, swap sampled every 2 s.
+
+| Model | Size | Per picture (first) | Peak (first / 2–5) | Plan | Over plan | Swap added | Target |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| SDXL Inpainting 0.1 | 1024² | 82 s (104 s) | 8.89 / 8.83–8.87 GB | 9.4 GB | -5 % | 0.10 GB | met |
+| SD 1.5 Inpainting | 512² | 16 s (26 s) | 3.83 / 3.77–3.81 GB | 3.6 GB | +6 % | 0.00 GB | met |
+| FLUX.1 Fill Q4 | 1024² | 712 s (753 s) | 10.94 / 10.02–10.05 GB | 10.0 GB | +9 % | 0.00 GB | met |
+
+- Seven of the Civitai models had no maker settings: imported before 2026-10-15 (d718c70, settings read on import);
+  later imports have them. The first series ran with VulKara's 30 steps and CFG 6, which painted MoP Mix fustercluck
+  (a DMD model) oversaturated and embossed. Read again with `main.py maker_settings` and measured again: the table
+  above. With the maker's LCM and 11 steps fustercluck takes 26 s instead of 120 s and looks right. epiCRealism,
+  LUSTIFY, Chroma, MOSS-Image, the FLUX.1 GGUFs and the inpainting models have no settings the reader finds.
+- The swap of the SDXL single files (Civitai) is added while loading, in the first picture only, and it is not the
+  model's: with the same memory it was 1.2–2.7 GB, and between the two series CyberRealistic Pony went from 2.59 to
+  1.35 GB and JANKU from 1.42 to 2.51 GB. The Diffusers folders of 7cq added 0.9–1.2 GB. Cause not measured.
+- FLUX.2 [klein] 9B (7bt: 12.4 GB with a new prompt per picture) and SD 3.5 Medium (7bv: 3.5–4.6 GB swap) now meet the
+  target with the benchmark's one prompt; GonzaLomo Chroma streams and takes half an hour per picture.
+- Pictures checked (contact sheets): lighthouses without faults; Retrordinary paints very dark,
+  JANKU a framed sepia drawing with lettering. Inpainting: one picture of SDXL has a second
+  animal behind, one of SD 1.5 a rabbit with three ears, one of FLUX Fill a blurred rabbit.
+
+- Where the swap comes from (a script outside the app, epiCRealism, `from_single_file` vs `from_pretrained`): the
+  pipeline is built from the file in 3 s with almost no memory (mapped); moving it to the GPU (`.to("mps")`) added
+  2.83 and 2.22 GB swap from the file, 1.08 GB from the same model saved as a Diffusers folder (save_pretrained, 50 s,
+  6.5 GB). Why is not measured; a guess: the converted tensors of the file are memory macOS has to swap out, those of
+  the folder pages it can drop.
+- Then (approved 2026-11-18) the import and the first load turn an SDXL file into a folder
+  (`importer.migrate_single_sdxl`); the seven SDXL files on the mini converted with the test DMG (50–95 s each) and
+  measured again as above:
+
+| Model | Swap added as a file (series) | As a folder | Per picture | Peak (first / 2–5) | Target |
+| --- | --- | --- | --- | --- | --- |
+| epiCRealism-XL-v8 | 2.74 | 2.26 GB | 120 s | 8.80 / 8.79–8.83 GB | missed |
+| JANKU Illustrious XL | 1.42 / 2.51 | 1.47 GB | 120 s | 8.80 / 8.77–8.81 GB | met |
+| Retrordinary | 2.48 / 2.81 | 0.60 GB | 150 s | 8.80 / 8.76–8.84 GB | met |
+| MoP-Mix-fustercluck | 1.28 / 2.72 | 1.39 GB | 26 s | 8.79 / 8.76–8.81 GB | met |
+| CyberRealistic-Pony-v18 | 2.59 / 1.35 | 1.50 GB | 231 s | 8.84 / 8.77–8.86 GB | met |
+| LUSTIFY-apexV8 | 1.22 | 1.45 GB | 123 s | 8.80 / 8.77–8.81 GB | met |
+| MoP-Mix-asap | 1.83 / 1.81 | 2.05 GB | 133 s | 8.80 / 8.78–8.83 GB | missed |
+
+- 2.06 GB swap on average as a file (12 series), 1.53 as a folder (7), over 2 GB 6 of 12 against 2 of 7; time and
+  memory the same, the pictures the same with the same seed. The Hugging Face folders of 7cq added 0.9–1.2 GB.
+  epiCRealism and MoP Mix asap leave the recommended list (decided 2026-11-18: the target as approved).
+
+Step 3 (models downloaded for the series, 2026-11-18/19, test DMG 0.9.0 48c24fa+, same method). The series stopped
+after seven models for a new test build; evaluated 2026-11-21. Swap added = highest swap of the five pictures minus the
+lowest at their start.
+
+| Model | Steps | s/step | First picture | Pictures 2–5 | Peak (first / 2–5) | Plan | Over plan | Swap added | Target |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SD-1.5 (512²) | 25 | 0.51 | 25 s | 14 s | 3.81 / 3.79 GB | 3.6 GB | +6 % | 0.00 GB | met |
+| SD-2.1 (768²) | 10 | 1.21 | 25 s | 14 s | 5.83 / 5.77–5.79 GB | 4.1 GB | +42 % | 0.00 GB | missed |
+| Dreamlike-Diffusion-1.0 | 25 | 0.51 | 25 s | 14 s | 3.71 / 3.66–3.67 GB | 3.6 GB | +3 % | 0.00 GB | met |
+| Arcane-Diffusion | 25 | 0.51 | 22 s | 14 s | 3.80 / 3.78 GB | 3.6 GB | +6 % | 0.02 GB | met |
+| Mo-Di-Diffusion | 25 | 0.51 | 22 s | 14 s | 3.80 / 3.78 GB | 3.6 GB | +6 % | 0.00 GB | met |
+| Realistic-Vision-5.1 | 25 | 0.51 | 34 s | 14 s | 4.40 / 3.79 GB | 3.6 GB | +22 % | 0.00 GB | missed |
+| Counterfeit-V2.5 | 20 | 0.51 | 33 s | 11 s | 4.33 / 3.67–3.68 GB | 3.6 GB | +20 % | 0.01 GB | missed |
+
+- The three misses are the app's plan, not a shortage: SD 2.1 stays at 5.8 GB in every picture (the plan reckons
+  4.1 GB at 768²); Realistic Vision and Counterfeit go over only in the first picture (load), later 3.7–3.8 GB.
+  None swaps, all far below 16 GB.
+- Pictures checked (contact sheet, 35): lighthouses without faults; SD 2.1 paints a watermark-like lettering in two,
+  Counterfeit a light vertical streak in two; Mo-Di and Arcane look like SD 1.5 without their trigger words in the
+  benchmark prompt.
+
+Step 3 continued (2026-11-21, same test DMG and method, the mini free of other jobs between the locks):
+
+| Model | Steps | s/step | First picture | Pictures 2–5 | Peak (first / 2–5) | Plan | Over plan | Swap added | Target |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DucHaiten-AIart (512²) | 25 | 0.51 | 41 s | 14 s | 4.40 / 3.79 GB | 3.6 GB | +22 % | 0.00 GB | missed |
+| ReV-Animated-1.2.2 (512²) | 25 | 0.51 | 39 s | 14 s | 4.64 / 3.78 GB | 3.6 GB | +29 % | 0.01 GB | missed |
+| SDXL-Base-1.0 | 30 | 3.87 | 142 s | 121 s | 8.77 / 8.74–8.78 GB | 9.4 GB | -7 % | 1.57 GB | met |
+| SDXL-Turbo (512²) | 3 | 0.48 | 27 s | 2 s | 8.76 / 8.74–8.75 GB | 8.28 GB | +6 % | 0.49 GB | met |
+| DreamShaper-XL-v2-Turbo | 6 | 3.88 | 49 s | 27–28 s | 8.77 / 8.73–8.78 GB | 9.4 GB | -7 % | 0.22 GB | met |
+| FLUX-3-Image-Klein-MLX-6bit | 16 | 13.44 | 237 s | 220 s | 9.39 / 9.34–9.40 GB | 8.7 GB | +8 % | 0.07 GB | met |
+| Chroma1-Flash (transformer 4 bit, quantized on load) | 12 | 28.34 | 539 s | 344 s | 10.62 / 7.75–7.79 GB | 11.5 GB | -8 % | 4.02 GB | missed |
+| Chroma1-HD (transformer 4 bit, quantized on load) | 40 | 56.73 | 2492 s | 2275–2276 s | 10.62 / 7.75–7.80 GB | 11.5 GB | -8 % | 4.39 GB | missed |
+
+- DucHaiten and ReV Animated miss like Realistic Vision and Counterfeit: weights in 32 bit (4.0 and 5.1 GB), only the
+  first picture is over the plan, no swap.
+- Both Chroma1 models were not streamed although the recommended list says they stream below 20 GB: the plan picked
+  an on-the-fly 4 bit transformer (79 s quantizing, 89 s for the text encoder, 37 GB read for the first picture); the
+  4 GB swap comes from that load. GonzaLomo Chroma (streamed, above) added none. Cause not looked into yet.
+- FLUX.1 [schnell] Q4 and SD 3.5 Large not measured: Hugging Face refused the token again (gated). GhostMix was not
+  installed (the import of 2026-11-18 had not kept it); imported again and measured separately.
+- Pictures checked (contact sheet, 40): **Chroma1-Flash paints all five pictures covered in coarse coloured noise**
+  (lighthouse only faintly visible) – unusable as set up; Chroma1-HD with the same 4 bit plan is clean. DreamShaper XL
+  Turbo paints two moons in one picture. All others without faults.
+- GhostMix v2 had been filed as a LoRA by the import of 2026-11-18 (a full SD 1.5 checkpoint with 216 tensors of a
+  merged LoRA left in it; registry.is_lora took any LoRA tensor for a LoRA). Fixed (a LoRA needs most of its tensors
+  to be LoRA tensors), imported again with test DMG 0.9.0 6bfed4c+ as a model (2.2 GB) and measured: 25 steps, 0.57
+  s/step, 21 s first / 15 s, peak 3.80 / 3.78 GB, plan 3.6 GB, +6 %, swap 0.00 GB: target met. Pictures without
+  faults (one with a signature-like scrawl in a corner).
+
+Step 4 (2026-11-21, test DMG 0.9.0 40af80e+): the four SD 1.5 models in 32 bit saved in 16 bit once
+(importer.migrate_fp32 for the three Diffusers folders, migrate_single_file for ReV Animated's file), on their first
+use; then five pictures each, same method.
+
+| Model | Disk before / after | First use (conversion) | Steps | s/step | First picture | Pictures 2–5 | Peak (first / 2–5) | Plan | Over plan | Swap added | Target |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Realistic-Vision-5.1 | 4.0 / 2.0 GB | 44 s, 4.48 GB | 25 | 0.51 | 22 s | 14 s | 3.80 / 3.79 GB | 3.6 GB | +6 % | 0.00 GB | met |
+| Counterfeit-V2.5 | 4.0 / 2.0 GB | 38 s, 4.40 GB | 20 | 0.51 | 19 s | 11 s | 3.72 / 3.66–3.67 GB | 3.6 GB | +3 % | 0.00 GB | met |
+| DucHaiten-AIart | 4.0 / 2.0 GB | 39 s, 4.48 GB | 25 | 0.51 | 21 s | 14 s | 3.81 / 3.79 GB | 3.6 GB | +6 % | 0.00 GB | met |
+| ReV-Animated-1.2.2 | 5.1 / 2.0 GB | 46 s, 4.67 GB | 25 | 0.51 | 22 s | 14 s | 3.84 / 3.80 GB | 3.6 GB | +7 % | 0.00 GB | met |
+
+- The one-time conversion goes over the plan once (+22–30 %, no swap), as the 32-bit load did before at every first
+  picture; afterwards the first picture takes 19–22 s (Realistic Vision and Counterfeit took 33–34 s in 32 bit).
+- Pictures checked (contact sheet, 20): lighthouses without faults; Counterfeit paints its signature-like lettering in
+  a corner again (the model, not the conversion).
+- SD 2.1: the plan of SD 2.x now reckons 4.0 GB activations at 1024² (2.25 at 768²), 5.8 GB peak as measured above.
+  The first import again failed (Hugging Face's Xet storage refused every connection from both Macs for some hours);
+  imported again once it answered (test DMG 0.9.0 693ef4e+): the plan says 5.8 GB, 9 GB of memory. Five pictures: 10
+  steps, 1.22 s/step, 25 s first / 14 s, peak 5.83 / 5.77–5.79 GB, plan 5.8 GB, +1 %, swap 0.00 GB: target met.
+  Pictures as before (a watermark-like lettering in two, the model).
+- Chroma1-Flash's noise: one picture with the same seed, transformer 4 bit (as planned) against 16 bit streamed from
+  the SSD (quant_request q8 in the test profile; q8 did not fit, the engine streamed): 4 bit coarse coloured noise, 16
+  bit streamed clean (517 s, 8.36 GB, no swap). Chroma1-HD stays clean in 4 bit; the distilled Flash does not. The
+  engine plans again at every load from quant_request (engine.py), the plan kept in model.json is only shown.
+- Fixed (memory.NO_Q4_FAMILIES: Chroma is streamed in 16 bit, never held in 4 bit; test DMG 0.9.0 ad9e5d3+), then
+  measured with the plan as the app makes it:
+
+| Model | Steps | s/step | First picture | Pictures 2–5 | Peak (first / 2–5) | Plan | Swap added | Target |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Chroma1-Flash (16 bit streamed) | 12 | 28.16 | 352 s | 320–323 s | 7.44 / 7.58–7.59 GB | 11.5 GB (old manifest) | 0.01 GB | met |
+| Chroma1-HD (16 bit streamed, one picture) | 40 | 54.07 | 2347 s | – | 7.93 GB | 11.5 GB (old manifest) | 0.00 GB | swap met (4.39 GB before) |
+
+  Pictures checked: all six clean. Streamed is even faster than the 4 bit plan (Flash 320 s against 344 s, HD 2347 s
+  against 2492 s for the first picture): no 37 GB read and no quantizing at the load. Both stay out of the
+  recommended list (decided before the fix); GonzaLomo Chroma and imported Chroma fine-tunes profit.
+
+The two gated models (2026-11-22; the stored Hugging Face token had been more than the token, 65-79 characters, and
+was refused with 401 – the app now cleans and checks a pasted token). Imported with test DMG 0.9.0 d459fe8+, five
+pictures each, same method:
+
+| Model | Steps | s/step | First picture | Pictures 2–5 | Peak (first / 2–5) | Plan | Over plan | Swap added | Target |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| FLUX.1-schnell-Q4 (GGUF Q4_K, T5 4 bit) | 4 | 32.17 | 269 s | 121–136 s | 11.69 / 9.81–9.86 GB | 10.6 GB | +10 % | 3.73 GB | see below |
+| SD3.5-Large (transformer 8 bit in memory) | 28 | 21.06 | 860 s | 594–595 s | 10.89 / 10.88–10.94 GB | 11.7 GB | -6 % | 6.39 GB | missed |
+
+- Both swap only while the first picture loads (23 / 41 GB read: the text encoder quantized once into qcache, SD 3.5
+  Large's 8 bit GGUF copy written once). Loaded a second time after a fresh start (one picture each): FLUX.1 [schnell]
+  Q4 0.00 GB swap (159 s, 7 GB read) – the swap was once after the import, the model stays (user); SD 3.5 Large 4.98 GB
+  swap again (630 s, 11 GB read): its 8 bit plan leaves 0.4 GB of the 12 GB budget.
+- SD 3.5 Large streamed in 16 bit (ssdStreaming always in the test profile, one picture): 0.05 GB swap, 21.71 s/step,
+  787 s, 322 GB read from the SSD. Fixed (user: "Streamen statt 8 Bit"; registry stream_before_quant,
+  memory.stream_first: streamed when the shrunk plan leaves less than 1 GB, i.e. on 16 GB; 24/32 GB keep 8 bit,
+  unmeasured), then with the plan as the app makes it (test DMG 0.9.0 750561b+): 28 steps, 21.69 s/step, 611 s first
+  / 574–601 s, peak 10.60 / 10.45–10.62 GB, plan 11.3 GB, -6 %, swap 1.03 GB: target met, and faster than in memory.
+- Pictures checked (contact sheets, 16): lighthouses without faults.
+- The token check of the same build in the test instance: Hugging Face "valid", Civitai "valid" (civitai.com/api/v1/me).
+
 ## 8. Earlier references (from the user guide and the changelog)
 
 - Training on the M2 (2025–26): SDXL about 2.5 s per step at 768 px, FLUX.2 [klein] 4B about 15 s, 9B about 30 s,

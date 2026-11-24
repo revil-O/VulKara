@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 import { Flame, FolderOpen, ImagePlus, Play, Square, X } from '@lucide/vue'
 import PageFrame from '../components/PageFrame.vue'
 import BakeDialog from '../components/BakeDialog.vue'
+import HintBadge from '../components/HintBadge.vue'
 import { useAssetsStore } from '../stores/assets'
 import { useHandoffStore } from '../stores/handoff'
 import { useQueueStore } from '../stores/queue'
@@ -15,13 +16,14 @@ import { formatDuration } from '../util/format'
 import type { TrainingImage, TrainingState } from '@shared/api'
 import { t, type PlainKey } from '../i18n'
 
-const TRAINABLE = ['sdxl', 'flux2_klein', 'krea2']
+const TRAINABLE = ['sdxl', 'flux2_klein', 'krea2', 'z_image', 'ernie_image']
 const PRESETS: { id: string; title: PlainKey; steps: number }[] = [
   { id: 'quick', title: 'training.presets.quick', steps: 100 }, { id: 'standard', title: 'training.presets.standard', steps: 500 },
   { id: 'thorough', title: 'training.presets.thorough', steps: 1200 },
 ]
-// seconds per training step on an M2 with 10 GPU cores at 512 px (it grows with the number of pixels)
-const SECONDS_PER_STEP: Record<string, number> = { sdxl: 2.5, flux2_klein_4b: 15, flux2_klein_9b: 30, krea2: 45 }
+// seconds per training step on an M2 with 10 GPU cores at 512 px (it grows with the number of pixels); Z-Image and
+// ERNIE-Image on the M4 Mac mini, where klein 4B takes the M2's 15 s too (MEASUREMENTS 7cn)
+const SECONDS_PER_STEP: Record<string, number> = { sdxl: 2.5, flux2_klein_4b: 15, flux2_klein_9b: 30, krea2: 45, z_image: 17, ernie_image: 21 }
 
 const assets = useAssetsStore()
 const queue = useQueueStore()
@@ -51,10 +53,13 @@ const PHASES: Record<string, PlainKey> = { loading: 'training.phases.loading', p
 const phaseText = computed(() => state.value.message
   ?? (PHASES[state.value.phase ?? ''] ? t(PHASES[state.value.phase ?? '']) : ''))
 
+// Z-Image Turbo (no guidance) trains with a helper that keeps its few steps for a short run only (ostris' model card)
+const turbo = computed(() => base.value?.meta.arch === 'z_image' && !(Number(base.value.meta.defaults?.guidance_scale ?? 0) > 1))
+
 const estimate = computed(() => {
   const b = base.value
   if (!b) return ''
-  const key = b.meta.arch === 'sdxl' ? 'sdxl' : b.meta.arch === 'krea2' ? 'krea2' : /9b/i.test(b.id) ? 'flux2_klein_9b' : 'flux2_klein_4b'
+  const key = ['sdxl', 'krea2', 'z_image', 'ernie_image'].includes(b.meta.arch) ? b.meta.arch : /9b/i.test(b.id) ? 'flux2_klein_9b' : 'flux2_klein_4b'
   const seconds = SECONDS_PER_STEP[key] * (resolution.value / 512) ** 2 * steps.value
   return t('training.estimate', { duration: formatDuration(seconds) })
 })
@@ -149,6 +154,7 @@ const url = (path: string): string => window.vk.files.url(path)
           <option v-for="m in baseModels" :key="m.id" :value="m.id">{{ m.title }} ({{ m.meta.label }} · {{ m.meta.arch === 'sdxl' ? 'Diffusers' : 'MLX' }})</option>
         </select>
         <small v-if="!baseModels.length" class="warn">{{ t('training.noModel') }}</small>
+        <small v-if="turbo" class="dim turbo">{{ t('training.turbo') }} <HintBadge :text="t('training.turboHint')" :notice="steps > 500" /></small>
       </label>
 
       <div class="field">
@@ -319,6 +325,13 @@ textarea {
 
 .warn {
   color: var(--accent);
+}
+
+/* the badge right after the text (in a block it would take the whole line) */
+.turbo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .status {

@@ -14,7 +14,7 @@ export interface ToolTexts {
   summary: string
   description: string
   defaultLabel?: string
-  variants?: Record<string, { label: string; description: string }>
+  variants?: Record<string, { label: string; description: string; warning?: string }>
 }
 
 export interface DataTexts {
@@ -48,7 +48,7 @@ export function toolText(lang: Lang, id: string, field: 'name' | 'summary' | 'de
   return own(own(own(DATA, lang)?.tools, id) as Record<string, string> | undefined, field) ?? english
 }
 
-export function variantText(lang: Lang, id: string, variant: string, field: 'label' | 'description', english: string): string {
+export function variantText(lang: Lang, id: string, variant: string, field: 'label' | 'description' | 'warning', english: string): string {
   return own(own(own(own(DATA, lang)?.tools, id)?.variants, variant), field) ?? english
 }
 

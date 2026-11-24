@@ -5,7 +5,7 @@ import { ArrowUpCircle, Check, Copy, Download, FolderOpen, Info, Monitor, Moon, 
 import PageFrame from '../components/PageFrame.vue'
 import LanguageSelect from '../components/LanguageSelect.vue'
 import HintBadge from '../components/HintBadge.vue'
-import { useRuntimesStore } from '../stores/runtimes'
+import { cleanError, useRuntimesStore } from '../stores/runtimes'
 import { useSettingsStore } from '../stores/settings'
 import { useQueueStore } from '../stores/queue'
 import type { RuntimeInfo } from '@shared/api'
@@ -25,6 +25,9 @@ const SERVICES: { id: Service; name: string; hint: PlainKey }[] = [
 ]
 const tokenInput = reactive<Record<Service, string>>({ huggingface: '', civitai: '' })
 const tokenStored = reactive<Record<Service, boolean>>({ huggingface: false, civitai: false })
+/** why a token was not saved, and what the site says of a saved one */
+const tokenError = reactive<Record<Service, string>>({ huggingface: '', civitai: '' })
+const tokenCheck = reactive<Record<Service, 'valid' | 'refused' | 'unknown' | ''>>({ huggingface: '', civitai: '' })
 const about = ref<RuntimeInfo>()
 
 /** bytes of encoded prompts on disk (Privacy) */
@@ -82,9 +85,17 @@ const certLink = computed(() => (remote.value.https && remote.value.addresses[0]
 onActivated(refresh)
 
 async function saveToken(service: Service, value: string): Promise<void> {
-  await window.vk.tokens.set(service, value)
+  tokenError[service] = ''
+  tokenCheck[service] = ''
+  try {
+    await window.vk.tokens.set(service, value)
+  } catch (err) {
+    tokenError[service] = cleanError(err)
+    return
+  }
   tokenInput[service] = ''
   tokenStored[service] = await window.vk.tokens.has(service)
+  if (tokenStored[service]) tokenCheck[service] = await window.vk.tokens.check(service)
 }
 
 async function chooseFolder(key: FolderKey): Promise<void> {
@@ -446,8 +457,11 @@ const THEMES: { id: 'system' | 'light' | 'dark'; title: PlainKey; icon: typeof M
               <div class="name">
                 <strong>{{ s.name }}</strong>
                 <span v-if="tokenStored[s.id]" class="tag ok">{{ t('settings.tokens.stored') }}</span>
+                <span v-if="tokenCheck[s.id] === 'valid'" class="tag ok">{{ t('settings.tokens.accepted', { site: s.name }) }}</span>
+                <span v-else-if="tokenCheck[s.id] === 'refused'" class="tag bad">{{ t('settings.tokens.refused', { site: s.name }) }}</span>
               </div>
               <p class="dim">{{ t(s.hint) }}</p>
+              <p v-if="tokenError[s.id]" class="bad">{{ tokenError[s.id] }}</p>
             </div>
             <input v-model="tokenInput[s.id]" type="password" :placeholder="t('settings.tokens.paste')" autocomplete="off" class="token" />
             <button class="btn" :disabled="!tokenInput[s.id].trim()" @click="saveToken(s.id, tokenInput[s.id])">{{ t('settings.tokens.save') }}</button>
@@ -502,6 +516,11 @@ section {
 
 .tag.ok {
   color: var(--ok);
+}
+
+.tag.bad,
+p.bad {
+  color: var(--danger);
 }
 
 .checked {

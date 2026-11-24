@@ -66,7 +66,7 @@ def install(helper_id, report=None, token=None):
         controlnet.ensure_downloaded(spec, token=token)
     elif kind == "upscaler":
         pinned.fetch_pinned(h["repo"], folder, token=token, report=say)
-    elif kind in ("pup", "lora"):
+    elif kind in ("pup", "lora", "text_encoder"):
         pinned.fetch_pinned(h["repo"], folder, token=token, report=say)
     else:
         raise ValueError("Unknown kind of helper: %s" % kind)

@@ -145,3 +145,25 @@ def test_a_card_longer_than_a_card_is_cut():
 def test_the_hires_part_is_cut_only_where_it_begins_a_line():
     card = "Great for upscaling portraits.\nSteps: 28, CFG 4\nHires fix\nSteps: 60"
     assert ms.parse(card) == {"num_steps": 28, "guidance_scale": 4.0}
+
+
+def test_a_markdown_table_and_its_hires_row():
+    # Juggernaut XL v9's card: the settings in a table, the hires fix in a row of it with its own steps
+    card = ("| Setting | Value |\n|---|---|\n| Resolution | `832 × 1216` (portrait) |\n| Sampler | `DPM++ 2M Karras` |\n"
+            "| Steps | `30 – 40` |\n| CFG scale | `3 – 7` (lower = more realistic) |\n"
+            "| Hi-Res fix | `4xNMKD-Siax_200k` upscaler · 15 steps · 0.3 denoise · 1.5× upscale |")
+    s = ms.parse(card)
+    assert s["num_steps"] == 35 and s["guidance_scale"] == 5.0
+    assert s["sampler"] == "DPM++ 2M" and s["sigma_schedule"] == "Karras"
+
+
+def test_the_recommended_guidance_among_a_range():
+    # Animagine XL 4.0's card
+    card = "- **CFG Scale**: 4-7 (5 Recommended)\n- **Sampling Steps**: 25-28 (28 Recommended)\n- **Preferred Sampler**: Euler Ancestral (Euler a)"
+    s = ms.parse(card)
+    assert s["guidance_scale"] == 5.0 and s["num_steps"] == 28
+
+
+def test_recommended_counts_only_on_the_same_line():
+    s = ms.parse("CFG Scale: 1.0-2.0\nSteps: 4-6\n\nRecommended Hires Fix Parameters:")
+    assert s["guidance_scale"] == 1.5 and s["num_steps"] == 5

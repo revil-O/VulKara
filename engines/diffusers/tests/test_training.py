@@ -64,3 +64,52 @@ def test_training_quantizes_more_on_small_macs():
               "components": {"transformer": 9.1, "text_encoder": 8.2, "vae": 0.08}}
     assert mlx_train.choose_bits(klein9, 24) == 4
     assert mlx_train.choose_bits(klein9, 64) == 8
+
+
+def test_training_bounds_mlx_buffer_cache_on_small_macs():
+    assert mlx_train.cache_limit(16) == 2.0 and mlx_train.cache_limit(24) == 2.0
+    assert mlx_train.cache_limit(64) is None
+
+
+def test_z_image_trains_turbo_or_base_with_its_targets_and_fitting_bits(tmp_path):
+    (tmp_path / "transformer").mkdir()
+    (tmp_path / "transformer" / "config.json").write_text(json.dumps({"n_layers": 30}))
+    turbo = {"arch": "z_image", "denoiser": "transformer", "defaults": {"guidance_scale": 0.0},
+             "components": {"text_encoder": 4.02, "transformer": 6.15, "vae": 0.08}}
+    assert mlx_train.model_name(turbo) == "z-image-turbo"
+    assert mlx_train.model_name(dict(turbo, defaults={"guidance_scale": 4.0})) == "z-image"
+    targets = mlx_train.lora_targets(turbo, str(tmp_path), 16)
+    assert len(targets) == 7 and all(t["blocks"] == {"start": 0, "end": 30} for t in targets)
+    assert {"module_path": "layers.{block}.attention.to_q", "blocks": {"start": 0, "end": 30}, "rank": 16} in targets
+    # measured: 4 bit fits 16 GB (10.2 GB), 8 bit (13.2 GB) only from 24 GB (MEASUREMENTS 7cn)
+    assert mlx_train.choose_bits(turbo, 16) == 4
+    assert mlx_train.choose_bits(turbo, 24) == 8
+
+
+def test_the_turbo_adapter_comes_pinned_and_checked(tmp_path, monkeypatch):
+    import pinned
+    seen = {}
+    monkeypatch.setenv("VK_HELPERS_DIR", str(tmp_path))
+    monkeypatch.setattr(pinned, "fetch_urls", lambda urls, files, folder, report=None: seen.update(urls=urls, files=files, folder=folder))
+    path = mlx_train.turbo_adapter()
+    name = "zimage_turbo_training_adapter_v2.safetensors"
+    assert path == str(tmp_path / "train_adapters" / name)
+    assert seen["urls"][name].startswith("https://huggingface.co/ostris/zimage_turbo_training_adapter/resolve/654cd1bf")
+    assert len(seen["files"][name]) == 64
+
+
+def test_ernie_trains_turbo_or_base_with_its_targets_and_fitting_bits(tmp_path):
+    (tmp_path / "transformer").mkdir()
+    (tmp_path / "transformer" / "config.json").write_text(json.dumps({"num_layers": 36}))
+    turbo = {"arch": "ernie_image", "denoiser": "transformer", "defaults": {"guidance_scale": 1.0},
+             "components": {"pe": 0.1, "pe_tokenizer": 0.1, "text_encoder": 3.85, "transformer": 8.03, "vae": 0.08}}
+    assert mlx_train.model_name(turbo) == "ernie-image-turbo"
+    assert mlx_train.model_name(dict(turbo, defaults={"guidance_scale": 4.0})) == "ernie-image"
+    targets = mlx_train.lora_targets(turbo, str(tmp_path), 16)
+    assert len(targets) == 8 and {"module_path": "text_proj", "rank": 16} in targets
+    assert all(t["blocks"] == {"start": 0, "end": 36} for t in targets[:7])
+    # measured: 4 bit fits 16 GB (10.9 GB), 8 bit (14.3 GB) from 24 GB (MEASUREMENTS 7cn)
+    assert mlx_train.choose_bits(turbo, 16) == 4
+    assert mlx_train.choose_bits(turbo, 24) == 8
+    assert mlx_train.FAMILIES["ernie_image"] == "ernie"
+

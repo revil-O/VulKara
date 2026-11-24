@@ -23,7 +23,10 @@ export const MEASURED_ON = { chip: 'Apple M4', ramGb: 16 }
 
 export const EXPECTED: Expectation[] = [
   { model: 'DreamShaper-8', steps: 25, size: 512, secondsPerPicture: 14, peakGb: 3.79, ref: '7bs' },
-  { model: 'Juggernaut-XL-v7', steps: 35, size: 1024, secondsPerPicture: 140, peakGb: 8.76, ref: '7bs' },
+  { model: 'Juggernaut-XL-v9', steps: 35, size: 1024, secondsPerPicture: 141, peakGb: 8.78, ref: '7cq' },
+  { model: 'RealVisXL-V5.0', steps: 30, size: 1024, secondsPerPicture: 235, peakGb: 8.79, ref: '7cq' },
+  { model: 'Animagine-XL-4.0', steps: 28, size: 1024, secondsPerPicture: 114, peakGb: 8.78, ref: '7cq' },
+  { model: 'NoobAI-XL-1.1', steps: 25, size: 1024, secondsPerPicture: 102, peakGb: 8.77, ref: '7cq' },
   { model: 'FLUX.2-klein-4B', steps: 4, size: 1024, secondsPerPicture: 51, peakGb: 6.91, ref: '7bt' },
   { model: 'Z-Image-Turbo', steps: 9, size: 1024, secondsPerPicture: 165, peakGb: 8.97, ref: '7bu' },
   { model: 'Anima-Turbo', steps: 10, size: 1024, secondsPerPicture: 64, peakGb: 10.02, ref: '7bt' },

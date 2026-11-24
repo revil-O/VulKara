@@ -37,6 +37,20 @@ describe('helper models', () => {
     expect(listHelpers(resolve('engines'), helpers).find((h) => h.id === 'objectclear')).toMatchObject({ installed: false, sizeMb: 7460 })
     writeFileSync(join(oc, '.vk-checked.json'), '{"revision": "c73af80888dbd519819d0a521b5c8d0f3cda6859"}')
     expect(listHelpers(resolve('engines'), helpers).find((h) => h.id === 'objectclear')?.installed).toBe(true)
+    // the prompt helpers the same way (FLUX 3's upsampler here): half of it is no download that ended
+    const pup = join(helpers, 'prompt_upsamplers', 'flux3_pup_mlx_4bit')
+    mkdirSync(pup, { recursive: true })
+    writeFileSync(join(pup, 'model-00001-of-00002.safetensors'), Buffer.alloc(4000 * 1024 ** 2 / 1000))
+    expect(listHelpers(resolve('engines'), helpers).find((h) => h.id === 'flux3_pup')?.installed).toBe(false)
+    writeFileSync(join(pup, '.vk-checked.json'), '{"repo": "VisualInference/FLUX-3-Image-Klein-pup-MLX-4bit", "revision": "b6cdf42d7f293db7f468e52de5e5d2e603484c7e"}')
+    expect(listHelpers(resolve('engines'), helpers).find((h) => h.id === 'flux3_pup')?.installed).toBe(true)
+    // LTX-2.3's Gemma the same way: more than half of it is no download that ended
+    const gemma = join(helpers, 'text_encoders', 'gemma_3_12b_it_mlx_4bit')
+    mkdirSync(gemma, { recursive: true })
+    writeFileSync(join(gemma, 'model-00001-of-00002.safetensors'), Buffer.alloc(5000 * 1024 ** 2 / 1000))
+    expect(listHelpers(resolve('engines'), helpers).find((h) => h.id === 'ltx23_gemma')?.installed).toBe(false)
+    writeFileSync(join(gemma, '.vk-checked.json'), '{"repo": "mlx-community/gemma-3-12b-it-4bit", "revision": "86cc6a8dedbc456dd0e4af01a9d09f396f77e558"}')
+    expect(listHelpers(resolve('engines'), helpers).find((h) => h.id === 'ltx23_gemma')?.installed).toBe(true)
   })
 
   it('leaves out the non-commercial ObjectClear and CodeFormer in a build with commercially usable models only', () => {

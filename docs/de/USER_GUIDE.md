@@ -18,7 +18,7 @@ Einstellung bewirkt und wo die App ihre Daten ablegt.
 5. [Bild zu Bild](#5-bild-zu-bild)
 6. [Inpainting](#6-inpainting)
 7. [KI-Leinwand](#7-ki-leinwand)
-8. [Bild zu Video](#8-bild-zu-video)
+8. [Video](#8-video)
 9. [Vergrößern](#9-vergrößern), [Verbessern: Fotowerkzeuge](#verbessern-fotowerkzeuge)
 10. [Restaurieren](#10-restaurieren)
 11. [Pose-Editor](#11-pose-editor)
@@ -469,21 +469,27 @@ Der Bereich rechts erklärt immer, welcher dieser Fälle eintritt.
   ![Erweitern mit FLUX.2 [klein] 4B](../screenshots/de/canvas_extend.jpg)
 - Die Leinwand samt ihren Bildern, Ansicht, Prompt und Modell bleibt über einen Neustart hinweg erhalten.
 
-## 8. Bild zu Video
+## 8. Video
 
-![Bild zu Video](../screenshots/de/video.jpg)
+![Video](../screenshots/de/video.jpg)
 
-Macht aus einem Bild ein kurzes Video. Dafür braucht es die ComfyUI-Runtime und ein Wan-2.2-Modell (Modelle →
-Empfohlen).
+Macht ein kurzes Video. Das können zwei Arten von Modellen (Modelle → Empfohlen):
 
-- **Startbild**: das erste Einzelbild. Das Video übernimmt seine Proportionen.
-- **Prompt**: was passiert, etwa Bewegung, Kamera und Stimmung: *the astronaut slowly waters the plants, gentle
-  camera push in*.
+- **LTX-2.3** (MLX-Runtime): ein Video **mit Ton**, nur aus dem Prompt oder aus einem Startbild. Gemma 3 12B liest
+  den Prompt; es ist ein Hilfsmodell mit 8,1 GB und wird einmal mit dem Button neben Erstellen geladen (oder auf der
+  Seite Modelle). Auf einem Mac mini M4 mit 16 GB brauchte ein Clip von zwei Sekunden in 896 × 512 etwa 5 Minuten,
+  einer von fünf Sekunden etwa 10; dabei waren 8 bis 9,6 GB belegt.
+- **Wan 2.2** (ComfyUI-Runtime): aus einem Startbild, ohne Ton. Auf einem M2 mit 24 GB brauchte ein Clip von einer
+  Sekunde in 480p etwa 8 Minuten, einer von fünf Sekunden 110 Minuten (Wan 2.2 14B, 4 Schritte); die Engine hielt
+  7 bis 10 GB.
+
+- **Startbild**: das erste Einzelbild; das Video übernimmt seine Proportionen. Wan braucht eines, LTX-2.3 startet
+  auch nur aus dem Prompt.
+- **Prompt**: was passiert, etwa Bewegung, Kamera, Stimmung und bei LTX-2.3 der Ton: *a red fox trots through fresh
+  snow at sunrise, soft crunching footsteps and distant birdsong*.
 - **Länge**: 1–5 Sekunden.
-- **Auflösung**: 480p oder 720p.
-
-Video dauert viel länger als Bilder. Auf einem M2 mit 24 GB brauchte ein Clip von einer Sekunde in 480p etwa
-8 Minuten, ein Clip von fünf Sekunden 110 Minuten (Wan 2.2 14B, 4 Schritte); die Engine hielt 7 bis 10 GB.
+- **Auflösung**: 480p oder 720p (LTX-2.3 rundet die Seiten auf Schritte von 64 px).
+- **Mit Ton** (LTX-2.3): aus macht das Video ohne Tonspur.
 
 ## 9. Vergrößern
 
@@ -538,6 +544,35 @@ Linie die Lizenz, ihren Hinweis und die Quelle.
   erstem Herunterladen in etwa 24 s zu 2048 px (MEASUREMENTS 7ce).
 
   ![Vergrößern ×4 mit Natürlich (langsam)](../screenshots/de/enhance_natural.jpg)
+
+- *Detailreich (KI, sehr langsam)* nutzt SeedVR2-3B von ByteDance Seed (Apache-2.0), ein Diffusionsmodell, das über
+  die MLX-Laufzeit läuft: Es stellt Gesichter, Laub und feine Strukturen deutlich besser wieder her als die beiden
+  anderen, **erfindet aber Details**: Schrift, Kennzeichen und kleine Strukturen können anders herauskommen als im Foto
+  (das **!** neben Charakter weist darauf hin). Nicht für Dokumente, Texte oder Beweisfotos. Es wird beim ersten
+  Einsatz einmalig heruntergeladen (7,3 GB); ein vorher geladenes Bildmodell wird währenddessen freigegeben. Auf einem
+  Mac mini mit 16 GB wurde ein Foto mit 512 px in etwa 40 s zu 1024 px und in etwa 2 Minuten zu 2048 px, mit
+  höchstens 11,3 GB Speicher; das Ergebnis hat höchstens 2048 px an der längeren Seite (MEASUREMENTS 7cl).
+
+  ![Vergrößern ×4 mit Detailreich (KI, sehr langsam)](../screenshots/de/enhance_detailed.jpg)
+
+- **Charakter** (Hintergrund entfernen): *Standard* ist BiRefNet; *Apple Vision (schnell)* nutzt die in macOS
+  eingebaute Motiverkennung, dieselbe wie *Motiv auswählen* im Maskenpinsel: etwa 0,2 s statt 5 s und kaum Speicher
+  statt etwa 9 GB, nichts herunterzuladen. Bei einem klaren Motiv schneiden beide gleich gut aus (die Kante von Apple
+  Vision ist etwas weicher); bei mehreren Dingen behält es alles im Vordergrund (eine ganze Gruppe, den Teller neben
+  dem Glas), wo BiRefNet das auffälligste nimmt, und in einem Bild ohne klares Motiv findet es nichts und sagt das:
+  dann Standard wählen (MEASUREMENTS 7cm).
+
+  ![Hintergrund entfernen mit Apple Vision (schnell)](../screenshots/de/enhance_vision.jpg)
+
+**Mehrere Bilder auf einmal.** *Mehrere Bilder …* im leeren Bildfeld (oder mehr als ein Bild ins Feld gezogen) macht
+einen Stapel: Die gewählten Bilder oder alle Bilder eines gewählten Ordners (ohne Unterordner), bis zu 100, erscheinen
+als Liste. Die Einstellungen rechts gelten für jedes; *Auf alle anwenden* stellt je Bild einen Auftrag in die
+Warteschlange, sie laufen nacheinander. *Rest abbrechen* nimmt die noch wartenden heraus. Ein Bild, das das Werkzeug
+nicht nimmt (Apple Vision findet kein Motiv), schlägt allein mit seiner Meldung fehl, die anderen laufen weiter.
+*Objekte auswählen* braucht Klicks in jedes Bild und geht deshalb nicht im Stapel. Auf einem Mac mini mit 16 GB
+brauchte Entrauschen 66 s für 12 Bilder mit 1024 px.
+
+![Ein Stapel Bilder auf Verbessern](../screenshots/de/enhance_batch.jpg)
 - **Vergrößern** (Werkzeuge, die vergrößern, etwa Vergrößern ×4): dieselben vorgegebenen Kacheln und derselbe Regler
   wie auf der Seite „Vergrößern“; das Ergebnis ist so viel Mal so groß wie dein Bild.
 - **Hintergrund entfernen**: *Transparent* ergibt ein PNG mit transparentem Hintergrund, *Maske* die Maske in Schwarz
@@ -559,6 +594,13 @@ Linie die Lizenz, ihren Hinweis und die Quelle.
 ![Restaurieren](../screenshots/de/restore.jpg)
 
 ![Ein von KI erstelltes Foto, künstlich gealtert und von VulKara restauriert: Staub und Kratzer entfernt, Details repariert, das Gesicht restauriert](../images/restore_example.jpg)
+
+**Mehrere Bilder auf einmal** geht auch hier, wie auf Verbessern: Jedes Bild wird als Ganzes mit den gewählten
+Schritten und der Notiz restauriert (eine gemalte Maske und die Vorschau gehören zu einem Bild und entfallen; die
+Gesichter werden in jedem Bild gesucht). Das KI-Modell wird für den ganzen Stapel einmal geladen: Auf einem Mac mini
+mit 16 GB brauchten sechs Bilder mit *Starke Schäden* 153 s für das erste und etwa 120 s für jedes weitere.
+
+![Ein Stapel Bilder auf Restaurieren](../screenshots/de/restore_batch.jpg)
 
 Restauriert alte Fotos: Farbstiche, verblasste Farben, weiche und unscharfe Bilder und Gesichter, Kratzer, Knicke,
 Flecken, Löcher und Schwarzweiß. Wähle das Foto (oder zieh es auf das Feld) und klicke auf **Restaurieren** oder drücke ⌘↩.
@@ -774,7 +816,7 @@ Bringt einem Modell mit deinen eigenen Bildern eine Person, ein Objekt oder eine
 
 1. Gib der LoRA einen **Namen**. Aus dem Namen wird ein **Trigger-Wort** gebildet (zum Beispiel `paper_cranes_zqx`);
    du kannst es ändern.
-2. **Modell für das Training**: SDXL (Diffusers-Runtime), FLUX.2 [klein] oder Krea 2 (MLX-Runtime).
+2. **Modell für das Training**: SDXL (Diffusers-Runtime), FLUX.2 [klein], Krea 2, Z-Image oder ERNIE-Image (MLX-Runtime).
 3. **Bilder**: 10–30 gute Bilder reichen. Verwende **Bilder hinzufügen** oder **Ordner hinzufügen**. Bei einem Ordner
    werden `.txt`-Dateien mit demselben Namen wie ein Bild als dessen Bildbeschreibung verwendet. Jede Bildbeschreibung
    beginnt mit dem Trigger-Wort. Beschreibe in den Bildbeschreibungen, was *nicht* gelernt werden soll, etwa Hintergrund
@@ -788,7 +830,17 @@ Bringt einem Modell mit deinen eigenen Bildern eine Person, ein Objekt oder eine
    Loss-Kurve und Restzeit. Der Mac bleibt wach, und das Erstellen pausiert während des Trainings.
 
 Wenn es fertig ist, öffnet **Stärken vergleichen** die neue LoRA im Vergleich. Ungefähre Zeiten auf einem M2: SDXL
-etwa 2,5 s pro Schritt bei 768 px, FLUX.2 [klein] 4B etwa 15 s, 9B etwa 30 s, Krea 2 etwa 45 s.
+etwa 2,5 s pro Schritt bei 768 px, FLUX.2 [klein] 4B etwa 15 s, 9B etwa 30 s, Krea 2 etwa 45 s; auf dem Mac mini M4 mit 16 GB Z-Image Turbo etwa 17 s und ERNIE-Image Turbo etwa 21 s bei 512 px.
+
+**Z-Image**: Auch Z-Image Turbo und Z-Image (Base) lassen sich trainieren. Für Turbo wird einmal ein Hilfsadapter
+(`zimage_turbo_training_adapter` von ostris, Apache-2.0, 0,3 GB) in den Ordner für Hilfsdateien geladen und geprüft; er
+erhält Turbos wenige Schritte während des Trainings. Er ist für kurze Trainings gedacht (eine Person, ein Gegenstand,
+ein Stil); sehr lange Läufe können Turbo sie trotzdem nehmen, darum wird der Hinweis über *Standard* hinaus zum **!**.
+Auf einem Mac mit 16 GB wird das Basismodell in 4 Bit trainiert (etwa 10 GB, kein Swap), ab 24 GB in 8 Bit.
+**ERNIE-Image** (Turbo und Base) trainiert ohne Hilfsadapter, ebenso auf 16 GB in 4 Bit (etwa 11 GB) und ab 24 GB in
+8 Bit.
+
+![Training mit Z-Image Turbo](../screenshots/de/training_zimage.jpg)
 
 ## 15. Modelle
 
@@ -859,7 +911,7 @@ sein Arbeitsspeicher); ältere Importe werden am Arbeitsspeicher erkannt, für d
 | Familie | Runtime | Hinweise | Modell / Bilder kommerziell |
 | --- | --- | --- | --- |
 | Stable Diffusion 1.5, 2.x | Diffusers | auch Inpainting-Checkpoints | ja / ja (Open RAIL, Nutzungsbeschränkungen) |
-| SDXL, inkl. Turbo, Pony, Illustrious, NoobAI | Diffusers | LoRAs von Pony, Illustrious und NoobAI werden von reinen SDXL-LoRAs unterschieden; auch Inpainting-Checkpoints (9 Kanäle) | ja / ja (Open RAIL++) |
+| SDXL, inkl. Turbo, Pony, Illustrious, NoobAI | Diffusers | LoRAs von Pony, Illustrious und NoobAI werden von reinen SDXL-LoRAs unterschieden; auch Inpainting-Checkpoints (9 Kanäle); eine Checkpoint-Datei wird einmal zu einem Diffusers-Ordner (beim Import, ein älterer Import beim ersten Laden), der beim Laden auf 16 GB weniger Swap braucht | ja / ja (Open RAIL++) |
 | Stable Diffusion 3.5 Medium / Large | Diffusers | | mit Auflagen (unter 1 Million USD Umsatz) |
 | FLUX.1 [schnell] / [dev] | Diffusers oder MLX | auch GGUF-Dateien | schnell ja / ja; dev nein / ja |
 | Chroma (Chroma1-HD, -Base, -Flash, Fine-Tunes) | Diffusers | echte Guidance mit Negativ-Prompt (zwei Durchgänge pro Schritt, daher langsamer als FLUX.1; Chroma1-Flash braucht 12 Schritte und keine Guidance – etwa 7 Minuten pro Bild bei 1024 px auf einem M2 mit 24 GB statt etwa 52); auf M1/M2 in float16 gerechnet, etwa 40 % schneller als bfloat16; safetensors und GGUF; Einzeldateien nehmen T5 und VAE von FLUX.1 | ja / ja (Apache 2.0) |
@@ -876,7 +928,8 @@ sein Arbeitsspeicher); ältere Importe werden am Arbeitsspeicher erkannt, für d
 | Fibo 2.0 Edit Turbo (auch Dev) | ComfyUI; MLX (8 Bit) | Das 8B-Modell von Bria AI; Qwen3-VL 4B liest Prompt und Bild (8 Bit, auf der CPU), der Transformer in 8 Bit, gerechnet in float16; bearbeitet ein Bild nach Anweisung (Bild zu Bild), nur innerhalb einer Maske (Inpainting, AI Canvas) und malt neue Bilder, 4 Schritte ohne Guidance (Dev: 50 Schritte, Guidance 5, zwei Durchläufe pro Schritt: etwa eine Stunde pro neuem Bild, zwei pro Bearbeitung): etwa 6 Minuten pro Bearbeitung und 3 pro neuem Bild bei 1024 px auf einem M2 mit 24 GB; eine Bearbeitung braucht etwa 14,5 GB, also nicht für Macs mit 16 GB; dort läuft die MLX-Version (8-Bit-Dateien von mflux-community: etwa 11 GB, der Text-Encoder nur für den Prompt, etwa 7 Minuten pro Bearbeitung); bis zu vier Bilder zusammen (Weitere Bilder), LoRAs im Diffusers- oder ComfyUI-Layout (jede Runtime bekommt ihres, einmal umgewandelt) | nein / nein (CC BY-NC 4.0) |
 | MOSS-Image (auch die 8-Schritt-Version mit DMD) | ComfyUI | Text im Bild (Englisch und Chinesisch), Poster und Layouts; Qwen 3.5 9B liest den Prompt (4 Bit, auf der CPU), der Transformer in 8 Bit, gerechnet in float16 (Größen bis 2048 px); die Einstellungen des Herstellers: 50 Schritte, Guidance 3, Schicht 22 im negativen Zweig ausgelassen, etwa 48 s pro Schritt bei 1024 px auf einem M2 mit 24 GB (40 Minuten pro Bild); die 8-Schritt-Version ohne Guidance etwa 4½ Minuten; höchstens 8,4 GB auf 16 GB; Text zu Bild, Bild zu Bild und LoRAs; Layouts als JSON (Kapitel 3) | ja / ja (Apache 2.0) |
 | AuraFlow, Pony V7 | ComfyUI; das Repository Diffusers | auf ComfyUI der Transformer als GGUF (Ponys Q8_0 / Q4_0); Prompts werden wie in Ponys Workflow auf 768 Token aufgefüllt; etwa 50 s pro Schritt bei 1024 px auf einem M2 mit 24 GB; die Repositories (fal/AuraFlow-v0.3, purplesmartai/pony-v7-base) auf Diffusers, dort mit 16 GB in 8 Bit; LoRAs für ComfyUI laufen auf beiden | mit Bedingungen (Pony License) |
-| Wan 2.2 5B / 14B (Video) | ComfyUI | Bild zu Video | ja / ja (Apache 2.0) |
+| Wan 2.2 5B / 14B (Video) | ComfyUI | aus einem Startbild | ja / ja (Apache 2.0) |
+| LTX-2.3 (Video mit Ton) | MLX (ltx-2-mlx) | die 4-Bit-MLX-Dateien von dgrauet (20,5 GB) und Gemma 3 12B als Hilfsmodell (8,1 GB); aus dem Prompt oder einem Startbild, 1–5 s mit 24 fps, auf 8 + 3 Schritte destilliert; etwa 5 Minuten für 2 s und 10 für 5 s in 896 × 512 auf einem Mac mini M4 mit 16 GB, höchstens 9,6 GB | mit Bedingungen (unter 10 Mio. US-Dollar Umsatz) |
 
 Die Seite Lizenzen enthält die vollständigen Bedingungen. *Bevorzugte Runtime* in den Einstellungen entscheidet
 zwischen Diffusers und MLX, wo beide ein Modell ausführen können.
@@ -942,8 +995,8 @@ ihrer Downloadgröße. Ein Modell, das mehr Arbeitsspeicher braucht, als der Mac
 
 | Gruppe | Modelle |
 | --- | --- |
-| **Basismodelle** | Stable Diffusion 1.5 (+ Inpainting), SD 2.1, SDXL 1.0 (+ Inpainting), SDXL Turbo, SD 3.5 Medium / Large, FLUX.1 schnell (4/8 Bit), FLUX.1 dev (16/4 Bit), Chroma1-HD, Chroma1-Flash (schnell), Z-Image-Turbo, ERNIE-Image-Turbo, MOSS-Image, Fibo 2.0 Edit Turbo, FLUX.2 [klein] 4B / 9B, Wan 2.2 TI2V 5B / I2V 14B (Video) |
-| **Community-Modelle** | GonzaLomo Chroma, DreamShaper 8, Realistic Vision 5.1, Counterfeit, DreamShaper XL Turbo, Juggernaut XL v7, epiCRealism XL, JANKU Illustrious XL, Anima Turbo, NetaYume Lumina v4, MOSS-Image 8-step (DMD) … |
+| **Basismodelle** | Stable Diffusion 1.5 (+ Inpainting), SD 2.1, SDXL 1.0 (+ Inpainting), SDXL Turbo, SD 3.5 Medium / Large, FLUX.1 schnell (4/8 Bit), Chroma1-Flash (schnell), Z-Image-Turbo, ERNIE-Image-Turbo, MOSS-Image, Fibo 2.0 Edit Turbo, FLUX.2 [klein] 4B / 9B, LTX-2.3 (Video) |
+| **Community-Modelle** | GonzaLomo Chroma, DreamShaper 8, Realistic Vision 5.1, Counterfeit, DreamShaper XL Turbo, Juggernaut XL v9, RealVisXL V5.0, Animagine XL 4.0, NoobAI-XL 1.1, JANKU Illustrious XL, Anima Turbo, NetaYume Lumina v4, MOSS-Image 8-step (DMD) … |
 | **Explizite Modelle** | nur gelistet, wenn Nacktheit in den Einstellungen erlaubt ist |
 
 Manche Modelle brauchen ein Zugriffstoken (Einstellungen → Zugriffstoken) oder eine auf ihrer Hugging-Face-Seite

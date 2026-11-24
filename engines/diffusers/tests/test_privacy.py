@@ -120,9 +120,11 @@ def test_the_helper_catalog_matches_what_the_engines_download():
         all_pins = json.load(f)
     for h in cat:
         assert h["kind"] in ("content", "lama", "ddcolor", "preprocess", "controlnet", "upscaler", "faces", "pup", "lora", "rorem",
-                             "objectclear"), h["id"]
-        if h["kind"] in ("preprocess", "controlnet", "upscaler", "pup", "lora"):
+                             "objectclear", "text_encoder"), h["id"]
+        if h["kind"] in ("preprocess", "controlnet", "upscaler", "pup", "lora", "text_encoder"):
             assert h["repo"] in all_pins, h["id"]
+        if h["kind"] in ("text_encoder", "pup"):  # the app counts it as there only with pinned.py's mark of this revision
+            assert h["revision"] == all_pins[h["repo"]]["revision"], h["id"]
         if h["kind"] == "faces":  # GitHub releases: every file with an https URL and its SHA-256
             import restore
             assert all(u.startswith("https://github.com/") and len(d) == 64 for u, d in restore.FACE_FILES.values())

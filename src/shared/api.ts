@@ -474,7 +474,8 @@ export interface RecommendedTool {
   summary?: string
   description: string
   /** other weights the tool offers, downloaded when first chosen; defaultLabel names its own */
-  variants?: { id: string; label: string; description: string; sizeMb: number }[]
+  /** maxOutput: the result's longer side at most; warning: what to keep in mind (SeedVR2 invents detail) */
+  variants?: { id: string; label: string; description: string; sizeMb: number; maxOutput?: number; warning?: string }[]
   defaultLabel?: string
   /** JPEG cleanup: the JPEG quality can be set */
   quality?: boolean
@@ -550,6 +551,8 @@ export interface VulkaraApi {
   tokens: {
     set(service: 'huggingface' | 'civitai', token: string): Promise<'stored' | 'session' | 'removed'>
     has(service: 'huggingface' | 'civitai'): Promise<boolean>
+    /** whether the site takes the stored token (Hugging Face only) */
+    check(service: 'huggingface' | 'civitai'): Promise<'valid' | 'refused' | 'unknown'>
   }
   runtimes: {
     list(): Promise<RuntimeInfo[]>
@@ -704,6 +707,8 @@ export interface VulkaraApi {
     /** vk-file:// URL of a local file for <img> / <video> */
     url(path: string): string
     choose(kind: 'image' | 'folder' | 'model'): Promise<string | undefined>
+    /** pictures and folders for a batch (a folder: its pictures); every one granted to the pages */
+    chooseMany(): Promise<string[]>
     saveAs(path: string, suggestedName: string): Promise<boolean>
     reveal(path: string): Promise<void>
     /** macOS's share menu for a result (Mail, Messages, AirDrop, apps that offer themselves); false: not allowed */

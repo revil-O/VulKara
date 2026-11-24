@@ -39,6 +39,8 @@ export function recommendedTools(enginesDir: string, toolsDir: string): Recommen
       ? Object.entries(t.variants as Record<string, Raw>).map(([id, v]) => ({
         id, label: variantText(lang, str(t.id), id, 'label', str(v.label) || id),
         description: variantText(lang, str(t.id), id, 'description', str(v.description)), sizeMb: Number(v.size_mb) || 0,
+        maxOutput: Number(v.max_output) || undefined,
+        warning: str(v.warning) ? variantText(lang, str(t.id), id, 'warning', str(v.warning)) : undefined,
       }))
       : undefined,
     defaultLabel: str(t.default_label) ? toolText(lang, str(t.id), 'defaultLabel', str(t.default_label)) : undefined, quality: t.quality === true, sizeMb: Number(t.size_mb) || 0, licence: str(t.licence),

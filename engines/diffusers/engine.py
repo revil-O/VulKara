@@ -264,7 +264,9 @@ class LoadedModel:
         self.stream_release = False  # the kept blocks make room while a new prompt is encoded
         self.stream_model = None
         mode = stream_mode()
-        if self._can_stream() and (mode == "always" or (mode == "auto" and not self.plan["fits"])):
+        auto = not self.plan["fits"] or memory.stream_first(self.spec, self.plan, self.m["denoiser"],
+                                                             self.m.get("quant_request", "auto"))
+        if self._can_stream() and (mode == "always" or (mode == "auto" and auto)):
             # the denoiser's blocks come from the SSD one at a time (streaming.py); "auto" only as an
             # emergency mode for models that do not fit otherwise
             comps = dict(self.m["components"])
@@ -1492,6 +1494,11 @@ class DiffusersEngine:
         # imports made before FP8 support: convert once to GGUF (the GPU can not use FP8)
         from importer import migrate_fp8
         migrate_fp8(model_dir, progress_cb=lambda p: protocol.status("Converting FP8 model to GGUF (one-time) %d%%" % p))
+        # SDXL and 32-bit SD 1.x / 2.x checkpoint files imported before: a 16-bit Diffusers folder loads with less
+        # swap; 32-bit SD 1.x / 2.x folders are saved in 16 bit (importer.migrate_single_file, migrate_fp32)
+        from importer import migrate_fp32, migrate_single_file
+        migrate_single_file(model_dir, status=protocol.status)
+        migrate_fp32(model_dir, status=protocol.status)
         # base parts a single-file model lacks (e.g. a Chroma checkpoint once imported as FLUX.1): taken from what
         # is there, else downloaded once
         from importer import ensure_base
@@ -1635,7 +1642,7 @@ class DiffusersEngine:
         if init_image is not None and d.get("mask_image"):
             # inpainting / outpainting (AI Canvas): white in the mask is painted anew
             if not spec.get("inpaint_pipeline"):
-                raise ValueError("%s can not paint into a mask; use an SD 1.5, SD 2.x, SDXL, SD 3.5, FLUX.1, Chroma, Qwen-Image or Z-Image model" % spec["label"])
+                raise ValueError("%s can not paint into a mask; use an SD 1.5, SD 2.x, SDXL, SD 3.5, FLUX.1, FLUX.2 [klein], Chroma, Qwen-Image or Z-Image model" % spec["label"])
             if pipe_class:
                 raise ValueError("ControlNet and a mask can not be combined")
             from PIL import Image

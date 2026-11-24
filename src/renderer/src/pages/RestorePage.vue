@@ -14,6 +14,8 @@ import CompareSlider from '../components/CompareSlider.vue'
 import FaceBoxes, { type Face } from '../components/FaceBoxes.vue'
 import HintBadge from '../components/HintBadge.vue'
 import ImageInput from '../components/ImageInput.vue'
+import BatchPanel from '../components/BatchPanel.vue'
+import { isRemote } from '../remote_vk'
 import MaskCanvas from '../components/MaskCanvas.vue'
 import SliderRow from '../components/SliderRow.vue'
 import JobGallery from '../components/JobGallery.vue'
@@ -216,8 +218,12 @@ watch(compare, async (c) => {
 }, { immediate: true })
 
 function check(): string {
-  return !input.value ? t('restore.choosePhoto')
-    : !opts.value.correct && !opts.value.dust && !opts.value.repair && !opts.value.colorize && !opts.value.sharpen && !opts.value.details && !opts.value.faces ? t('restore.chooseStep')
+  return !input.value ? t('restore.choosePhoto') : checkSteps()
+}
+
+/** What the settings lack, whatever the picture (also for a batch). */
+function checkSteps(): string {
+  return !opts.value.correct && !opts.value.dust && !opts.value.repair && !opts.value.colorize && !opts.value.sharpen && !opts.value.details && !opts.value.faces ? t('restore.chooseStep')
       : usesAi.value && !model.value ? t('restore.needsModelError') : ''
 }
 
@@ -251,23 +257,34 @@ async function send(o: RestoreOptions, kind: string): Promise<void> {
   try {
     const data = painted.value ? await mask.value?.exportMask() : undefined
     const maskImage = data ? await window.vk.files.writeImage(data) : undefined
-    const what = [o.correct && 'corrected', o.dust && 'dust removed', o.repair && 'repaired', o.details && 'details rebuilt', o.faces && 'faces restored',
-      o.colorize && 'coloured', o.sharpen && 'sharpened', o.scale === 2 && 'twice the size'].filter(Boolean).join(', ')
-    const scale = o.scale === 2 && !o.preview ? 2 : 1
-    const job: Omit<Job, 'id'> = {
-      page: 'restore', prompt: note.value.trim(), modelId: usesAi.value ? model.value!.id : '', modelDir: usesAi.value ? model.value!.folder : '',
-      width: size.value[0] * scale, height: size.value[1] * scale, seed: -1, steps: usesAi.value ? steps.value : 0, guidance: 1, inputImage: input.value, maskImage,
-      // the consistency LoRA only where it is made for (klein 4B); its switch is hidden for the others
-      restore: { ...o, consistency: o.consistency && takesConsistency(model.value?.meta), scale, rules: [...userRules.value], facePoints: facesState.value === 'found' ? faces.value.map((f) => f.points.map(([x, y]) => [x, y] as [number, number])) : undefined },
-      label: `${kind || 'Restored'}: ${what}`, // i18n-ok: stored in English, shown by jobLabel()
-    }
-    await queue.add(job)
+    const facePoints = facesState.value === 'found' ? faces.value.map((f) => f.points.map(([x, y]) => [x, y] as [number, number])) : undefined
+    await queue.add(jobFor(o, kind, input.value, size.value, maskImage, facePoints))
   } catch (err) {
     error.value = cleanError(err)
   } finally {
     sending.value = false
   }
 }
+
+/** The job of one picture with these options (also each picture of a batch: no mask, the engine finds the faces). */
+function jobFor(o: RestoreOptions, kind: string, path: string, sz: [number, number], maskImage?: string, facePoints?: [number, number][][]): Omit<Job, 'id'> {
+  const what = [o.correct && 'corrected', o.dust && 'dust removed', o.repair && 'repaired', o.details && 'details rebuilt', o.faces && 'faces restored',
+    o.colorize && 'coloured', o.sharpen && 'sharpened', o.scale === 2 && 'twice the size'].filter(Boolean).join(', ')
+  const scale = o.scale === 2 && !o.preview ? 2 : 1
+  return {
+    page: 'restore', prompt: note.value.trim(), modelId: usesAi.value ? model.value!.id : '', modelDir: usesAi.value ? model.value!.folder : '',
+    width: sz[0] * scale, height: sz[1] * scale, seed: -1, steps: usesAi.value ? steps.value : 0, guidance: 1, inputImage: path, maskImage,
+    // the consistency LoRA only where it is made for (klein 4B); its switch is hidden for the others
+    restore: { ...o, consistency: o.consistency && takesConsistency(model.value?.meta), scale, rules: [...userRules.value], facePoints },
+    label: `${kind || 'Restored'}: ${what}`, // i18n-ok: stored in English, shown by jobLabel()
+  }
+}
+
+// a batch: the pictures, what the settings lack, the job of each (the whole photo, no preview)
+const batch = ref<string[]>([])
+const remote = isRemote()
+const batchBlocked = computed(() => checkSteps() || undefined)
+const makeJob = (path: string, sz: [number, number]): Omit<Job, 'id'> => jobFor({ ...opts.value, preview: undefined }, '', path, sz)
 
 function open(q: QueuedJob, file: string): void {
   const pictures = jobs.value.flatMap((x) => queue.shown(x).map((f) => ({ job: JSON.parse(JSON.stringify(x.job)) as Job, file: f })))
@@ -278,7 +295,8 @@ function open(q: QueuedJob, file: string): void {
 <template>
   <PageFrame :title="t('restore.title')" :subtitle="t('restore.subtitle')">
     <div class="page-grid">
-      <ImageInput v-model="input" @size="(w, h) => (size = [w, h])">
+      <BatchPanel v-if="batch.length" v-model="batch" :make="makeJob" :blocked="batchBlocked" />
+      <ImageInput v-else v-model="input" :many="!remote" @size="(w, h) => (size = [w, h])" @many="batch = $event">
         <template #default="{ src, loaded }">
           <MaskCanvas ref="mask" :src="src" @loaded="(e) => (loaded(e), measure(e))" @change="painted = $event">
             <template #overlay>
@@ -314,7 +332,7 @@ function open(q: QueuedJob, file: string): void {
         <div class="send">
           <span v-if="error" class="error selectable">{{ error }}</span>
           <span v-else class="dim">{{ t('restore.shortcut') }}</span>
-          <span class="buttons">
+          <span v-if="!batch.length" class="buttons">
             <button class="btn" :disabled="sending || !input" @click="preview"><Eye :size="14" /> {{ t('restore.preview') }}</button>
             <HintBadge above :text="t('restore.previewHint')" />
             <button class="btn primary" :disabled="sending || !input" @click="restore"><WandSparkles :size="14" /> {{ t('restore.restore') }}</button>

@@ -138,6 +138,46 @@ const PLAN_M4 = [
   ['AI Canvas Extend, FLUX.2 [klein] 4B + outpaint LoRA', 'Diffusers · 104–126 s per picture (7cg)', 10.2, 11.6],
 ]
 
+// the recommended list of 0.10.0: the models kept, each with its last five-picture series on the Mac mini M4 16 GB,
+// the highest peak of pictures 2–5 against the plan (MEASUREMENTS 7cq, 7cr)
+const RECOMMENDED = [
+  ['SD 1.5, 512 px', 'Diffusers · 14 s (7cr)', 3.79, 3.6],
+  ['Dreamlike Diffusion 1.0, 512 px', 'Diffusers · 14 s (7cr)', 3.67, 3.6],
+  ['Arcane Diffusion, 512 px', 'Diffusers · 14 s (7cr)', 3.78, 3.6],
+  ['Mo-Di Diffusion, 512 px', 'Diffusers · 14 s (7cr)', 3.78, 3.6],
+  ['GhostMix v2, 512 px', 'Diffusers · 15 s (7cr)', 3.78, 3.6],
+  ['CyberRealistic Final, 512 px', 'Diffusers · 32 s (7cr)', 3.78, 3.6],
+  ['Realistic Vision 5.1, 512 px', 'Diffusers · 14 s; 32 bit saved in 16 bit once (7cr)', 3.79, 3.6],
+  ['Counterfeit V2.5, 512 px', 'Diffusers · 11 s; saved in 16 bit (7cr)', 3.67, 3.6],
+  ['DucHaiten AIart, 512 px', 'Diffusers · 14 s; saved in 16 bit (7cr)', 3.79, 3.6],
+  ['ReV Animated 1.2.2, 512 px', 'Diffusers · 14 s; saved in 16 bit (7cr)', 3.80, 3.6],
+  ['SD 2.1, 768 px', 'Diffusers · 14 s; plan corrected from 4.1 GB (7cr)', 5.79, 5.8],
+  ['SDXL Base 1.0', 'Diffusers · 121 s (7cr)', 8.78, 9.4],
+  ['SDXL Turbo, 512 px', 'Diffusers · 2 s (7cr)', 8.75, 8.28],
+  ['DreamShaper XL v2 Turbo', 'Diffusers · 27–28 s (7cr)', 8.78, 9.4],
+  ['Animagine XL 4.0', 'Diffusers · 114 s (7cq)', 8.78, 9.4],
+  ['RealVisXL V5.0', 'Diffusers · 235 s; DPM++ SDE takes two passes per step (7cq)', 8.79, 9.4],
+  ['NoobAI-XL 1.1', 'Diffusers · 102 s (7cq)', 8.77, 9.4],
+  ['Juggernaut XL v9', 'Diffusers · 141 s (7cq)', 8.78, 9.4],
+  ['CyberRealistic Pony v18', 'Diffusers · 231 s; file turned into a folder (7cr)', 8.86, 9.4],
+  ['JANKU Illustrious XL', 'Diffusers · 120 s; as a folder (7cr)', 8.81, 9.4],
+  ['Retrordinary', 'Diffusers · 150 s; as a folder (7cr)', 8.84, 9.4],
+  ['LUSTIFY apexV8', 'Diffusers · 123 s; as a folder (7cr)', 8.81, 9.4],
+  ['MoP Mix fustercluck', "Diffusers · 26 s with the maker's LCM; as a folder (7cr)", 8.81, 9.4],
+  ['SD 3.5 Medium', 'Diffusers, 8 bit · 325 s (7cr)', 5.31, 10.4],
+  ['SD 3.5 Large, streamed', 'Diffusers · 574–601 s; streamed instead of 8 bit on 16 GB (7cr)', 10.62, 11.3],
+  ['FLUX.1 [schnell] Q4', 'Diffusers, GGUF · 121–136 s; swap once after the import only (7cr)', 9.86, 10.6],
+  ['FLUX.2 [klein] 9B', 'Diffusers · 114 s (7cr)', 10.03, 9.8],
+  ['FLUX 3 Image Klein, MLX 6 bit', 'MLX · 220 s (7cr)', 9.40, 8.7],
+  ['Chroma1 Flash, streamed', 'Diffusers · 320–323 s; never 4 bit any more (7cr)', 7.59, 11.5],
+  ['GonzaLomo Chroma, streamed', 'Diffusers · 1908 s (7cr)', 8.01, 11.5],
+  ['MOSS-Image 8-step DMD', 'ComfyUI · 208 s (7cr)', 8.69, 9.2],
+  ['MOSS-Image', 'ComfyUI · 1955 s, 50 steps (7cr)', 8.42, 9.2],
+  ['Inpainting: SD 1.5 Inpainting, 512 px', 'Diffusers · 16 s (7cr)', 3.81, 3.6],
+  ['Inpainting: SDXL Inpainting 0.1', 'Diffusers · 82 s (7cr)', 8.87, 9.4],
+  ['Inpainting: FLUX.1 Fill Q4', 'Diffusers, GGUF · 712 s (7cr)', 10.05, 10.0],
+]
+
 // work done once and kept, and a stop that waited (MEASUREMENTS 7r, 7s, 7t, 7u, 7x, 7y, 7z): before, after, unit
 const ONCE = [
   { ref: '7s', what: 'Qwen-Image 2.1, whole picture', sub: '16 GB plan: text encoder quantized to 4 bit, then from the quantized cache', a: 10971, b: 221, unit: 's' },
@@ -162,6 +202,15 @@ const ONCE = [
   { ref: '7cc', what: 'ObjectClear, picture changed outside the painted mask', sub: '11 photos, mean: beyond the mask only where its fill is lighter (a removed shadow), never on another face', a: 14.3, b: 6.5, unit: '%' },
   { ref: '7cc', what: 'ObjectClear, the same on architecture', sub: '28 pictures of buildings and streets, mean', a: 11.7, b: 6.0, unit: '%' },
   { ref: '7cd', what: 'ObjectClear, a person beside the removed one', sub: 'picture changed beyond twice the mask growth: people found by Apple Vision protected', a: 0.36, b: 0.11, unit: '%' },
+  { ref: '7cj', what: 'ObjectClear, an unpainted person beside the object', sub: 'Mac mini M4 16 GB: her area changed with the soft edge (0.9.0) against without it; not taken: a hard seam and a light patch remain', a: 63.6, b: 18.4, unit: '%' },
+  { ref: '7ck', what: 'SDXL, prompt K/V once per picture', sub: 'Mac mini M4 16 GB, Juggernaut XL v7, 20 steps: bit-equal but only 0.9 % faster, under the 5 % asked; not built in', a: 76.77, b: 76.06, unit: 's' },
+  { ref: '7cl', what: 'SeedVR2-3B, upscale to 2048 px, memory at most', sub: "Mac mini M4 16 GB, 8 bit: plain against mflux's low-ram saver, bit-equal, about 7 % more time", a: 15.52, b: 11.29, unit: 'GB' },
+  { ref: '7cn', what: 'LoRA training, FLUX.2 [klein] 4B, memory at most', sub: "Mac mini M4 16 GB, 4 bit base: MLX's buffer cache bounded to 2 GB, the same 15 s per step, no swap added", a: 11.49, b: 8.37, unit: 'GB' },
+  { ref: '7cp', what: 'LTX-2.3, 2 s video with sound, memory at most', sub: "Mac mini M4 16 GB: ltx-2-mlx as it is against the app's path (Gemma freed after encoding, transformer streamed)", a: 14.36, b: 8.0, unit: 'GB' },
+  { ref: '7cr', what: 'SDXL single files, swap added while loading', sub: 'Mac mini M4 16 GB, the mean of the series: the file as it is against turned into a Diffusers folder once; time, memory and pictures the same', a: 2.06, b: 1.53, unit: 'GB' },
+  { ref: '7cr', what: 'SD 3.5 Large, swap added (second load)', sub: 'Mac mini M4 16 GB: transformer 8 bit in memory against streamed in 16 bit (574–601 s against 594–595 s per picture)', a: 4.98, b: 1.03, unit: 'GB' },
+  { ref: '7cr', what: 'Chroma1 Flash, per picture', sub: 'Mac mini M4 16 GB, pictures 2–5: transformer quantized to 4 bit at the load (coarse coloured noise) against streamed in 16 bit (clean)', a: 344, b: 323, unit: 's' },
+  { ref: '7cr', what: 'MoP Mix fustercluck (DMD), per picture', sub: "Mac mini M4 16 GB: VulKara's 30 steps and CFG 6 against the maker's LCM and 11 steps, which also look right", a: 120, b: 26, unit: 's' },
   { ref: '7r', what: 'Stop while SSD streaming is prepared', sub: 'Chroma1 Flash, stopped at 21 %: seconds until the job ended', a: 84.9, b: 0, unit: 's' },
 ]
 
@@ -228,6 +277,14 @@ const TOOLS = [
   ['AI Canvas Extend, Juggernaut XL v7', '', 145, 10.2, '7cg'],
   ['AI Canvas Extend, klein 9B, reference as it is', 'bars stayed in 7 of 10', 259, 11.7, '7ch'],
   ['AI Canvas Extend, klein 9B, reference blanked under the mask (0.9.0)', '', 214, 11.9, '7ch'],
+  ['Upscale ×4 to 1024 px, SeedVR2-3B (Detailed)', '8 bit, low-ram saver, 36–38 s', 38.1, 11.24, '7cl'],
+  ['Upscale ×4 to 2048 px, SeedVR2-3B (Detailed)', '8 bit, low-ram saver; 132 s in the app', 127.0, 11.29, '7cl'],
+  ['Creative upscale, SDXL tiles + Tile ControlNet (not built)', '9 tiles of 1024 px, strength 0.45', 574, 11.2, '7co'],
+  ['Remove background, Apple Vision (fast)', '15 pictures, median', 0.15, 0.06, '7cm'],
+  ['Remove background, BiRefNet lite (Standard)', 'ONNX fp16 on the CPU', 5.67, 9.94, '7cm'],
+  ['Video, LTX-2.3, 2 s with sound, 896 × 512', 'MLX in the app, 6 runs 305–333 s', 333, 9.1, '7cp'],
+  ['Video, LTX-2.3, 5 s with sound, 896 × 512', 'MLX in the app', 581, 9.6, '7cp'],
+  ['Video, LTX-2.3, 5 s with sound, 1280 × 704', 'MLX in the app, the example clip (seed 7)', 1141, 11.6, '7cp'],
 ]
 
 // the fused kernel by head size, 2 × 8 heads, 4096 tokens (MEASUREMENTS 7n): [label, ms, extra GB]
@@ -379,7 +436,7 @@ function planChart(id, title, sub, data, ref) {
   const ax = axis(Math.max(...data.flatMap((p) => [p[2], p[3]])), 4)
   const rows = data.map(([model, rt, used, plan]) => {
     const d = used - plan
-    const v = `${d >= 0 ? '+' : '−'}${fmt(Math.abs(d))} GB`
+    const v = fmt(Math.abs(d)) === '0' ? '±0 GB' : `${d >= 0 ? '+' : '−'}${fmt(Math.abs(d))} GB`
     return dumbbell({ label: model, sub: rt, a: plan, b: used, ax, value: v, tip: `${model} (${rt}): planned ${fmt(plan)} GB, used ${fmt(used)} GB (${v}). MEASUREMENTS ${ref}` })
   }).join('')
   return `
@@ -514,19 +571,20 @@ function captionChart() {
 }
 
 function toolsChart() {
+  const fmt2 = (v) => fmt(v, v < 1 ? 2 : 1)
   const ax = axis(Math.max(...TOOLS.map((r) => r[2])), 4)
   const rows = TOOLS.map(([label, sub, sec, gb, ref]) => `
-        <div class="bx-row" data-tip="${esc(`${label}: up to ${fmt(sec)} s per picture, ${fmt(gb)} GB at most. MEASUREMENTS ${ref}`)}" tabindex="0">
+        <div class="bx-row" data-tip="${esc(`${label}: up to ${fmt2(sec)} s per picture, ${fmt2(gb)} GB at most. MEASUREMENTS ${ref}`)}" tabindex="0">
           <span class="dot-label">${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ''}</span>
           <span class="bx-track">${grid(ax)}<span class="hbar ${at(`width:${pct(sec, ax.top)}%`)}"></span></span>
-          <span class="bx-value">${fmt(sec)} s · ${fmt(gb)} GB</span>
+          <span class="bx-value">${fmt2(sec)} s · ${fmt2(gb)} GB</span>
         </div>`).join('')
   return `
     <section class="chart" id="tools">
-      <h2>Remove, upscale, refine faces, extend: on a 16 GB Mac</h2>
-      <p class="sub">The tools of 0.9.0 on a Mac mini M4 with 16 GB, through the app's engine, one job per picture (the mean or the slowest picture). The bar is the time per picture, the memory is the job's peak. ObjectClear removed shadows with the object where LaMa and RORem left a dark patch, and invented things in about 6 of 28 architecture pictures; DAT2 kept the most natural texture. klein Base 4B with the LoRA (50 steps) was as good as the distilled one but took 42–43 minutes per picture.</p>
+      <h2>Remove, upscale, refine faces, extend, cut out, video: on a 16 GB Mac</h2>
+      <p class="sub">The tools of 0.9.0, and from SeedVR2 on those of 0.10.0, on a Mac mini M4 with 16 GB, through the app's engine, one job per picture (the mean or the slowest picture). The bar is the time per picture, the memory is the job's peak. ObjectClear removed shadows with the object where LaMa and RORem left a dark patch, and invented things in about 6 of 28 architecture pictures; DAT2 kept the most natural texture. klein Base 4B with the LoRA (50 steps) was as good as the distilled one but took 42–43 minutes per picture.</p>
       <div class="bx">${ticksRow(ax, ' s')}${rows}
-      </div>${table(['Tool', 's per picture', 'GB at most', 'MEASUREMENTS'], TOOLS.map(([l, sub, sec, gb, ref]) => [esc(l + (sub ? ` (${sub})` : '')), fmt(sec), fmt(gb), ref]))}
+      </div>${table(['Tool', 's per picture', 'GB at most', 'MEASUREMENTS'], TOOLS.map(([l, sub, sec, gb, ref]) => [esc(l + (sub ? ` (${sub})` : '')), fmt2(sec), fmt2(gb), ref]))}
     </section>`
 }
 
@@ -610,6 +668,7 @@ export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }
     planChart('plan', 'The memory plan against the measurement', 'Before every picture VulKara plans the memory a model needs and picks bit size, staging or streaming from it. Here the plan against what the engine used, 1024 px; the right column is the difference. Before the fixes of the same day (decoding in tiles, padded attention).', PLAN, '7m'),
     planChart('plan-after', 'Plans brought to the measurements', 'SD 1.5 planned at its own size with fused attention, ComfyUI models with the plan of a model held whole (shown in the benchmark since 0.7.5). The ComfyUI figures are the middle of two runs. Qwen-Image 2.1 streamed: the blocks kept in memory were not counted while denoising (planned 9.1 GB before). ComfyUI on 16 GB: the text encoder and the model planned apart, as ComfyUI loads them (MOSS-Image 14 GB before, NetaYume 11.6). Fibo 2.0: the activations of an edit counted (12.1 GB planned before).', PLAN_AFTER, '7p'),
     planChart('plan-m4', 'On a 16 GB Mac: Mac mini M4', 'VulKara 0.7.11 on an Apple M4 with 16 GB (the other charts: the M2, 16 GB simulated there); from MOSS-Image on, test builds after it (MEASUREMENTS 7ah, 7ba–7bl). The plan against what the engine used, 1024 px (Fibo 768 px), with the seconds per step or per picture. Fibo 2.0 on MLX started 6.3 GB short and read 18.9 GB back from the swap: slower than on the M2 (7ba). Above their plan and open: FLUX.1 [schnell] 8 bit streamed (3.9 GB), NetaYume v4 (1.8 GB), FLUX.1 Fill (0.9 GB) (7bf, 7bj).', PLAN_M4, '7af'),
+    planChart('plan-list', 'The recommended list on a 16 GB Mac', 'The models kept in the recommended list of 0.10.0, five pictures each on a Mac mini M4 with 16 GB in the app (Hardware → Benchmark, the model\'s own settings, 1024 px unless named), the highest peak of pictures 2–5 against the plan, with the time per picture. The target: at most 10 % over the plan and at most 2 GB swap added. epiCRealism XL v8, MoP Mix asap, MiaoMiao RealSkin, FLUX.1 [dev] and its Q4 missed it and left the list, Chroma1 HD too; four SD 1.5 models in 32 bit are saved in 16 bit and the SDXL single files turned into folders once, at the import or the first load (MEASUREMENTS 7cq, 7cr).', RECOMMENDED, '7cq'),
     onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
   const tileHtml = tiles()
   const css = RULES.map((r, i) => `.bench-page .p${i}{${r}}`).join('\n') + '\n'

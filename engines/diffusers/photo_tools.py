@@ -399,6 +399,27 @@ def run_mask(m, folder, rgb):
     return np.asarray(mask, np.float32) / 255.0
 
 
+def vision_mask(rgb):
+    """The subject as a mask by Apple Vision (the app's helper, VK_SUBJECT_HELPER: every foreground instance, as
+    Select subject takes it), HW float 0..1; no model, no download (MEASUREMENTS 7cm)."""
+    import subprocess
+    import tempfile
+    from PIL import Image
+    helper = os.environ.get("VK_SUBJECT_HELPER") or ""
+    if not os.path.isfile(helper):
+        raise ValueError("Apple Vision is not available here (the app's helper is missing)")
+    with tempfile.TemporaryDirectory() as work:
+        src, out = os.path.join(work, "picture.png"), os.path.join(work, "mask.png")
+        Image.fromarray(rgb).save(src)  # upright and in sRGB as the app shows it
+        run = subprocess.run([helper, src, out], capture_output=True, text=True, timeout=120)
+        if run.returncode == 4:
+            raise ValueError("Apple Vision found no subject in this picture: try Standard (BiRefNet)")
+        if run.returncode != 0:
+            raise ValueError("Apple Vision failed: %s" % (run.stderr.strip()[-200:] or "exit %d" % run.returncode))
+        with Image.open(out) as mask:
+            return np.asarray(mask.convert("L").resize((rgb.shape[1], rgb.shape[0]), Image.BILINEAR), np.float32) / 255.0
+
+
 def blend(original, result, strength):
     """The tool's result mixed with the original (enlarged the plain way where the tool enlarges)."""
     if strength >= 0.999:
@@ -462,7 +483,11 @@ def apply(job, images_dir, report=None, stop=None, note=None):
                 picture = picture.resize(target, Image.LANCZOS)
         suffix = m.get("task") or "enhanced"
     elif m["kind"] == "mask":
-        mask = run_mask(m, folder, rgb)
+        variant = opts.get("variant")
+        v = variants(m).get(variant) if variant and variant != "default" else None
+        if variant and variant != "default" and not v:
+            raise ValueError("%s has no variant %s" % (m.get("name", "This tool"), variant))
+        mask = vision_mask(rgb) if v and v.get("helper") == "subject-mask" else run_mask(m, folder, rgb)
         picture, suffix = _cutout_or_mask(rgb, mask, opts.get("output", "cutout"))
     elif m["kind"] == "segment":
         # the mask was chosen interactively (segment_serve); the job only cuts out with it
@@ -495,6 +520,8 @@ def _variant_model(m, folder, variant, report=None):
     v = variants(m).get(variant)
     if not v:
         raise ValueError("%s has no variant %s" % (m.get("name", "This tool"), variant))
+    if v.get("engine"):  # SeedVR2: the app sends it to that engine (src/main/engines.ts)
+        raise ValueError("%s runs with the %s runtime" % (v.get("label", variant), v["engine"].upper()))
     import pinned
     rel = os.path.join("variants", variant)
     numbers = (lambda x: report(x) if isinstance(x, (int, float)) else None) if report else None

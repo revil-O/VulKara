@@ -5,7 +5,7 @@ export default {
     text: { title: 'Text to image', subtitle: 'A picture from a description', prompt: 'Describe the picture' },
     image: { title: 'Image to image', subtitle: 'A new picture from a picture and a description', prompt: 'Describe what the picture should become' },
     inpaint: { title: 'Inpainting', subtitle: 'Repaint a part of a picture', prompt: 'Describe what should appear in the painted part; empty removes what is painted' },
-    video: { title: 'Image to video', subtitle: 'Bring a picture to life as a short video', prompt: 'Describe what happens: movement, camera, mood' },
+    video: { title: 'Video', subtitle: 'A short video from a picture, or with LTX-2.3 from the description alone', prompt: 'Describe what happens: movement, camera, mood, sound' },
     illusion: { title: 'Illusion', subtitle: 'Hide a spiral, a pattern or a word in a picture', prompt: 'Describe the picture the pattern hides in, e.g. a medieval village from above' },
   },
   send: {
@@ -32,6 +32,11 @@ export default {
     hintErnie: "ERNIE-Image's own prompt enhancer (Baidu's, Ministral 3 3B, 16 bit) rewrites a short prompt into a rich visual description before the picture is made; the description becomes the picture's note. Off, the prompt goes as written.",
     downloadErnie: 'Download it (7.7 GB)',
     missingErnie: 'The prompt enhancer is not downloaded yet: download it with the button next to the option, or switch the option off.',
+  },
+  // helper models a model needs before it runs (LTX-2.3's text encoder)
+  helper: {
+    download: 'Download it (8.1 GB)',
+    missing: "LTX-2.3's text encoder (Gemma 3 12B) is not downloaded yet: download it with the button next to Generate or on the Models page (Helper models).",
   },
   // Inpainting → Remove (engines/diffusers/remove.py)
   remove: {
@@ -102,6 +107,7 @@ export default {
     lengthHint: 'Longer videos take much longer and need more memory.',
     resolution: 'Resolution',
     resolutionHint: 'The video gets the proportions of the start picture.',
+    sound: 'With sound',
     patternStrength: 'Pattern strength',
     patternStrengthHint: 'About 0.8 subtle, 1.2 clear, 1.6 dominant. The pattern model (5 GB for SDXL) is downloaded on first use.',
     customSize: "Own size instead of the picture's proportions",
@@ -151,6 +157,7 @@ export default {
     choosePicture: 'Choose a picture.',
     paintMask: 'Paint over the part of the picture that is to change.',
     describe: 'Describe the picture.',
+    describeVideo: 'Describe the video, or choose a start picture.',
     chooseControl: 'Choose the control picture, or set Control to None.',
     tooManyForFast: 'Fast adds the Turbo-Alpha LoRA: remove a LoRA (at most {n} of your own), or switch Fast off.',
   },

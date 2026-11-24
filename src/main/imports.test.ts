@@ -66,6 +66,7 @@ describe('imports', () => {
     expect(reason('RepositoryNotFoundError', '404 Client Error. (Request ID: Root=1-6a)\n\nRepository Not Found for url')).toMatch(/does not exist/)
     expect(reason('ValueError', 'Could not recognize the model architecture (Request ID: x)\nmore')).toBe('Could not recognize the model architecture')
     expect(reason('X', '')).toBe('The import failed.')
+    expect(reason('TokenRejected', '401 Client Error.')).toMatch(/refused the stored access token/)
     expect(reason('NotEnoughSpace', 'Only 31 GB free on the models disk: models are installed with 50 GB free or more')).toMatch(/^Only 31 GB are free/)
   })
 

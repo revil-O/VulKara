@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
 import { describe, expect, it } from 'vitest'
-import { CURATED, GROUPS, importRequest, installedAs, licencePage, memoryFit } from './curated'
+import { CURATED, GROUPS, curatedHits, importRequest, installedAs, licencePage, memoryFit } from './curated'
 import type { Asset } from '@shared/types'
 
 const asset = (name: string, source?: Asset['source']): Asset => ({
@@ -38,11 +38,11 @@ describe('recommended models', () => {
   })
 
   it('says streamed where only SSD streaming makes a model fit', () => {
-    // FLUX.1 [dev] 16 bit: in memory from 24 GB, streamed on a 16 GB Mac (Mac mini M4), not on 8 GB
-    const flux = CURATED.find((m) => m.id === 'FLUX.1-dev')!
-    expect(memoryFit(flux, 24)).toBe('memory')
-    expect(memoryFit(flux, 16)).toBe('streamed')
-    expect(memoryFit(flux, 8)).toBe('none')
+    // SD 3.5 Large: in memory from 24 GB, streamed on a 16 GB Mac (Mac mini M4), not on 8 GB
+    const large = CURATED.find((m) => m.id === 'SD3.5-Large')!
+    expect(memoryFit(large, 24)).toBe('memory')
+    expect(memoryFit(large, 16)).toBe('streamed')
+    expect(memoryFit(large, 8)).toBe('none')
   })
 
   it('streams GGUF files too (unpacked into the stream cache once)', () => {
@@ -50,5 +50,16 @@ describe('recommended models', () => {
     expect(memoryFit(gguf, 24)).toBe('memory')
     expect(memoryFit(gguf, 16)).toBe('streamed')
     expect(memoryFit(gguf, 8)).toBe('none')
+  })
+
+  it('names the recommended models a search means, however it spells them', () => {
+    const refs = (q: string, source: 'hf' | 'civitai' = 'hf') => curatedHits(q, source, false).map((h) => h.ref)
+    expect(refs('sd 3.5 large')).toEqual(['stabilityai/stable-diffusion-3.5-large'])
+    expect(refs('Stable Diffusion 3.5 Large')).toEqual(['stabilityai/stable-diffusion-3.5-large'])
+    expect(refs('flux schnell q4')).toEqual(['city96/FLUX.1-schnell-gguf'])
+    const q4 = curatedHits('flux.1 schnell q4', 'hf', false)[0]
+    expect([q4.file, q4.recommended, q4.title]).toEqual(['flux1-schnell-Q4_K_S.gguf', true, 'FLUX.1 [schnell] (4 bit)'])
+    expect(refs('')).toEqual([])
+    expect(refs('stable diffusion 3.5 large', 'civitai')).toEqual([])
   })
 })

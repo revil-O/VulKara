@@ -132,5 +132,7 @@ export default {
     paste: 'Paste a token',
     save: 'Save',
     remove: 'Remove the token',
+    accepted: 'accepted by {site}',
+    refused: 'refused by {site}: paste the token again',
   },
 } as const

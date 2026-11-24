@@ -268,6 +268,8 @@ export default {
       ideogram: 'Generating pictures for revenue-generating products or advertising is not a non-commercial purpose.',
       qwen: 'Research and evaluation only; commercial use needs a separate licence from Alibaba (Tongyi Lab).',
       krea: 'Commercial use only below USD 1 million company revenue; content filter measures required.',
+      ltx: 'Free use below USD 10 million annual revenue; companies above need a paid licence from Lightricks. Use restrictions (Attachment A) apply to the model and its outputs.',
+      gemma: 'The Gemma Prohibited Use Policy applies; passing the model on needs the agreement and a Notice file.',
       fluxKommunity: 'Non-commercial use of the model. Pictures may be used commercially only by people and companies below USD 5 million annual revenue, with content filter measures and the AI disclosure the law requires; anything else needs a licence from Black Forest Labs.',
       pony: "Model and pictures may be used commercially, except to offer the model as an inference service or app, by companies above USD 1 million revenue, or in professional video production; for those PurpleSmartAI's permission is needed.",
     },

@@ -162,6 +162,8 @@ export interface Job {
   loras?: { path: string; scale: number }[]
   controlnet?: { type: string; image: string; weight: number; preprocess: boolean }
   videoSeconds?: number
+  /** a video without sound (models that make one with sound) */
+  videoMute?: boolean
   /** enlarge the input picture to this many times its size (1.1 to 4) instead of painting */
   upscale?: number
   /** keep width and height although there is an input picture */

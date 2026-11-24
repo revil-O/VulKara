@@ -7,15 +7,11 @@
   "FLUX.2-klein-9B": "Modelo klein más grande; funciona en 8/4 bits en Macs de 16-24 GB.",
   "FLUX.1-schnell-Q4": "FLUX.1 de 4 pasos con transformer GGUF precuantizado. Los codificadores de texto y el VAE vienen del repositorio oficial.",
   "FLUX.1-schnell-Q8": "FLUX.1 de 4 pasos con transformer GGUF de 8 bits, casi con la calidad completa.",
-  "FLUX.1-dev": "FLUX.1 [dev] completo. En Macs con menos de 24 GB, su transformer se carga por streaming desde el SSD: más lento, pero funciona con 16 GB.",
-  "FLUX.1-dev-Q4": "FLUX.1 con guidance destilada para el máximo detalle, transformer GGUF precuantizado.",
   "FLUX.1-Fill-Q4": "FLUX.1 [dev] entrenado para repintar zonas enmascaradas (páginas Inpainting y Lienzo IA): continúa la imagen sin costura y pintó el mejor conejo de nuestras pruebas. Transformer GGUF precuantizado; los codificadores de texto y el VAE vienen del repositorio oficial (acepta su licencia en Hugging Face, hace falta un token de acceso). Unos 13–14 minutos por imagen a 1024 px en un Mac mini con 16 GB (50 pasos).",
-  "Chroma1-HD": "Modelo Apache 2.0 basado en FLUX.1 [schnell] (8.9B): guidance real con prompt negativo, sin censura. Su transformer se cuantiza a 8 bits al cargarse en Macs con menos de 32 GB y se carga por streaming desde el SSD con menos de 20 GB.",
   "Chroma1-Flash": "El Chroma rápido: destilado a 12 pasos sin guidance (una pasada por paso en lugar de dos) – unos 7 minutos por imagen a 1024 px en un M2 con 24 GB, siete veces más rápido que Chroma con guidance. Apache 2.0, sin censura. Cuantizado a 8 bits con menos de 32 GB, streaming desde el SSD con menos de 20 GB.",
   "Z-Image-Turbo": "Modelo de 6B de Tongyi-MAI destilado a 8–9 pasos sin guidance: imágenes fotorrealistas y texto legible (inglés y chino) en pocos pasos. Apache 2.0. Unos 5½ minutos por imagen a 1024 px en un M2 con 24 GB con el runtime MLX (8 bits; 4 bits con 16 GB), unos 6½ con Diffusers; imagen a imagen e inpainting funcionan con Diffusers. Funcionan las LoRAs con nombres de ai-toolkit, ComfyUI y kohya. El repositorio oficial guarda el transformer en 32 bits (24.6 GB de la descarga); se calcula en 8 o 16 bits.",
   "ERNIE-Image-Turbo": "El modelo de 8B de Baidu destilado a 8 pasos: fuerte con texto en imágenes, pósteres, cómics y composiciones de varios paneles. Funciona con el runtime MLX (4 u 8 bits, codificador de texto incluido).",
   "MOSS-Image": "El modelo de 5B de OpenMOSS para texto en imágenes (inglés y chino), pósteres y composiciones, fotos y anime; Qwen 3.5 9B lee el prompt. 50 pasos con guía, unos 40 minutos por imagen a 1024 px en un M2 con 24 GB (MOSS-Image 8-step: unos 4½). Funciona con el runtime ComfyUI (Ajustes → Runtimes): el transformer en 8 bits, el codificador de texto en 4 bits. Apache 2.0.",
-  "Fibo-2.0-Edit-Turbo": "El modelo de 8B de Bria AI edita una imagen siguiendo una instrucción («conviértela en una noche nevada»), también solo dentro de una máscara (Inpainting, AI Canvas), y pinta imágenes nuevas a partir de texto; Qwen3-VL 4B lee el prompt y la imagen. 4 pasos sin guidance: unos 6 minutos por edición y 3 por imagen nueva a 1024 px en un M2 con 24 GB; una edición necesita unos 14,5 GB, demasiado para un Mac con 16 GB (allí funciona la versión MLX). Funciona con el runtime de ComfyUI (Ajustes → Runtimes), el transformer y el codificador de texto en 8 bits. Licencia no comercial (CC BY-NC 4.0).",
   "Fibo-2.0-Edit-Turbo-MLX": "Fibo 2.0 Edit Turbo para el runtime de MLX, en 8 bits (mflux-community): las mismas ediciones siguiendo una instrucción, dentro de una máscara e imágenes nuevas, y funciona en Macs con 16 GB (unos 11 GB, el codificador de texto solo para el prompt). Unos 7 minutos por edición y 3 por imagen nueva a 1024 px en un M2 con 24 GB. Licencia no comercial (CC BY-NC 4.0).",
   "SD3.5-Medium": "Modelo MMDiT de 2.5B que sigue bien el prompt.",
   "SD3.5-Large": "Modelo MMDiT de 8B, cuantizado automáticamente para que quepa en tu Mac.",
@@ -30,27 +26,25 @@
   "Arcane-Diffusion": "Estilo de la serie Arcane (SD 1.5, palabra clave: arcane style).",
   "Mo-Di-Diffusion": "Estilo de película de animación moderna (SD 1.5, palabra clave: modern disney style).",
   "ReV-Animated-1.2.2": "Modelo SD 1.5 de fantasía / ilustración.",
-  "Wan2.2-I2V-14B": "Convierte una imagen en un vídeo corto (página Imagen a vídeo) y sigue de cerca el movimiento descrito. Dos expertos de 14B en 4 bits con las LoRAs de 4 pasos lightx2v, 16 fps. Unos 25 min para 2 s a 480p en un M2 con 24 GB. Apache 2.0. Funciona con el runtime ComfyUI (Ajustes → Runtimes).",
-  "Wan2.2-TI2V-5B": "Modelo de vídeo más pequeño (página Imagen a vídeo): descarga menor, pero sigue con menos precisión las descripciones de movimiento y está hecho para 720p. Apache 2.0. Funciona con el runtime ComfyUI (Ajustes → Runtimes).",
+  "LTX-2.3-MLX-4bit": "El modelo de vídeo con sonido de Lightricks para el runtime MLX (página Vídeo): a partir de un prompt o de una imagen inicial, 1-5 s a 24 fps, destilado a 8 + 3 pasos. Unos 5 min para 2 s y 10 min para 5 s en 896 × 512 en un Mac mini M4 con 16 GB. Gemma 3 12B lee el prompt (un modelo auxiliar de 8,1 GB que se descarga una vez en la página Vídeo). LTX-2 Community License: gratuito por debajo de 10 millones de dólares de ingresos anuales.",
   "Anima-Turbo": "Modelo de anime / ilustración de CircleStone Labs (2B, codificador de texto Qwen3), 10 pasos. Funciona con el runtime ComfyUI (Ajustes → Runtimes). Licencia no comercial.",
-  "MiaoMiao-RealSkin-Anima": "Ajuste fino de Anima para piel realista, con su propio codificador de texto y VAE. Funciona con el runtime ComfyUI (Ajustes → Runtimes).",
   "NetaYume-Lumina-v4": "Modelo de anime basado en Lumina Image 2.0 (2,6B, codificador de texto Gemma 2), etiquetas de Danbooru o frases. Funciona con el runtime de ComfyUI (Ajustes → Runtimes).",
   "MOSS-Image-8step-DMD": "MOSS-Image con la destilación de 8 pasos de lodestones integrada y en 8 bits (Spectrallic): 8 pasos sin guía, unos 4½ minutos por imagen a 1024 px en un M2 con 24 GB en lugar de unos 40 con los 50 pasos de MOSS-Image. Funciona con el runtime ComfyUI (Ajustes → Runtimes). Apache 2.0.",
   "CyberRealistic-Final": "Modelo SD 1.5 fotorrealista.",
   "GhostMix-v2": "Anime / ilustración semirrealista (SD 1.5).",
   "DreamShaper-XL-v2-Turbo": "Ajuste fino versátil de SDXL destilado a pocos pasos.",
-  "Juggernaut-XL-v7": "Ajuste fino fotorrealista de SDXL.",
-  "epiCRealism-XL-v8": "Fotos de aspecto natural con SDXL.",
+  "Juggernaut-XL-v9": "Ajuste fino fotorrealista de SDXL.",
+  "RealVisXL-V5.0": "Ajuste fino fotorrealista de SDXL para personas y escenas.",
+  "Animagine-XL-4.0": "Modelo de anime; prompts como etiquetas de Danbooru.",
+  "NoobAI-XL-1.1": "Modelo de anime / ilustración (Illustrious); prompts como etiquetas de Danbooru.",
   "JANKU-Illustrious-XL": "Modelo de anime / ilustración (Illustrious, NoobAI).",
   "Retrordinary": "Estilo de ilustración retro (Illustrious).",
   "GonzaLomo-Chroma": "Ajuste fino de Chroma (8 bits): guidance real con prompt negativo.",
   "LUSTIFY-apexV8": "Checkpoint SDXL fotorrealista NSFW.",
-  "MoP-Mix-asap": "Mezcla SDXL NSFW.",
   "MoP-Mix-fustercluck": "Mezcla SDXL NSFW.",
   "CyberRealistic-Pony-v18": "Modelo Pony (SDXL) realista, apto para NSFW.",
   "FLUX-3-Image-Klein-MLX-6bit": "El modelo más nuevo de Black Forest Labs en 6 bits para el runtime MLX: texto a imagen y edición con una imagen de referencia, 16 pasos, unos 6 minutos por imagen. Funciona en Macs de 16 GB; un ampliador de prompts opcional escribe la descripción completa.",
-  "FLUX-3-Image-Klein-MLX-8bit": "FLUX 3 Image Klein en 8 bits para el runtime MLX, el más cercano a los archivos de 16 bits de Black Forest Labs; también cabe en Macs de 16 GB (el prompt se lee antes de cargar el modelo).",
-  "FLUX-3-Image-Klein": "Los archivos de 16 bits de Black Forest Labs de FLUX 3 Image Klein (solo se descarga lo que lee el runtime MLX). Requiere aceptar la licencia en Hugging Face y un token de acceso."
+  "FLUX-3-Image-Klein-MLX-8bit": "FLUX 3 Image Klein en 8 bits para el runtime MLX, el más cercano a los archivos de 16 bits de Black Forest Labs; también cabe en Macs de 16 GB (el prompt se lee antes de cargar el modelo)."
  },
  "helpers": {
   "content-nsfw": {
@@ -168,6 +162,10 @@
   "qwen3_vl": {
    "name": "Qwen3-VL 2B (prompt desde imagen)",
    "description": "Describe una imagen como prompt (Imagen a imagen, botón Prompt desde imagen): motivo, entorno, luz, colores, estilo y cámara en un párrafo en inglés. Qwen3-VL 2B Instruct de Qwen (Apache-2.0), cargado solo para la imagen y liberado después."
+  },
+  "ltx23_gemma": {
+   "name": "Gemma 3 12B (codificador de texto de LTX-2.3, MLX 4 bits)",
+   "description": "Lee el prompt de los vídeos de LTX-2.3 (página Vídeo, runtime MLX) y se libera antes de crear el vídeo. Gemma 3 12B Instruct de Google (Gemma Terms of Use), cuantizado a 4 bits para MLX."
   }
  },
  "groups": {
@@ -206,6 +204,11 @@
     "natural": {
      "label": "Natural (lento)",
      "description": "4xBHI_dat2_real de Philip Hofmann (CC BY 4.0): la textura más natural (asfalto, ladrillo, follaje), unas tres veces más lento que SwinIR; en imágenes con mucho ruido puede convertir el ruido en una cuadrícula fina."
+    },
+    "detailed": {
+     "label": "Detallado (IA, muy lento)",
+     "description": "SeedVR2-3B de ByteDance Seed, con el entorno MLX: reconstruye caras, follaje y estructuras finas mejor que los otros dos, pero inventa detalles. En un Mac con 16 GB unos 40 s para un resultado de 1024 píxeles y 2 minutos para 2048; el resultado tiene como máximo 2048 píxeles en el lado más largo.",
+     "warning": "Inventa detalles: textos, matrículas y estructuras pequeñas pueden salir distintos que en la foto. No para documentos, textos ni fotos de prueba."
     }
    }
   },
@@ -217,7 +220,13 @@
   "birefnet-lite": {
    "name": "Quitar fondo (BiRefNet)",
    "summary": "Solo el sujeto",
-   "description": "Separa el sujeto principal del fondo: una imagen con fondo transparente, o la máscara."
+   "description": "Separa el sujeto principal del fondo: una imagen con fondo transparente, o la máscara.",
+   "variants": {
+    "vision": {
+     "label": "Apple Vision (rápido)",
+     "description": "Integrado en macOS: unos 0,2 s por imagen y casi nada de memoria. Conserva todo lo que está en primer plano (un grupo entero, el plato junto al vaso); en una imagen sin un sujeto claro no encuentra nada, y sus bordes son algo más suaves que los de BiRefNet."
+    }
+   }
   },
   "sam21-tiny": {
    "name": "Seleccionar objetos (SAM 2.1)",
@@ -239,17 +248,15 @@
   "Recommended: SD 2.x": "Recomendados: SD 2.x",
   "Not in websites or apps that earn revenue or donations; outputs commercially only in teams of 10 or less.": "No en sitios web ni apps que generen ingresos o reciban donaciones; uso comercial de los resultados solo en equipos de 10 personas o menos.",
   "Civitai permissions: Image, RentCivit. Selling generated pictures: allowed. Sharing merges / derivatives: allowed. The license of the base model applies as well.": "Permisos de Civitai: Image, RentCivit. Vender imágenes generadas: permitido. Compartir mezclas / derivados: permitido. También se aplica la licencia del modelo base.",
-  "Recommended: Wan": "Recomendados: Wan",
+  "Recommended: LTX": "Recomendados: LTX",
   "Recommended: Anima": "Recomendados: Anima",
   "Recommended: ERNIE-Image": "Recomendados: ERNIE-Image",
   "Recommended: MOSS-Image": "Recomendados: MOSS-Image",
   "Recommended: Fibo 2.0": "Recomendado: Fibo 2.0",
   "Recommended: Lumina 2": "Recomendados: Lumina 2",
   "The model only for non-commercial purposes; generated pictures may be used for any purpose.": "El modelo, solo con fines no comerciales; las imágenes generadas pueden usarse para cualquier fin.",
-  "Civitai permissions: RentCivit. Selling generated pictures: not allowed. Sharing merges / derivatives: not allowed. The license of the base model applies as well.": "Permisos de Civitai: RentCivit. Vender imágenes generadas: no permitido. Compartir mezclas / derivados: no permitido. También se aplica la licencia del modelo base.",
   "Civitai permissions: Image, RentCivit, Rent, Sell, SellMerge. Selling generated pictures: allowed. Sharing merges / derivatives: allowed. The license of the base model applies as well.": "Permisos de Civitai: Image, RentCivit, Rent, Sell, SellMerge. Vender imágenes generadas: permitido. Compartir mezclas / derivados: permitido. También se aplica la licencia del modelo base.",
   "Civitai permissions: RentCivit, Rent. Selling generated pictures: not allowed. Sharing merges / derivatives: not allowed. The license of the base model applies as well.": "Permisos de Civitai: RentCivit, Rent. Vender imágenes generadas: no permitido. Compartir mezclas / derivados: no permitido. También se aplica la licencia del modelo base.",
-  "Civitai permissions: Image, RentCivit. Selling generated pictures: allowed. Sharing merges / derivatives: not allowed. The license of the base model applies as well.": "Permisos de Civitai: Image, RentCivit. Vender imágenes generadas: permitido. Compartir mezclas / derivados: no permitido. También se aplica la licencia del modelo base.",
   "Civitai permissions: RentCivit, Image. Selling generated pictures: allowed. Sharing merges / derivatives: not allowed. The license of the base model applies as well.": "Permisos de Civitai: RentCivit, Image. Vender imágenes generadas: permitido. Compartir mezclas / derivados: no permitido. También se aplica la licencia del modelo base.",
   "Civitai permissions: RentCivit, Rent. Selling generated pictures: not allowed. Sharing merges / derivatives: allowed. The license of the base model applies as well.": "Permisos de Civitai: RentCivit, Rent. Vender imágenes generadas: no permitido. Compartir mezclas / derivados: permitido. También se aplica la licencia del modelo base.",
   "Base models": "Modelos base",
@@ -259,8 +266,8 @@
   "Video": "Vídeo",
   "ControlNet": "ControlNet",
   "Use-based restrictions apply.": "Se aplican restricciones de uso.",
+  "Use-based restrictions (Prohibited Uses) apply to the model and its outputs. A modified model stays under this licence; whoever lets others use the model over a network must offer them its source (the model). The outputs are not covered by the licence.": "Al modelo y a sus resultados se aplican restricciones de uso (Prohibited Uses). Un modelo modificado sigue bajo esta licencia; quien ofrezca el modelo a otros a través de una red debe ofrecerles su código fuente (el modelo). Los resultados no están cubiertos por la licencia.",
   "lodestones' 8-step DMD LoRA (Apache 2.0) merged into MOSS-Image SFT.": "El LoRA DMD de 8 pasos de lodestones (Apache 2.0), integrado en MOSS-Image SFT.",
-  "Model and pictures for non-commercial use only; commercial use needs an agreement with Bria AI. ComfyUI files repackaged by Comfy-Org.": "El modelo y las imágenes solo para uso no comercial; el uso comercial requiere un acuerdo con Bria AI. Archivos de ComfyUI reempaquetados por Comfy-Org.",
   "Model and pictures for non-commercial use only; commercial use needs an agreement with Bria AI. Saved in 8 bit for mflux by mflux-community.": "El modelo y las imágenes solo para uso no comercial; el uso comercial requiere un acuerdo con Bria AI. Guardado en 8 bits para mflux por mflux-community.",
   "Helper models": "Modelos auxiliares",
   "Photo tools": "Herramientas de fotos",
@@ -273,6 +280,10 @@
   "The original weights, published with KAIR (MIT) by SCUNet's author; SCUNet itself is Apache-2.0. Both allow any use.": "Los pesos originales, publicados con KAIR (MIT) por el autor de SCUNet; SCUNet en sí es Apache-2.0. Ambos permiten cualquier uso.",
   "Recommended: FLUX 3": "Recomendados: FLUX 3",
   "For non-commercial use only; the licence does not mention the pictures, so VulKara treats them as non-commercial too. The use-based restrictions of SDXL's licence (Attachment A) also apply. VulKara runs it with its own code and downloads the weights from the project once.": "Solo para uso no comercial; la licencia no menciona las imágenes, así que VulKara también las trata como no comerciales. Además se aplican las restricciones de uso de la licencia de SDXL (anexo A). VulKara lo ejecuta con código propio y descarga los pesos del proyecto una vez.",
-  "By Philip Hofmann; VulKara downloads the weights unchanged from his release on first use.": "De Philip Hofmann; VulKara descarga los pesos sin cambios de su publicación la primera vez que se usan."
+  "By Philip Hofmann; VulKara downloads the weights unchanged from his release on first use.": "De Philip Hofmann; VulKara descarga los pesos sin cambios de su publicación la primera vez que se usan.",
+  "SeedVR2 by ByteDance Seed (Apache-2.0); VulKara downloads the weights unchanged from numz/SeedVR2_comfyUI on first use.": "SeedVR2 de ByteDance Seed (Apache-2.0); VulKara descarga los pesos sin cambios de numz/SeedVR2_comfyUI al usarlo por primera vez.",
+  "Free use below USD 10 million annual revenue; companies above need a paid commercial licence from Lightricks. The use restrictions of Attachment A apply to the model and its outputs; Lightricks claims no rights in the outputs.": "Uso libre por debajo de 10 millones de dólares de ingresos anuales; las empresas por encima necesitan una licencia comercial de pago de Lightricks. Las restricciones de uso del Anexo A se aplican al modelo y a sus resultados; Lightricks no reclama derechos sobre los resultados.",
+  "Free use below USD 10 million annual revenue; companies above need a paid commercial licence from Lightricks. The use restrictions of Attachment A apply to the model and its outputs; Lightricks claims no rights in the outputs. Quantized to 4 bit for MLX by dgrauet (ltx-2.3-mlx-q4).": "Uso libre por debajo de 10 millones de dólares de ingresos anuales; las empresas por encima necesitan una licencia comercial de pago de Lightricks. Las restricciones de uso del Anexo A se aplican al modelo y a sus resultados; Lightricks no reclama derechos sobre los resultados. Cuantizado a 4 bits para MLX por dgrauet (ltx-2.3-mlx-q4).",
+  "The Gemma Prohibited Use Policy applies; Google may restrict usage. Passing the model on needs the agreement and a Notice file; Google claims no rights in outputs.": "Se aplica la Gemma Prohibited Use Policy; Google puede restringir el uso. Quien redistribuya el modelo debe incluir el acuerdo y un archivo Notice; Google no reclama derechos sobre los resultados."
  }
 }

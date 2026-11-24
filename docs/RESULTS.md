@@ -249,9 +249,27 @@ axiomofmind's Fibo-2.0-anime-lora at strength 0.9 (a 400-step pilot: the style s
 
 *ComfyUI, Fibo 2.0 Dev, 768 × 768, seed 5*
 
+## Video with sound: LTX-2.3
+
+A five-second clip with sound (121 frames at 24 fps) from the prompt alone, LTX-2.3 as the app installs it (MLX, 4 bit, distilled 8 + 3 steps, Gemma 3 12B reading the prompt), 1280 × 704, seed 7; made on a Mac mini M4 with 16 GB. The clip carries the EU icon AI GENERATED in its lower right corner.
+
+### A ship passing a ringed planet
+
+> A sleek silver spaceship glides slowly past a giant ringed gas planet, sunlight flaring across its hull, a colourful nebula and distant stars behind it, slow cinematic tracking shot, deep rumbling engine hum and faint radio chatter
+
+The sound is the deep engine rumble; the radio chatter of the prompt is not in it.
+
+- **MLX, Mac mini M4 16 GB**: 1141 s (19 min), peak 11.6 GB (7cp)
+
+The clip as MP4: https://www.vulkara.net/assets/results/ltx23_space.mp4
+
+![A ship passing a ringed planet: A frame of the clip at 2 s](images/results/ltx23_space.jpg)
+
+*A frame of the clip at 2 s*
+
 ## Image to video: Wan 2.2 I2V 14B
 
-A five-second clip (77 frames at 16 fps) from the ERNIE-Image lighthouse above, Wan 2.2 I2V 14B as the app installs it (Q4_K GGUF, both experts read from the SSD per step), 832 × 480, 4 steps, seed 3; 110 minutes on the M2 (7ay: 1 s takes 8 minutes, 2 s 16, 3 s 52). The clip carries the EU icon AI GENERATED in its lower right corner.
+A five-second clip (77 frames at 16 fps) from the ERNIE-Image lighthouse above, Wan 2.2 I2V 14B as the app installed it from the recommended list (Q4_K GGUF, both experts read from the SSD per step; no longer recommended since it needs 24 GB, it can still be imported), 832 × 480, 4 steps, seed 3; 110 minutes on the M2 (7ay: 1 s takes 8 minutes, 2 s 16, 3 s 52). The clip carries the EU icon AI GENERATED in its lower right corner.
 
 ### Five seconds
 

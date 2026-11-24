@@ -5,7 +5,7 @@
 import { app, BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, nativeImage, net, powerSaveBlocker, ShareMenu, shell, type IpcMainInvokeEvent } from 'electron'
 import { type ChildProcess, execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, isAbsolute, join } from 'node:path'
 import { totalmem } from 'node:os'
 import { describeMac, macModel } from './mac_model'
@@ -40,7 +40,7 @@ import { runTool } from './tool_process'
 import { dirSize, engineCommand, installRuntime, listRuntimes, removeRuntime, staleRuntimes, updateTargets, type RuntimeId } from './runtimes'
 import { AUTO_INTERVAL, UpdateChecker } from './runtime_updates'
 import { AppUpdater } from './app_update'
-import { getToken, hasToken, setToken, type TokenService } from './secrets'
+import { checkToken, getToken, hasToken, setToken, type TokenService } from './secrets'
 import { closeViewers, isViewer, openViewer, viewerPayload } from './viewer'
 import { isMonitor, monitorContents } from './monitor_window'
 import { confirmSplash, isSplash, splashState } from './splash'
@@ -433,6 +433,8 @@ export function registerIpc(): void {
 
   handle('tokens:set', (service: TokenService, token: string) => setToken(service, String(token)))
   handle('tokens:has', (service: TokenService) => hasToken(service))
+  handle('tokens:check', (service: TokenService) => checkToken(service, (url, init) =>
+    net.fetch(url, { ...init, headers: { ...(init.headers as Record<string, string>), 'User-Agent': 'VulKara' } })))
 
   handle('runtimes:list', () => listRuntimes().map((r) => ({
     ...r, installing: installing.has(r.id) ? lastStage[r.id] ?? t('main.status.starting') : undefined, error: installError[r.id],
@@ -783,6 +785,24 @@ export function registerIpc(): void {
     if (kind === 'folder') fileAccess.grantFolder(res.filePaths[0])
     else if (kind === 'image') fileAccess.grantFile(res.filePaths[0])
     return res.filePaths[0]
+  })
+  // a batch on Enhance and Restore: pictures and folders (their pictures, not the subfolders'), granted as chosen
+  handle('files:chooseMany', async () => {
+    if (!win) return []
+    const res = await dialog.showOpenDialog(win, { properties: ['openFile', 'openDirectory', 'multiSelections'],
+      filters: [{ name: t('main.dialogs.pictures'), extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp'] }] })
+    if (res.canceled) return []
+    const out: string[] = []
+    for (const p of res.filePaths) {
+      if (statSync(p, { throwIfNoEntry: false })?.isDirectory()) {
+        fileAccess.grantFolder(p)
+        out.push(...folderImages(p).map((i) => i.path))
+      } else {
+        fileAccess.grantFile(p)
+        out.push(p)
+      }
+    }
+    return [...new Set(out)]
   })
   handleFrom('files:saveAs', async (event, path: string, suggestedName: string) => {
     const owner = BrowserWindow.fromWebContents(event.sender)

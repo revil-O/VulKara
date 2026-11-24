@@ -2,8 +2,17 @@
 // Copyright (C) 2026 Oliver Schmidt
 // A job of the app in the field names the engines take (protocol v2, "generate").
 
+import photoTools from '../../engines/diffusers/photo_tools.json'
 import { applyStyle } from './styles'
 import type { Job } from './types'
+
+// the photo tools' variants another runtime runs (photo_tools.json "engine"): SeedVR2 needs MLX
+const OTHER_ENGINE = new Map((photoTools.tools as { variants?: Record<string, { engine?: string }> }[])
+  .flatMap((t) => Object.entries(t.variants ?? {})).filter(([, v]) => v.engine).map(([id, v]) => [id, v.engine as string]))
+
+/** The runtime a photo tool job runs in: the Diffusers runtime unless its variant names another. */
+export const photoToolEngine = (variant: unknown): 'diffusers' | 'mlx' =>
+  OTHER_ENGINE.get(String(variant)) === 'mlx' ? 'mlx' : 'diffusers'
 
 /** further pictures beside the input picture an edit model takes at most (Fibo 2.0 edits four together) */
 export const MAX_REFERENCES = 3
@@ -28,6 +37,7 @@ export function toEngineJob(job: Job): Record<string, unknown> {
     ['mask_image', job.maskImage],
     ['reference_images', job.referenceImages?.length ? job.referenceImages : undefined],
     ['video_seconds', job.videoSeconds],
+    ['audio', job.videoMute ? false : undefined],
     ['upscale', job.upscale],
     ['upsample', job.upsample],
     ['keep_picture', job.keepPicture],

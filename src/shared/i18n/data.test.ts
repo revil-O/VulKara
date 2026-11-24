@@ -25,7 +25,7 @@ function english(): DataTexts {
     out.tools[String(t.id)] = {
       name: String(t.name), summary: String(t.summary ?? ''), description: String(t.description),
       ...(t.default_label ? { defaultLabel: String(t.default_label) } : {}),
-      ...(variants ? { variants: Object.fromEntries(Object.entries(variants).map(([k, v]) => [k, { label: String(v.label), description: String(v.description) }])) } : {}),
+      ...(variants ? { variants: Object.fromEntries(Object.entries(variants).map(([k, v]) => [k, { label: String(v.label), description: String(v.description), ...(v.warning ? { warning: String(v.warning) } : {}) }])) } : {}),
     }
   }
   for (const m of licences.models) {

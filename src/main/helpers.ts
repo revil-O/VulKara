@@ -15,6 +15,8 @@ import { mainLanguage } from './i18n'
 type Raw = Record<string, unknown>
 /** what engines/diffusers/pinned.py writes once every file of a download is there and checked */
 const PIN_MARK = '.vk-checked.json'
+// helpers whose download only counts once pinned.py has marked it complete (see listHelpers)
+const MARKED = ['rorem', 'objectclear', 'text_encoder', 'pup']
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 function dirBytes(dir: string): number {
@@ -70,9 +72,9 @@ export function listHelpers(enginesDir: string, helpersDir: string): HelperModel
     return {
       id: str(h.id), name: helperText(lang, str(h.id), 'name', str(h.name)), group: str(h.group),
       description: helperText(lang, str(h.id), 'description', str(h.description)), repo: str(h.repo),
-      // a model of many files (RORem, ObjectClear) is half there long before its download ends: only pinned.py's mark
-      // counts, and only for the revision pinned now (a new pin downloads it again)
-      folder, sizeMb, installed: h.kind === 'rorem' || h.kind === 'objectclear' ? markedRevision(folder) === str(h.revision) && str(h.revision) !== '' : bytes > sizeMb * 0.5 * 1024 ** 2,
+      // a model of many files (RORem, ObjectClear, the prompt helpers, LTX-2.3's Gemma) is half there long before its
+      // download ends: only pinned.py's mark counts, and only for the revision pinned now (a new pin downloads it again)
+      folder, sizeMb, installed: MARKED.includes(str(h.kind)) ? markedRevision(folder) === str(h.revision) && str(h.revision) !== '' : bytes > sizeMb * 0.5 * 1024 ** 2,
       diskMb: Math.round(bytes / 1024 ** 2), required: h.required === true, preview: str(h.preview),
     }
   })

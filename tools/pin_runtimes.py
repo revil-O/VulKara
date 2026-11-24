@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Copyright (C) 2026 Oliver Schmidt
 """Pins of the runtime installs (src/main/runtimes.ts): the SHA-256 of the uv archives (compared with the ones
-published with the release) and the content hashes of the ComfyUI and ComfyUI-GGUF archives.
+published with the release) and the content hashes of the ComfyUI, ComfyUI-GGUF and ltx-2-mlx archives.
 Content hash = sha256 over sorted lines "<relative posix path>\\0<sha256 of the file>\\n" of all regular files
 (symlinks: "<path>\\0link:<target>\\n"), the archive's single top folder stripped. Same as treeHash in src/main/archive_hash.ts."""
 import hashlib
@@ -10,8 +10,8 @@ import subprocess
 import sys
 import urllib.request
 
-# usage: python3 -I tools/pin_runtimes.py <empty folder> <uv version> <ComfyUI release> <ComfyUI-GGUF commit>
-WORK, UV, COMFY, GGUF = sys.argv[1:5]
+# usage: python3 -I tools/pin_runtimes.py <empty folder> <uv version> <ComfyUI release> <ComfyUI-GGUF commit> <ltx-2-mlx commit>
+WORK, UV, COMFY, GGUF, LTX = sys.argv[1:6]
 
 
 def get(url, to):
@@ -50,7 +50,8 @@ for arch in ("aarch64", "x86_64"):
     print("uv", arch, published, "match" if file_sha(to) == published else "MISMATCH")
 
 for name, url in [("comfyui", "https://github.com/comfyanonymous/ComfyUI/archive/refs/tags/v%s.zip" % COMFY),
-                  ("gguf", "https://github.com/city96/ComfyUI-GGUF/archive/%s.zip" % GGUF)]:
+                  ("gguf", "https://github.com/city96/ComfyUI-GGUF/archive/%s.zip" % GGUF),
+                  ("ltx-2-mlx", "https://github.com/dgrauet/ltx-2-mlx/archive/%s.zip" % LTX)]:
     z = os.path.join(WORK, name + ".zip")
     get(url, z)
     out = os.path.join(WORK, name)

@@ -107,13 +107,25 @@ export const RESULTS = [
     ],
   },
   {
+    id: 'video-ltx', title: 'Video with sound: LTX-2.3',
+    intro: 'A five-second clip with sound (121 frames at 24 fps) from the prompt alone, LTX-2.3 as the app installs it (MLX, 4 bit, distilled 8 + 3 steps, Gemma 3 12B reading the prompt), 1280 × 704, seed 7; made on a Mac mini M4 with 16 GB. The clip carries the EU icon AI GENERATED in its lower right corner.',
+    items: [
+      {
+        title: 'A ship passing a ringed planet', prompt: 'A sleek silver spaceship glides slowly past a giant ringed gas planet, sunlight flaring across its hull, a colourful nebula and distant stars behind it, slow cinematic tracking shot, deep rumbling engine hum and faint radio chatter',
+        note: 'The sound is the deep engine rumble; the radio chatter of the prompt is not in it.',
+        runs: [['MLX, Mac mini M4 16 GB', '1141 s (19 min), peak 11.6 GB (7cp)']],
+        video: ['ltx23_space', 1280, 704, '0.6'], pics: [['ltx23_space', 'A frame of the clip at 2 s', 1280, 704]],
+      },
+    ],
+  },
+  {
     id: 'video', title: 'Image to video: Wan 2.2 I2V 14B',
-    intro: 'A five-second clip (77 frames at 16 fps) from the ERNIE-Image lighthouse above, Wan 2.2 I2V 14B as the app installs it (Q4_K GGUF, both experts read from the SSD per step), 832 × 480, 4 steps, seed 3; 110 minutes on the M2 (7ay: 1 s takes 8 minutes, 2 s 16, 3 s 52). The clip carries the EU icon AI GENERATED in its lower right corner.',
+    intro: 'A five-second clip (77 frames at 16 fps) from the ERNIE-Image lighthouse above, Wan 2.2 I2V 14B as the app installed it from the recommended list (Q4_K GGUF, both experts read from the SSD per step; no longer recommended since it needs 24 GB, it can still be imported), 832 × 480, 4 steps, seed 3; 110 minutes on the M2 (7ay: 1 s takes 8 minutes, 2 s 16, 3 s 52). The clip carries the EU icon AI GENERATED in its lower right corner.',
     items: [
       {
         title: 'Five seconds', prompt: 'the lighthouse beam sweeps slowly across the dusk sky, waves roll onto the rocks, slow push-in',
         runs: [['ComfyUI', '6601 s (110 min), 2155 s per step, 10.0 GB (7ay)']],
-        video: ['wan_5s', 832, 480], pics: [['wan_5s', 'The last frame of the clip', 832, 480]],
+        video: ['wan_5s', 832, 480, '1.5'], pics: [['wan_5s', 'The last frame of the clip', 832, 480]],
       },
     ],
   },
@@ -126,7 +138,7 @@ function itemHtml(item) {
   const pics = item.pics.map(([f, cap, w, h]) => `
           <figure${w > h ? ' class="wide"' : ''}><a href="../assets/results/${f}.jpg"><img src="../assets/results/${f}.jpg" width="${w}" height="${h}" alt="${esc(`${item.title}: ${cap}`)}" loading="lazy" decoding="async"></a><figcaption>${esc(cap)}</figcaption></figure>`).join('')
   const video = item.video ? `
-          <figure class="wide"><video src="../assets/results/${item.video[0]}.mp4" width="${item.video[1]}" height="${item.video[2]}" controls muted playsinline preload="metadata" poster="../assets/results/${item.video[0]}.jpg"></video><figcaption>The clip (MP4, 1.5 MB)</figcaption></figure>` : ''
+          <figure class="wide"><video src="../assets/results/${item.video[0]}.mp4" width="${item.video[1]}" height="${item.video[2]}" controls muted playsinline preload="metadata" poster="../assets/results/${item.video[0]}.jpg"></video><figcaption>The clip (MP4, ${item.video[3]} MB)</figcaption></figure>` : ''
   return `
       <article class="item">
         <h3>${esc(item.title)}</h3>${prompt ? `

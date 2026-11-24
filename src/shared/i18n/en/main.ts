@@ -147,6 +147,7 @@ export default {
     failed: 'The import failed.',
     repoNotFound: 'This repository does not exist on Hugging Face, or it is private and needs an access token.',
     gated: 'This model is gated: accept its licence on its Hugging Face page and store an access token in Settings.',
+    tokenRejected: 'Hugging Face refused the stored access token for this model: accept its licence on its page with the same account, and check that the token may read gated repositories (a "Read" token can).',
     noSuchFile: 'The repository has no such file.',
     hfUnreachable: 'Hugging Face could not be reached. Check the internet connection.',
     serverUnreachable: 'The server could not be reached. Check the internet connection.',
@@ -209,6 +210,9 @@ export default {
   caption: {
     needsDiffusers: 'A prompt is written from a picture with the Diffusers runtime: install it in Settings → Runtimes',
     busy: 'A job is running: a prompt can be written from the picture when the queue is empty.',
+  },
+  tokens: {
+    notHf: 'That is not a Hugging Face token: paste only the token itself (hf_ followed by letters and digits).',
   },
   logs: {
     noLogFile: 'There is no log file in this session.',

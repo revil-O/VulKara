@@ -6,6 +6,7 @@ Accepts a model page URL (optionally with ?modelVersionId=…), "<model id>" or 
 Only SafeTensor files are downloaded; the result goes through the normal file import
 (architecture detection, LoRA handling, FP8 conversion).
 """
+import glob
 import hashlib
 import json
 import os
@@ -99,12 +100,14 @@ def is_civitai_url(url):
     return u.scheme == "https" and (host == "civitai.com" or host.endswith(".civitai.com"))
 
 
-def _request(url, token=None):
+def _request(url, token=None, start=0):
     if not is_civitai_url(url):
         raise CivitaiError("Not a Civitai address: %s" % urllib.parse.urlparse(url or "").netloc)
     headers = {"User-Agent": "VulKara"}
     if token:
         headers["Authorization"] = "Bearer " + token
+    if start:
+        headers["Range"] = "bytes=%d-" % start  # going on with a broken download (pinned.resume_into)
     return urllib.request.Request(url, headers=headers)
 
 
@@ -296,34 +299,36 @@ def _sha256_file(path):
 
 
 def download(info, dest_dir, token=None, progress=None):
-    """Downloads the file into dest_dir, verifies SHA256, returns the local path."""
+    """Downloads the file into dest_dir, verifies SHA256, returns the local path. With a known SHA256 a broken
+    download goes on from its part file (pinned.resume_into); without one it starts over."""
+    import pinned
     os.makedirs(dest_dir, exist_ok=True)
     safe = re.sub(r"[^A-Za-z0-9._-]+", "_", info["file_name"] or "").lstrip(".") or "model.safetensors"
     path = os.path.join(dest_dir, safe)
-    part = path + ".partial"
-    h = hashlib.sha256()
-    done = 0
-    if info["sha256"] and os.path.isfile(path) and _sha256_file(path) == info["sha256"]:
+    digest = (info["sha256"] or "").lower()
+    # the checksum in the name: a part of another version of the file is never continued
+    part = "%s.%s.partial" % (path, digest[:12]) if digest else path + ".partial"
+    if digest and os.path.isfile(path) and _sha256_file(path) == digest:
         return path  # kept from an import that failed after downloading
+    for stale in glob.glob(glob.escape(path) + ".*partial"):
+        if stale != part or not digest:
+            os.remove(stale)
+    last = [-1]
+
+    def report(pct):
+        if progress and int(pct) != last[0]:
+            last[0] = int(pct)
+            progress(last[0])
     try:
-        with _opener.open(_request(info["download_url"], token), timeout=60) as r, open(part, "wb") as out:
-            total = int(r.headers.get("Content-Length") or info["size_bytes"] or 0)
-            last = -1
-            while True:
-                chunk = r.read(8 * 1024 * 1024)
-                if not chunk:
-                    break
-                out.write(chunk)
-                h.update(chunk)
-                done += len(chunk)
-                pct = int(100 * done / total) if total else -1
-                if progress and pct != last:
-                    progress(pct)
-                    last = pct
-        if info["sha256"] and h.hexdigest() != info["sha256"]:
+        # without a checksum a continued part could not be checked: every try asks for the whole file
+        pinned.resume_into(part, lambda start: _opener.open(_request(info["download_url"], token, start if digest else 0),
+                                                            timeout=60), report=report)
+        if digest and _sha256_file(part) != digest:
+            os.remove(part)
             raise CivitaiError("Checksum mismatch, the download is damaged")
     except BaseException as e:
-        if os.path.exists(part):
+        # a stop, the disk or a refusal: the part stays only where it can be continued and checked
+        if os.path.exists(part) and (not digest or isinstance(e, urllib.error.HTTPError)):
             os.remove(part)
         if not isinstance(e, urllib.error.HTTPError):
             raise

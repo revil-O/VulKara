@@ -110,8 +110,9 @@ def test_a_single_file_is_completed_from_chroma1_hd(tmp_path, monkeypatch, hub):
     assert BASE_BYTES < info["download_bytes"] < BASE_BYTES + 1_000_000
     plan = importer.make_plan(info, ram_gb=24)
     assert plan["fits"] and plan["quant"] == {"transformer": "q8", "text_encoder": "q8"} and not plan.get("streamed")
-    # 16 GB: the transformer in 4 bit in memory (before streaming 16 bit from the SSD, MEASUREMENTS 7be)
-    assert importer.make_plan(info, ram_gb=16)["quant"]["transformer"] == "q4" and not importer.make_plan(info, ram_gb=16).get("streamed")
+    # 16 GB: streamed in 16 bit, not held in 4 bit (Chroma1-Flash painted noise in 4 bit, MEASUREMENTS 7cr)
+    small = importer.make_plan(info, ram_gb=16)
+    assert small["quant"]["transformer"] == "none" and small.get("streamed")
     flash = tmp_path / "Chroma1-HD-Flash.safetensors"
     flash.write_bytes(b"x")
     assert importer.inspect("file", str(flash))["base_repo"] == "lodestones/Chroma1-Flash"

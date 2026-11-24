@@ -3,6 +3,7 @@
 """Photo tools (photo_tools.py) with tiny ONNX models (tests/fixtures/onnx, made by make_onnx_fixtures.py)."""
 import json
 import os
+import sys
 
 import numpy as np
 import pytest
@@ -42,7 +43,11 @@ def test_the_catalog_is_pinned_and_licensed_for_commercial_use():
         else:
             assert t["model"].endswith(".onnx"), t["id"]
         for v in (t.get("variants") or {}).values():  # other weights: pinned, and their own licence when it differs
-            assert v["url"].startswith("https://") and len(v["sha256"]) == 64, t["id"]
+            if v.get("helper"):  # Apple Vision: part of macOS, nothing to download
+                continue
+            # one file, or several (SeedVR2, run by another engine): each with an https URL and its checksum
+            files = v.get("files") or {v["file"]: {"url": v["url"], "sha256": v["sha256"]}}
+            assert all(f["url"].startswith("https://") and len(f["sha256"]) == 64 for f in files.values()), t["id"]
             assert v.get("licence", t["licence"]) in ("MIT", "Apache-2.0", "BSD-3-Clause", "CC-BY-4.0"), t["id"]
     assert sum(t.get("runtime") == "torch" for t in photo_tools.catalog()) == 3
 
@@ -56,7 +61,9 @@ def test_a_file_from_a_url_is_checked_and_a_wrong_one_removed(tmp_path, monkeypa
     served = {"a.pth": good, "b.pth": b"tampered"}
 
     class Answer(io.BytesIO):
-        headers = {"Content-Length": str(len(good))}
+        @property
+        def headers(self):
+            return {"Content-Length": str(len(self.getvalue()))}
 
         def __enter__(self):
             return self
@@ -168,6 +175,19 @@ def test_the_catalog_offers_scunet_sharp_and_the_jpeg_quality(monkeypatch):
     # 16 GB Mac (Metal budget 12.7 GB): 512 alone (11.5 GB, run in the test app at 12.3 GB, no swap), 384 beside 1 GB
     assert photo_tools.metal_tile(natural, budget_gb=12.7, used_gb=0.0) == 512
     assert photo_tools.metal_tile(natural, budget_gb=12.7, used_gb=1.0) == 384
+    # SeedVR2 (MEASUREMENTS 7cl): its two files pinned at one revision, the result at most 2048 px, run by MLX only
+    detailed = tools["swinir-real-x4"]["variants"]["detailed"]
+    assert detailed["engine"] == "mlx" and detailed["max_output"] == 2048 and detailed["licence"] == "Apache-2.0"
+    assert sorted(detailed["files"]) == ["ema_vae_fp16.safetensors", "seedvr2_ema_3b_fp16.safetensors"]
+    assert all("/resolve/09ced71023636e9bc8cdf9cdecfb2625d1e691e8/" in f["url"] for f in detailed["files"].values())
+
+
+def test_a_variant_of_another_engine_is_refused_here(helpers, tmp_path, tiny_torch_model):
+    folder, m = photo_tools.import_file(tiny_torch_model, "Tiny")
+    m["variants"] = {"detailed": {"label": "Detailed", "description": "", "engine": "mlx", "files": {}}}
+    json.dump(m, open(os.path.join(folder, "tool.json"), "w"))
+    with pytest.raises(ValueError, match="runs with the MLX runtime"):
+        photo_tools.apply({"photo_tool": {"folder": folder, "variant": "detailed"}, "input_image": photo(tmp_path, (40, 30))}, tmp_path)
 
 
 def test_a_file_that_is_no_photo_model_is_refused(tmp_path):
@@ -432,3 +452,30 @@ def test_a_hole_with_a_not_this_click_stays_open_and_a_click_beside_the_picture_
     edge[:, 15:] = 1.0
     out = photo_tools.whole(edge, [(-1, 10)])
     assert (out[:, :5] > 0).all() and (out[:, 15:] <= 0).all()
+
+
+def test_apple_vision_cuts_out_with_the_apps_helper_and_says_when_it_finds_nothing(helpers, tmp_path, monkeypatch):
+    import stat
+    folder = os.path.join(photo_tools.root(), "birefnet-lite")
+    os.makedirs(folder)
+    json.dump({"type": "photo_tool", "name": "Remove background (BiRefNet)", "task": "cutout", "kind": "mask",
+               "model": "onnx/model.onnx", "recommended": "birefnet-lite"}, open(os.path.join(folder, "tool.json"), "w"))
+    # the helper stood in: a mask with the left half white, or exit 4 (no subject) for a picture named so
+    helper = tmp_path / "subject-mask"
+    helper.write_text("#!/bin/sh\n[ -f %s ] && exit 4\n%s -c 'import sys; from PIL import Image; im = Image.open(sys.argv[1]); "
+                      "m = Image.new(\"L\", im.size, 0); m.paste(255, (0, 0, im.width // 2, im.height)); m.save(sys.argv[2])' \"$1\" \"$2\"\n"
+                      % (tmp_path / "nothing", sys.executable))
+    helper.chmod(helper.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("VK_SUBJECT_HELPER", str(helper))
+    monkeypatch.setattr(photo_tools, "run_mask", lambda *a: pytest.fail("BiRefNet must not run"))
+    job = {"photo_tool": {"folder": folder, "variant": "vision", "output": "cutout"}, "input_image": photo(tmp_path, (40, 30))}
+    alpha = np.asarray(Image.open(photo_tools.apply(job, tmp_path)))[..., 3]
+    assert alpha.shape == (30, 40) and alpha[:, :20].min() == 255 and alpha[:, 20:].max() == 0
+    (tmp_path / "nothing").write_text("")
+    with pytest.raises(ValueError, match="found no subject.*BiRefNet"):
+        photo_tools.apply(job, tmp_path)
+    monkeypatch.setenv("VK_SUBJECT_HELPER", str(tmp_path / "gone"))
+    with pytest.raises(ValueError, match="not available"):
+        photo_tools.apply(job, tmp_path)
+    with pytest.raises(ValueError, match="no variant"):
+        photo_tools.apply(dict(job, photo_tool=dict(job["photo_tool"], variant="gone")), tmp_path)

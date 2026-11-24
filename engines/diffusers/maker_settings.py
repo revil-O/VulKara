@@ -34,6 +34,8 @@ def _plain(text):
     t = re.sub(r"<[^>]+>", " ", t)
     t = html.unescape(t)
     t = re.sub(r"[*_`]+", "", t)
+    # a Markdown table row "| Steps | 30 – 40 |" as "Steps: 30 – 40" (Juggernaut XL v9)
+    t = re.sub(r"(?m)^[ \t]*\|(.*)\|[ \t]*$", lambda m: ": ".join(c.strip() for c in m.group(1).split("|")), t)
     return re.sub(r"[ \t]+", " ", t)
 
 
@@ -62,7 +64,7 @@ def _steps(t):
         if _steps_ok(int(-(-(lo + hi) // 2))):
             return int(-(-(lo + hi) // 2))
     # "Steps: 4 (min) 6 (recommended)" -> the recommended one
-    m = re.search(r"(?i)\bsteps?\b[^\n\d]{0,30}" + NUM + r"[^\n]{0,30}?" + NUM + r"\s*\(?\s*recommended", t)
+    m = re.search(r"(?i)\bsteps?\b[^\n\d]{0,30}" + NUM + r"[^\n]{0,30}?" + NUM + r"[ \t]*\(?[ \t]*recommended", t)
     if m and _steps_ok(int(_number(m.group(2)))):
         return int(_number(m.group(2)))
     # "Sampling Steps: 5" / "Steps: 4-6" (the middle, rounded up) / "4 to 8 steps"
@@ -80,6 +82,10 @@ def _cfg(t):
     m = re.search(r"(?i)\b(?:cfg(?: scale)?|guidance(?: scale)?)\b[^\n]{0,30}?\(\s*i use\s*" + NUM, t)
     if m and 0 <= _number(m.group(1)) <= 30:
         return _number(m.group(1))
+    # "CFG Scale: 4-7 (5 Recommended)" -> the recommended one
+    m = re.search(r"(?i)\b(?:cfg(?: scale)?|guidance(?: scale)?)\b[^\n\d]{0,30}" + NUM + r"[^\n]{0,30}?" + NUM + r"[ \t]*\(?[ \t]*recommended", t)
+    if m and 0 <= _number(m.group(2)) <= 30:
+        return _number(m.group(2))
     m = re.search(r"(?i)\b(?:cfg(?: scale)?|guidance(?: scale)?)\b\s*[:=]?\s*" + NUM + r"(?:\s*(?:-|–|to)\s*" + NUM + r")?", t)
     if not m:
         return None
@@ -159,7 +165,7 @@ def parse(text):
     code = _code(text)
     t = _plain(text)
     # the generation part of the card when it has one (not the hires fix, whose steps are others)
-    gen = re.split(r"(?im)^\s*#*\s*(?:hires|upscal)", t)[0]
+    gen = re.split(r"(?im)^\s*[#>-]*\s*(?:hi-?res|upscal)", t)[0]
     out = {}
     steps = _steps(gen)
     if steps:

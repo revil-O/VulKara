@@ -9,6 +9,7 @@ and its checksum is compared. Once a folder is complete and checked, it is used 
 Face again. The pins of the helpers are in helper_pins.json (tools/pin_helpers.py writes it).
 """
 
+import glob
 import hashlib
 import json
 import os
@@ -71,10 +72,58 @@ def fetch(repo, revision, files, folder, rename=None, token=None, report=None):
     return folder
 
 
+# a few short network failures are tried again (github.com came and went for minutes on 2026-11-14), the pause
+# growing each time; what was downloaded stays, the next try asks only for the rest (MEASUREMENTS D1, 2026-11-15)
+TRIES, PAUSE = 5, 5
+
+
+def resume_into(part, open_at, report=None, sleep=None):
+    """Downloads into the file part, going on from its size: open_at(start) -> the response for the bytes from start
+    (a Range request when start > 0). A server answering 200 instead of 206 sends the whole file, which then starts
+    over; 416 means part already holds all of it. A broken connection or a 5xx answer is tried again TRIES times, the
+    part kept (also for a later job); other HTTP errors go to the caller. report(percent) on the way. The caller
+    checks the result (SHA-256): a part of another file can not pass."""
+    import http.client
+    import time
+    import urllib.error
+    sleep = sleep or time.sleep
+    for attempt in range(TRIES):
+        start = os.path.getsize(part) if os.path.exists(part) else 0
+        try:
+            with open_at(start) as r:
+                if start and getattr(r, "status", 200) != 206:
+                    start = 0  # no ranges here: the whole file comes again
+                length = int(r.headers.get("Content-Length") or 0)
+                total = start + length
+                got = start
+                with open(part, "ab" if start else "wb") as f:
+                    while True:
+                        chunk = r.read(1 << 20)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        got += len(chunk)
+                        if report and total:
+                            report(100.0 * got / total)
+            if length and got < total:
+                raise http.client.IncompleteRead(b"", total - got)
+            return got
+        except urllib.error.HTTPError as e:
+            if e.code == 416 and start:
+                return start
+            if e.code < 500 or attempt == TRIES - 1:
+                raise
+        except (urllib.error.URLError, http.client.HTTPException, ConnectionError, TimeoutError):
+            if attempt == TRIES - 1:
+                raise
+        sleep(PAUSE * (attempt + 1))
+
+
 def fetch_urls(urls, files, folder, report=None):
     """Like fetch() for files published outside Hugging Face (GitHub releases): urls: name -> https URL, files:
-    name -> SHA-256 (required here, there is no commit to pin). A file is downloaded to a .part file, checked and
-    renamed; a mismatch removes it and raises."""
+    name -> SHA-256 (required here, there is no commit to pin). A file is downloaded to a .part file named after its
+    checksum (a broken download goes on from there, resume_into), checked and renamed; a mismatch removes it and
+    raises."""
     import urllib.request
     os.makedirs(folder, exist_ok=True)
     local = {name: os.path.join(folder, name) for name in files}
@@ -96,19 +145,16 @@ def fetch_urls(urls, files, folder, report=None):
             os.remove(path)
         if report:
             report("Downloading %s" % name)
-        part = path + ".part"
-        req = urllib.request.Request(url, headers={"User-Agent": "VulKara"})
-        with urllib.request.urlopen(req, timeout=60) as r, open(part, "wb") as f:
-            total = int(r.headers.get("Content-Length") or 0)
-            got = 0
-            while True:
-                chunk = r.read(1 << 20)
-                if not chunk:
-                    break
-                f.write(chunk)
-                got += len(chunk)
-                if report and total:
-                    report(100.0 * got / total)
+        # the checksum in the name: a part of an older version of the file is never continued
+        part = "%s.%s.part" % (path, digest[:12])
+        for stale in glob.glob(glob.escape(path) + ".*part"):
+            if stale != part:
+                os.remove(stale)
+
+        def open_at(start, url=url):
+            headers = {"User-Agent": "VulKara", **({"Range": "bytes=%d-" % start} if start else {})}
+            return urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60)
+        resume_into(part, open_at, report=report)
         if _sha256(part) != digest:
             os.remove(part)
             raise RuntimeError("%s does not match its checksum: it was removed" % name)

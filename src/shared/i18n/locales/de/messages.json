@@ -74,7 +74,7 @@
    "image": "Bild zu Bild",
    "inpaint": "Inpainting",
    "canvas": "Leinwand",
-   "video": "Bild zu Video",
+   "video": "Video",
    "upscale": "Vergrößern",
    "illusion": "Illusion",
    "lora": "LoRA-Vergleich",
@@ -138,9 +138,9 @@
     "prompt": "Beschreibe, was im bemalten Teil erscheinen soll; leer entfernt das Bemalte"
    },
    "video": {
-    "title": "Bild zu Video",
-    "subtitle": "Ein Bild als kurzes Video zum Leben erwecken",
-    "prompt": "Beschreibe, was passiert: Bewegung, Kamera, Stimmung"
+    "title": "Video",
+    "subtitle": "Ein kurzes Video aus einem Bild, mit LTX-2.3 auch nur aus der Beschreibung",
+    "prompt": "Beschreibe, was passiert: Bewegung, Kamera, Stimmung, Ton"
    },
    "illusion": {
     "title": "Illusion",
@@ -172,6 +172,10 @@
    "hintErnie": "Der eigene Prompt-Enhancer von ERNIE-Image (von Baidu, Ministral 3 3B, 16 Bit) schreibt einen kurzen Prompt vor dem Bild zu einer ausführlichen Bildbeschreibung um; die Beschreibung wird zur Notiz des Bildes. Ausgeschaltet geht der Prompt, wie er geschrieben ist.",
    "downloadErnie": "Laden (7,7 GB)",
    "missingErnie": "Der Prompt-Enhancer ist noch nicht geladen: Lade ihn mit dem Button neben der Option, oder schalte die Option aus."
+  },
+  "helper": {
+   "download": "Laden (8,1 GB)",
+   "missing": "Das Textmodell von LTX-2.3 (Gemma 3 12B) ist noch nicht geladen: lade es mit dem Button neben „Erstellen“ oder auf der Seite Modelle (Hilfsmodelle)."
   },
   "remove": {
    "action": "Was mit dem bemalten Teil passiert",
@@ -241,6 +245,7 @@
    "lengthHint": "Längere Videos dauern deutlich länger und brauchen mehr Arbeitsspeicher.",
    "resolution": "Auflösung",
    "resolutionHint": "Das Video übernimmt die Proportionen des Startbildes.",
+   "sound": "Mit Ton",
    "patternStrength": "Musterstärke",
    "patternStrengthHint": "Etwa 0,8 dezent, 1,2 deutlich, 1,6 dominant. Das Mustermodell (5 GB für SDXL) wird beim ersten Mal heruntergeladen.",
    "customSize": "Eigene Größe statt der Proportionen des Bildes",
@@ -290,6 +295,7 @@
    "choosePicture": "Wähle ein Bild.",
    "paintMask": "Male über den Teil des Bildes, der sich ändern soll.",
    "describe": "Beschreibe das Bild.",
+   "describeVideo": "Beschreibe das Video oder wähle ein Startbild.",
    "chooseControl": "Wähle das Steuerbild oder stelle „Steuerung“ auf „Keine“.",
    "tooManyForFast": "„Schnell“ fügt den LoRA Turbo-Alpha hinzu: Entferne einen LoRA (höchstens {n} eigene) oder schalte „Schnell“ aus."
   },
@@ -428,12 +434,28 @@
  "edit": {
   "becomes": "{size} wird zu {result}",
   "enlargeBy": "×{factor} vergrößern",
+  "batch": {
+   "many": "Mehrere Bilder …",
+   "count": "{n} Bilder",
+   "more": "Hinzufügen",
+   "clear": "Liste leeren",
+   "remove": "Aus der Liste nehmen",
+   "capped": "Nur die ersten {max} von {n} Bildern werden genommen",
+   "hint": "Die Einstellungen rechts gelten für jedes Bild, eines nach dem anderen",
+   "run": "Auf alle anwenden ({n})",
+   "cancelRest": "Rest abbrechen ({n})",
+   "status": "Stapel: {done} von {n} fertig",
+   "failed": "{n} fehlgeschlagen",
+   "unreadable": "{name} lässt sich nicht als Bild lesen",
+   "notSelect": "Objekte auswählen braucht Klicks in jedes Bild: für einen Stapel ein anderes Werkzeug wählen"
+  },
   "enhance": {
    "title": "Verbessern",
    "subtitle": "Mit Fotowerkzeugen schärfen, entrauschen, vergrößern, freistellen und auswählen",
    "standard": "Standard",
    "variantOwn": "{label}: die eigenen Gewichte des Werkzeugs, originalgetreu.",
    "variantOther": "{label}: {description} {size} MB, wird beim ersten Einsatz heruntergeladen.",
+   "variantBuiltIn": "{label}: {description} Nichts herunterzuladen.",
    "runsGpu": "Läuft auf der GPU mit seinen originalen PyTorch-Gewichten.",
    "runsCpu": "Läuft auf der CPU als ONNX-Modell.",
    "madeSmaller": "Ein Bild mit mehr als {side} px an der längeren Seite wird zuerst auf diese Größe verkleinert.",
@@ -1042,7 +1064,9 @@
   "trigger": "Trigger-Wort",
   "triggerPlaceholder": "ein ungewöhnliches Wort, z. B. zqx_hund",
   "model": "Modell für das Training",
-  "noModel": "Installiere zuerst ein SDXL-, FLUX.2-[klein]- oder Krea-2-Modell (Seite „Modelle“).",
+  "noModel": "Installiere zuerst ein SDXL-, FLUX.2-[klein]-, Krea-2-, Z-Image- oder ERNIE-Image-Modell (Seite „Modelle“).",
+  "turbo": "Z-Image Turbo trainiert mit einem Hilfsadapter (0,3 GB, einmal geladen).",
+  "turboHint": "Für kurze Trainings gedacht (eine Person, ein Gegenstand, ein Stil). Sehr lange Läufe können Turbo seine wenigen Schritte nehmen: Dann braucht es mehr Schritte oder macht unschärfere Bilder.",
   "pictures": "Bilder",
   "addPictures": "Bilder hinzufügen",
   "addFolderHint": "Bildbeschreibungen als .txt-Dateien neben den Bildern werden verwendet",
@@ -1448,7 +1472,9 @@
    "stored": "gespeichert",
    "paste": "Token einfügen",
    "save": "Speichern",
-   "remove": "Token entfernen"
+   "remove": "Token entfernen",
+   "accepted": "von {site} angenommen",
+   "refused": "von {site} abgelehnt: Token neu einfügen"
   }
  },
  "hardware": {
@@ -1814,6 +1840,8 @@
     "ideogram": "Bilder für umsatzbringende Produkte oder Werbung zu erstellen, ist kein nicht kommerzieller Zweck.",
     "qwen": "Nur für Forschung und Evaluierung; kommerzielle Nutzung erfordert eine gesonderte Lizenz von Alibaba (Tongyi Lab).",
     "krea": "Kommerzielle Nutzung nur unter 1 Million USD Unternehmensumsatz; Inhaltsfilter-Maßnahmen erforderlich.",
+    "ltx": "Freie Nutzung unter 10 Mio. US-Dollar Jahresumsatz; Unternehmen darüber brauchen eine kostenpflichtige Lizenz von Lightricks. Die Nutzungsbeschränkungen (Anhang A) gelten für das Modell und seine Ausgaben.",
+    "gemma": "Die Gemma Prohibited Use Policy gilt; wer das Modell weitergibt, muss die Vereinbarung und eine Notice-Datei mitgeben.",
     "fluxKommunity": "Nutzung des Modells nur nichtkommerziell. Bilder dürfen nur Personen und Unternehmen mit weniger als 5 Millionen USD Jahresumsatz kommerziell nutzen, mit Inhaltsfilter-Maßnahmen und der gesetzlich verlangten KI-Kennzeichnung; alles andere braucht eine Lizenz von Black Forest Labs.",
     "pony": "Modell und Bilder dürfen kommerziell genutzt werden, außer um das Modell als Inferenzdienst oder App anzubieten, durch Unternehmen über 1 Million USD Umsatz oder in professioneller Videoproduktion; dafür braucht es die Erlaubnis von PurpleSmartAI."
    }
@@ -2058,6 +2086,7 @@
    "failed": "Der Import ist fehlgeschlagen.",
    "repoNotFound": "Dieses Repository existiert nicht auf Hugging Face, oder es ist privat und benötigt ein Zugriffstoken.",
    "gated": "Dieses Modell ist zugangsbeschränkt: Akzeptiere die Lizenz auf seiner Hugging-Face-Seite und hinterlege ein Zugriffstoken in den Einstellungen.",
+   "tokenRejected": "Hugging Face hat das gespeicherte Zugangstoken für dieses Modell abgelehnt: Akzeptiere die Lizenz auf seiner Seite mit demselben Konto und prüfe, ob das Token zugangsbeschränkte Repositories lesen darf (ein „Read“-Token darf das).",
    "noSuchFile": "Das Repository enthält diese Datei nicht.",
    "hfUnreachable": "Hugging Face ist nicht erreichbar. Prüfe die Internetverbindung.",
    "serverUnreachable": "Der Server ist nicht erreichbar. Prüfe die Internetverbindung.",
@@ -2121,6 +2150,9 @@
    "needsDiffusers": "Aus dem Bild wird ein Prompt geschrieben mit der Diffusers-Runtime: Installiere sie unter Einstellungen → Runtimes",
    "busy": "Ein Auftrag läuft: Ein Prompt aus dem Bild geht, wenn die Warteschlange leer ist."
   },
+  "tokens": {
+   "notHf": "Das ist kein Hugging-Face-Token: Füge nur das Token selbst ein (hf_ gefolgt von Buchstaben und Ziffern)."
+  },
   "logs": {
    "noLogFile": "In dieser Sitzung gibt es keine Protokolldatei.",
    "noSession": "Diese Protokollsitzung gibt es nicht."
@@ -2143,6 +2175,7 @@
   "unpackingGguf": "Die GGUF-Datei wird für SSD-Streaming entpackt (einmalig)",
   "convertingFp8": "FP8-Modell wird in GGUF umgewandelt (einmalig)",
   "convertingFp8Import": "FP8 wird in GGUF umgewandelt",
+  "convertingSingle": "Modelldatei wird in einen Ordner umgewandelt (einmalig)",
   "preparingControl": "Steuerbild ({type}) wird vorbereitet",
   "encodingPrompt": "Prompt wird codiert",
   "generating": "Wird erstellt",
@@ -2166,6 +2199,10 @@
   "facesNotRefined": "Gesichter nicht verfeinert: {reason}",
   "outpaintLoraMissing": "Outpaint-LoRA nicht verfügbar: mit FLUX.2 [klein] 9B erweitert",
   "objectclearKept": "ObjectClear hat das Objekt behalten: ohne ObjectClear neu gefüllt",
+  "downloadingSeedvr2": "SeedVR2 wird heruntergeladen ({size} GB, einmalig)",
+  "upscalingSeedvr2": "Vergrößern (SeedVR2)",
+  "decodingSeedvr2": "Dekodieren (SeedVR2)",
+  "seedvr2Limit": "Das Ergebnis hat {size}: SeedVR2 macht höchstens {max} Pixel an der längeren Seite",
   "klein9ExtendsLess": "FLUX.2 [klein] 9B erweitert schlechter; ohne eigene LoRAs würde ein installiertes FLUX.2 [klein] 4B erweitern",
   "loadingFaceModel": "Das Gesichtsmodell wird geladen",
   "loadingFillModel": "Das Füllmodell wird geladen (0,2 GB, einmalig heruntergeladen)",
@@ -2201,6 +2238,11 @@
    "other": "{n} Bilder werden codiert"
   },
   "trainBaseBits": "Basismodell in {bits} Bit, {n} Bilder",
-  "trainLoadingArch": "{name} wird geladen und die Bilder werden codiert"
+  "trainAdapterZimage": "Trainingsadapter für Z-Image Turbo wird heruntergeladen (0,3 GB, einmalig)",
+  "trainLoadingArch": "{name} wird geladen und die Bilder werden codiert",
+  "ltxEncoding": "Prompt wird gelesen (Gemma 3 12B)",
+  "ltxMaking": "Video wird erstellt (LTX-2.3, {width} × {height}, {frames} Bilder)",
+  "ltxDecoding": "Video wird dekodiert",
+  "ltxDecodingSound": "Video und Ton werden dekodiert"
  }
 }

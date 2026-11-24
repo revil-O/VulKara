@@ -6,6 +6,7 @@ import list from '@shared/data/curated_models.json'
 import licences from '@shared/data/licenses.json'
 import { EDITION, commerciallyUsable } from '@shared/edition'
 import type { ImportRequest } from '@shared/api'
+import type { LoraHit } from '@shared/lora_bases'
 import type { Asset } from '@shared/types'
 import { t } from '../i18n'
 
@@ -71,3 +72,21 @@ export function installedAs(m: CuratedModel, assets: Asset[]): Asset | undefined
 /** The page where the licence of a gated model is accepted. */
 export const licencePage = (m: CuratedModel): string | undefined =>
   m.source === 'hf' ? `https://huggingface.co/${m.ref}` : /^https:\/\//.test(m.ref) ? m.ref : undefined
+
+const words = (text: string): string[] =>
+  text.toLowerCase().replace(/\bsd(?=\s|\d|$)/g, 'stable diffusion ').split(/[^a-z0-9.]+/).filter(Boolean)
+
+/** The recommended models a search names: every word of it in the title, id or repository ("sd" also as Stable
+ *  Diffusion), as finder hits. */
+export function curatedHits(query: string, source: 'hf' | 'civitai', explicit: boolean): LoraHit[] {
+  const want = words(query)
+  if (!want.length) return []
+  return CURATED
+    .filter((m) => m.source === source && (explicit || !m.nsfw))
+    .filter((m) => { const have = words(`${m.title} ${m.id} ${m.ref} ${m.file ?? ''}`).join(' '); return want.every((w) => have.includes(w)) })
+    .map((m) => ({
+      source: m.source, ref: m.ref, page: licencePage(m) ?? m.ref, file: m.file, files: m.file ? [m.file] : undefined,
+      title: m.title, baseModel: m.family, triggerWords: [], nsfw: m.nsfw, gated: m.gated, needsToken: !!m.needs_token,
+      installed: false, recommended: true,
+    }))
+}

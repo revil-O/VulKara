@@ -6,7 +6,7 @@ export default {
     image: 'Image to image',
     inpaint: 'Inpainting',
     canvas: 'Canvas',
-    video: 'Image to video',
+    video: 'Video',
     upscale: 'Upscale',
     illusion: 'Illusion',
     lora: 'LoRA comparison',

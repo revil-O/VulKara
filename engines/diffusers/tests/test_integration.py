@@ -86,10 +86,13 @@ def test_staged_and_quantized(imported, tmp_path, family, ram_gb):
         engine.generate(job(imported[family], guidance_scale=4.0, negative_prompt="blurry"))
 
 
-def test_too_little_ram_points_to_mlx(imported, tmp_path):
+def test_too_little_ram_points_to_mlx(imported, tmp_path, monkeypatch):
+    # 14 GB: below the 4 bit plan (fits from 16 GB, 7be); with streaming (auto) it goes from the SSD instead
+    # (test_stream_mode.py; the tiny model has no blocks to stream)
+    monkeypatch.setenv("VK_SSD_STREAMING", "off")
     with full_size(imported["flux1"]):
         with pytest.raises(MemoryError, match="MLX"):
-            make_engine(tmp_path, ram_gb=20).generate(job(imported["flux1"]))
+            make_engine(tmp_path, ram_gb=14).generate(job(imported["flux1"]))
 
 
 def test_stop(imported, tmp_path):
@@ -131,10 +134,12 @@ def tiny_controlnets(imported, tmp_path_factory):
         cn.save_pretrained(str(root / spec["id"]))
         made[family] = (m["arch"], control_type)
         model.destroy()
-    old_root = controlnet.root
+    old_root, old_fetch = controlnet.root, controlnet.ensure_downloaded
     controlnet.root = lambda models_dir=None: root
+    # the tiny ControlNets do not match the pinned checksums: take them as they are, never download the real ones
+    controlnet.ensure_downloaded = lambda spec, **kw: controlnet.local_dir(spec)
     yield made
-    controlnet.root = old_root
+    controlnet.root, controlnet.ensure_downloaded = old_root, old_fetch
 
 
 @pytest.mark.parametrize("family", list(TINY))

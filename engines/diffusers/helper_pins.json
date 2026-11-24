@@ -172,5 +172,23 @@
    "flux-outpaint-lora.safetensors": "9623927f2471613e0c9d7810da3c39f0b277a448193b223ea3cee67d5750974a"
   },
   "revision": "b11770ac6a3cf9325dcf81742c12b1c4e257880f"
+ },
+ "mlx-community/gemma-3-12b-it-4bit": {
+  "files": {
+   "added_tokens.json": null,
+   "chat_template.json": null,
+   "config.json": null,
+   "generation_config.json": null,
+   "model-00001-of-00002.safetensors": "995cbd05b7bfd8f5ab5307b476eb5496b5ec3f5256a9dd26366236ce8816c93f",
+   "model-00002-of-00002.safetensors": "8b7af7eb5ff32109fc65cbcd0af5b8016ac0de46df17f40705f043f899495333",
+   "model.safetensors.index.json": null,
+   "preprocessor_config.json": null,
+   "processor_config.json": null,
+   "special_tokens_map.json": null,
+   "tokenizer.json": "4667f2089529e8e7657cfb6d1c19910ae71ff5f28aa7ab2ff2763330affad795",
+   "tokenizer.model": "1299c11d7cf632ef3b4e11937501358ada021bbdf7c47638d13c0ee982f2e79c",
+   "tokenizer_config.json": null
+  },
+  "revision": "86cc6a8dedbc456dd0e4af01a9d09f396f77e558"
  }
 }

@@ -1,14 +1,16 @@
 <!-- SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0 · Copyright (C) 2026 Oliver Schmidt -->
 <script setup lang="ts">
-// The picture a job starts from: chosen from the history or from disk (pickImage), or dropped onto the field.
+// The picture a job starts from: chosen from the history or from disk (pickImage), or dropped onto the field. With many,
+// several pictures (a dialog for pictures and folders, or more than one dropped) go to the page as a batch.
 import { ref } from 'vue'
-import { ImagePlus, X } from '@lucide/vue'
+import { Images, ImagePlus, X } from '@lucide/vue'
 import ZoomPan from './ZoomPan.vue'
 import { pickImage } from '../util/pick_image'
 import { t } from '../i18n'
 
 const path = defineModel<string>({ required: true })
-const emit = defineEmits<{ size: [width: number, height: number] }>()
+const props = defineProps<{ many?: boolean }>()
+const emit = defineEmits<{ size: [width: number, height: number]; many: [paths: string[]] }>()
 const over = ref(false)
 const IMAGE = /\.(png|jpe?g|webp|bmp)$/i
 const url = (p: string): string => window.vk.files.url(p)
@@ -20,9 +22,14 @@ async function choose(): Promise<void> {
 
 function drop(event: DragEvent): void {
   over.value = false
-  const file = event.dataTransfer?.files[0]
-  const dropped = file ? window.vk.files.pathOf(file) : ''
-  if (dropped && IMAGE.test(dropped)) path.value = dropped
+  const dropped = [...(event.dataTransfer?.files ?? [])].map((f) => window.vk.files.pathOf(f)).filter((p) => p && IMAGE.test(p))
+  if (props.many && dropped.length > 1) emit('many', dropped)
+  else if (dropped[0]) path.value = dropped[0]
+}
+
+async function chooseMany(): Promise<void> {
+  const chosen = await window.vk.files.chooseMany()
+  if (chosen.length) emit('many', chosen)
 }
 
 function loaded(event: Event): void {
@@ -39,10 +46,13 @@ function loaded(event: Event): void {
       </slot>
       <button class="btn small clear" :title="t('generate.imageInput.remove')" @click="path = ''"><X :size="12" /></button>
     </template>
-    <button v-else class="empty" @click="choose">
-      <ImagePlus :size="26" :stroke-width="1.4" />
-      <span>{{ t('generate.imageInput.choose') }}</span>
-    </button>
+    <template v-else>
+      <button class="empty" @click="choose">
+        <ImagePlus :size="26" :stroke-width="1.4" />
+        <span>{{ t('generate.imageInput.choose') }}</span>
+      </button>
+      <button v-if="many" class="btn small many" @click="chooseMany"><Images :size="12" /> {{ t('edit.batch.many') }}</button>
+    </template>
   </div>
 </template>
 
@@ -88,6 +98,13 @@ img {
 
 .empty:hover {
   color: var(--text);
+}
+
+.many {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .clear {

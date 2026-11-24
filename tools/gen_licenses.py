@@ -30,6 +30,9 @@ LICENSES = {
     "openrail": dict(
         name="OpenRAIL", url="https://huggingface.co/blog/open_rail",
         model="yes", outputs="yes", note="Use-based restrictions apply."),
+    "fair-ai-public-license-1.0-sd": dict(
+        name="Fair AI Public License 1.0-SD", url="https://freedevproject.org/faipl-1.0-sd/", model="yes", outputs="yes",
+        note="Use-based restrictions (Prohibited Uses) apply to the model and its outputs. A modified model stays under this licence; whoever lets others use the model over a network must offer them its source (the model). The outputs are not covered by the licence."),
     "bsd-3-clause": dict(
         name="BSD 3-Clause License", url="https://opensource.org/license/bsd-3-clause", model="yes", outputs="yes", note=""),
     "mit": dict(
@@ -79,6 +82,13 @@ LICENSES = {
         url="https://cdn.jsdelivr.net/gh/krea-ai/krea-2@db3984fbc6e13b34c0064990fc2d95ac64d00058/assets/hf_samples/LICENSE.pdf",
         model="limited", outputs="limited",
         note="Commercial use only below USD 1 million company revenue. Section 4.2 requires reasonable content filter measures against prohibited content (Acceptable Use Policy: https://www.krea.ai/krea-2-use-policy)."),
+    "ltx-2-community-license-agreement": dict(
+        name="LTX-2 Community License Agreement", url="https://github.com/Lightricks/LTX-2/blob/main/LICENSE-2",
+        model="limited", outputs="limited",
+        note="Free use below USD 10 million annual revenue; companies above need a paid commercial licence from Lightricks. The use restrictions of Attachment A apply to the model and its outputs; Lightricks claims no rights in the outputs."),
+    "gemma": dict(
+        name="Gemma Terms of Use", url="https://gemma.ai/resources/terms/", model="yes", outputs="yes",
+        note="The Gemma Prohibited Use Policy applies; Google may restrict usage. Passing the model on needs the agreement and a Notice file; Google claims no rights in outputs."),
     "dreamlike": dict(
         name="Dreamlike License (modified CreativeML OpenRAIL-M)",
         url="https://huggingface.co/dreamlike-art/dreamlike-diffusion-1.0/blob/main/LICENSE.md",
@@ -102,6 +112,7 @@ EXTRA = [
     ("Video", "lightx2v/Wan2.2-Lightning", "lightx2v 4-step LoRAs (Wan 2.2)"),
     ("Video", "Wan-AI/Wan2.2-I2V-A14B", "Wan 2.2 I2V A14B (original weights)"),
     ("Video", "Wan-AI/Wan2.2-TI2V-5B", "Wan 2.2 TI2V 5B (original weights)"),
+    ("Video", "Lightricks/LTX-2.3", "LTX-2.3 (original weights)"),
     ("ControlNet", "xinsir/controlnet-union-sdxl-1.0", "ControlNet Union SDXL (xinsir)"),
     ("ControlNet", "Shakker-Labs/FLUX.1-dev-ControlNet-Union-Pro-2.0", "ControlNet Union Pro 2.0 for FLUX.1 (Shakker Labs)"),
     ("ControlNet", "lllyasviel/control_v11p_sd15_openpose", "ControlNet 1.1 for SD 1.5 (pose, depth, canny, lineart, scribble)"),
@@ -112,9 +123,11 @@ EXTRA = [
     ("Helper models", "depth-anything/Depth-Anything-V2-Small-hf", "Depth Anything V2 Small (depth maps)"),
     ("Helper models", "Comfy-Org/Real-ESRGAN_repackaged", "Real-ESRGAN x4plus (Upscale)"),
     ("Helper models", "VisualInference/FLUX-3-Image-Klein-pup-MLX-4bit", "FLUX 3 prompt upsampler (MLX, 4 bit)"),
+    ("Helper models", "mlx-community/gemma-3-12b-it-4bit", "Gemma 3 12B (LTX-2.3 text encoder, MLX 4 bit)"),
     ("Helper models", "piddnad/ddcolor_modelscope", "DDColor (colouring old photos, Restore)"),
     ("Helper models", "lrzjason/Consistance_Edit_Lora", "Consistency LoRA for FLUX.2 [klein] 4B (Restore)"),
     ("Helper models", "fal/flux-2-klein-4B-outpaint-lora", "Outpaint LoRA for FLUX.2 [klein] 4B (AI Canvas)"),
+    ("Helper models", "ostris/zimage_turbo_training_adapter", "Z-Image Turbo training adapter (LoRA training)"),
     ("Helper models", "Falconsai/nsfw_image_detection", "NSFW image detection (content filter)"),
     ("Helper models", "dima806/facial_age_image_detection", "Facial age detection (content filter)"),
 ]
@@ -132,6 +145,10 @@ SOFTWARE = [
     ("Runtimes (installed on demand)", "ComfyUI (runs as a separate process)", "GPL-3.0",
      "https://github.com/comfyanonymous/ComfyUI/blob/master/LICENSE"),
     ("Runtimes (installed on demand)", "ComfyUI-GGUF", "Apache-2.0", "https://github.com/city96/ComfyUI-GGUF/blob/main/LICENSE"),
+    ("Runtimes (installed on demand)", "ltx-2-mlx (LTX-2.3 on MLX)", "MIT", "https://github.com/dgrauet/ltx-2-mlx/blob/main/LICENSE"),
+    ("Runtimes (installed on demand)", "mlx-arsenal", "Apache-2.0", "https://pypi.org/project/mlx-arsenal/"),
+    ("Runtimes (installed on demand)", "PyAV (writes videos; its wheels bring FFmpeg's libraries, LGPL/GPL)", "BSD-3-Clause",
+     "https://github.com/PyAV-Org/PyAV/blob/main/LICENSE.txt"),
     ("Runtimes (installed on demand)", "gguf", "MIT", "https://github.com/ggml-org/llama.cpp/blob/master/LICENSE"),
     ("Runtimes (installed on demand)", "ONNX Runtime", "MIT", "https://github.com/microsoft/onnxruntime/blob/main/LICENSE"),
     ("Runtimes (installed on demand)", "OpenCV", "Apache-2.0", "https://github.com/opencv/opencv/blob/4.x/LICENSE"),
@@ -195,7 +212,7 @@ def photo_tools():
         for v in (t.get("variants") or {}).values():
             if v.get("licence"):
                 name, url = TOOL_LICENSES[v["licence"]]
-                out.append(dict(group="Photo tools", id=None, title="%s: %s (%s)" % (t["name"], v["label"], v["file"]),
+                out.append(dict(group="Photo tools", id=None, title="%s: %s (%s)" % (t["name"], v["label"], v.get("file") or ", ".join(v["files"])),
                                 source=v["source_url"], license=name, license_url=v.get("licence_url") or url,
                                 model="yes", outputs="yes", note=v.get("licence_note", "")))
     return out
@@ -233,9 +250,8 @@ GITHUB_HELPERS = [
 OVERRIDES = {
     "MOSS-Image": dict(source="https://huggingface.co/OpenMOSS-Team/MOSS-Image-SFT"),
     "MOSS-Image-8step-DMD": dict(note="lodestones' 8-step DMD LoRA (Apache 2.0) merged into MOSS-Image SFT."),
-    "Fibo-2.0-Edit-Turbo": dict(source="https://huggingface.co/briaai/Fibo-2.0-edit-turbo",
-                                note="Model and pictures for non-commercial use only; commercial use needs an agreement "
-                                     "with Bria AI. ComfyUI files repackaged by Comfy-Org."),
+    "LTX-2.3-MLX-4bit": dict(source="https://huggingface.co/Lightricks/LTX-2.3",
+                             note="Free use below USD 10 million annual revenue; companies above need a paid commercial licence from Lightricks. The use restrictions of Attachment A apply to the model and its outputs; Lightricks claims no rights in the outputs. Quantized to 4 bit for MLX by dgrauet (ltx-2.3-mlx-q4)."),
     "Fibo-2.0-Edit-Turbo-MLX": dict(source="https://huggingface.co/briaai/Fibo-2.0-edit-turbo",
                                     note="Model and pictures for non-commercial use only; commercial use needs an "
                                          "agreement with Bria AI. Saved in 8 bit for mflux by mflux-community."),

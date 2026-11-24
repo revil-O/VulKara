@@ -96,6 +96,21 @@ def test_family_from_the_file(name):
     assert (r["family"], r["variant"]) == EXPECTED[name]
 
 
+def test_every_fixture_is_a_lora():
+    for name, h in HEADERS.items():
+        assert registry.is_lora(registry._strip(h["shapes"].keys())), name
+
+
+def test_a_checkpoint_with_a_merged_loras_leftovers_is_no_lora():
+    # GhostMix v2 (Civitai 76907): a full SD 1.5 checkpoint with 216 lora_te_* tensors left in it
+    keys = ["model.diffusion_model.b%d.weight" % i for i in range(686)] \
+        + ["first_stage_model.b%d.weight" % i for i in range(248)] \
+        + ["cond_stage_model.b%d.weight" % i for i in range(197)] \
+        + ["embedding_manager.b%d" % i for i in range(197)] \
+        + ["lora_te_text_model_encoder_layers_%d_mlp_fc1.lora_down.weight" % i for i in range(216)]
+    assert not registry.is_lora(registry._strip(keys))
+
+
 def test_no_lora_is_taken_for_sdxl_by_default():
     with pytest.raises(registry.UnsupportedModel, match="Could not tell"):
         registry.lora_identity({"lora_unet_something_new_0_proj.lora_down.weight": [8, 777],
@@ -360,6 +375,30 @@ def test_recheck_corrects_wrong_families_and_keeps_a_backup(tmp_path):
     assert written["sub_base"] == "klein9b" and "variant" not in written
     assert not (fine / "lora.json.bak").exists()
     assert recheck.recheck(str(models), str(loras)) == []  # once is enough
+
+
+def test_recheck_marks_a_whole_model_filed_as_a_lora(tmp_path):
+    from safetensors.numpy import save_file
+    import numpy as np
+    def folder(name, tensors):
+        d = tmp_path / "loras" / name
+        d.mkdir(parents=True)
+        save_file(tensors, str(d / "lora.safetensors"))
+        (d / "lora.json").write_text(json.dumps({"name": name, "file": "lora.safetensors", "family": "sd1"}))
+
+    model = {"cond_stage_model.transformer.text_model.x": np.zeros(1, np.float16),
+             "model.diffusion_model.input_blocks.0.0.weight": np.zeros((320, 4, 3, 3), np.float16)}
+    model.update({"model.diffusion_model.b%d.weight" % i: np.zeros((2, 2), np.float16) for i in range(5)})
+    leftovers = {"lora_te_x_%d.lora_down.weight" % i: np.zeros((2, 2), np.float16) for i in range(2)}
+    folder("GhostMix-v2", dict(model, **leftovers))
+    # mostly not LoRA tensors, but no model either (an unknown adapter format): stays where it is
+    folder("odd", dict({"unknown_adapter.b%d.w" % i: np.zeros((2, 2), np.float16) for i in range(5)}, **leftovers))
+    fine = _lora_folder(tmp_path / "loras", "fine", "sd1_kohya_te", {"family": "sd1"})
+    (fine / "lora.json").write_text(json.dumps({"name": "fine", "file": "missing.safetensors"}))
+    by_name = {r["name"]: r for r in recheck.recheck(None, str(tmp_path / "loras"))}
+    assert by_name["GhostMix-v2"]["not_lora"] is True  # the app moves its folder to the trash
+    assert "not_lora" not in by_name["fine"]  # an unreadable LoRA stays
+    assert by_name["odd"]["error"] == registry.NOT_A_LORA and "not_lora" not in by_name["odd"]
 
 
 def test_a_sub_base_written_into_the_file_variant_is_moved_back(tmp_path):

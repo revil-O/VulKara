@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
 import { describe, expect, it } from 'vitest'
-import { toEngineJob } from './engine_job'
+import { photoToolEngine, toEngineJob } from './engine_job'
 import type { Job } from './types'
 
 const BASE: Job = {
@@ -14,6 +14,13 @@ describe('the engine job', () => {
     const job: Job = { id: '2', page: 'text', prompt: 'a fox', modelId: 'm', modelDir: '/m', width: 1024, height: 1024, seed: 7 }
     expect(toEngineJob({ ...job, upsample: true }).upsample).toBe(true)
     expect('upsample' in toEngineJob(job)).toBe(false)
+  })
+
+  it('passes a video without sound on as audio off, and nothing for one with sound', () => {
+    const job: Job = { id: '4', page: 'video', prompt: 'a fox', modelId: 'm', modelDir: '/m', width: 768, height: 512, seed: 7, videoSeconds: 2 }
+    expect(toEngineJob({ ...job, videoMute: true }).audio).toBe(false)
+    expect('audio' in toEngineJob(job)).toBe(false)
+    expect(toEngineJob(job).video_seconds).toBe(2)
   })
 
   it('passes keep the picture on only when it is on', () => {
@@ -63,5 +70,14 @@ describe('Restore jobs for the engine', () => {
     expect(r).toMatchObject({ details: true, detail_level: 2.5, detail_strength: 0.7, faces: true, face_fidelity: 1, face_strength: 0.5, scale: 2, consistency: true })
     expect(r.face_points).toEqual(points)
     expect(r.preview).toEqual({ x: 10, y: 20, w: 300, h: 300 })
+  })
+})
+
+describe('the runtime of a photo tool job', () => {
+  it('is MLX for SeedVR2 (the Upscale tool\'s Detailed variant) and the Diffusers runtime otherwise', () => {
+    expect(photoToolEngine('detailed')).toBe('mlx')
+    expect(photoToolEngine('natural')).toBe('diffusers')
+    expect(photoToolEngine(undefined)).toBe('diffusers')
+    expect(photoToolEngine('default')).toBe('diffusers')
   })
 })

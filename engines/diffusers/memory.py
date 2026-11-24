@@ -13,7 +13,8 @@ RESERVE_FRACTION = 0.2
 MIN_RESERVE_GB = 4.0
 RUNTIME_OVERHEAD_GB = 1.0  # python + torch + app
 # SD 1.5 at 1024 px measured 1.9 GB over its weights with fused attention (docs/MEASUREMENTS.md 7n)
-ACTIVATIONS_GB = {"sd1": 1.9, "sd2": 1.0, "sdxl": 1.5, "sd3": 2.0, "flux1": 2.5, "flux2": 3.0, "flux3": 2.5, "krea2": 3.0, "ideogram4": 2.5,
+ACTIVATIONS_GB = {"sd1": 1.9, "sd2": 4.0, "sdxl": 1.5, "sd3": 2.0, "flux1": 2.5, "flux2": 3.0, "flux3": 2.5, "krea2": 3.0, "ideogram4": 2.5,
+                  # sd2: SD 2.1 at 768² peaks at 5.8 GB in every picture (MEASUREMENTS 7cr, Mac mini M4), 2.25 GB above its parts
                   "chroma": 2.5,  # FLUX.1's blocks; the guided and the unguided pass run one after the other
                   # Z-Image at 1024 px (4096 image + up to 512 caption tokens, 3840 wide); with guidance (Base)
                   # both passes run as one batch
@@ -25,6 +26,9 @@ ACTIVATIONS_GB = {"sd1": 1.9, "sd2": 1.0, "sdxl": 1.5, "sd3": 2.0, "flux1": 2.5,
                   # Fibo 2.0 (ComfyUI, int8): an edit at 1024² runs the picture's tokens beside the new ones, 5.2 GB
                   # over the loaded model (MEASUREMENTS 7ai)
                   "fibo2": 5.0}
+# families whose denoiser is streamed in 16 bit instead of held in 4 bit: Chroma1-Flash paints coarse noise from a
+# 4 bit transformer, Chroma1-HD swapped 4.4 GB loading it; streamed both are clean without swap (MEASUREMENTS 7cr)
+NO_Q4_FAMILIES = ("chroma",)
 # families made for a smaller picture: whether they fit is judged at their own size, not at 1024²
 NATIVE_SIDE = {"sd1": 512, "sd2": 768}
 # further denoisers that run next to the main one and get its precision (Ideogram 4 denoises with a
@@ -257,6 +261,18 @@ def plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=N
     }
 
 
+# shortcut: one measurement (SD 3.5 Large, 16 GB: 0.4 GB left, 5 GB swap at each load); measure 24 GB to place it better
+STREAM_FIRST_HEADROOM_GB = 1.0
+
+
+def stream_first(spec, plan, denoiser, quant="auto"):
+    """Whether a model the plan would hold with a shrunk denoiser, close to the budget, is streamed in 16 bit instead
+    (its arch says so)."""
+    return bool(spec.get("stream_before_quant")) and quant == "auto" \
+        and (plan.get("quant") or {}).get(denoiser) not in (None, "none") \
+        and plan.get("budget_gb", 0) - plan.get("est_peak_gb", 0) < STREAM_FIRST_HEADROOM_GB
+
+
 def fitting_plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fixed_gb=None, activations_gb=None,
                  encode_extra_gb=0.0):
     """The plan without SSD streaming: plan(), and where that does not fit, a big text encoder may go to 4 bit, then
@@ -273,7 +289,7 @@ def fitting_plan(components, denoiser, family, ram_gb, quant="auto", denoiser_fi
         if q["fits"]:
             q["releases_denoiser"] = frees and q["staged_text_encoder"]
             return q
-    if quant == "auto" and denoiser_fixed_gb is None:
+    if quant == "auto" and denoiser_fixed_gb is None and family not in NO_Q4_FAMILIES:
         # a 4 bit denoiser kept in memory before streaming 16 bit from the SSD: streamed, FLUX.1 dev and FLUX.2 [klein]
         # 9B read 16-28 GB per step on a 16 GB Mac mini and took the SSD's time (MEASUREMENTS 7be); quantized once in
         # a process of its own (quantize_once.py) and cached

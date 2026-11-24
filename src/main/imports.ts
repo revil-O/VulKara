@@ -24,6 +24,7 @@ export type ImportRunner = (req: ImportRequest, dryRun: boolean, onProgress: (st
 const REASONS: Record<string, PlainKey> = {
   RepositoryNotFoundError: 'main.imports.repoNotFound',
   GatedRepoError: 'main.imports.gated',
+  TokenRejected: 'main.imports.tokenRejected',
   EntryNotFoundError: 'main.imports.noSuchFile',
   LocalEntryNotFoundError: 'main.imports.hfUnreachable',
   ConnectionError: 'main.imports.serverUnreachable',

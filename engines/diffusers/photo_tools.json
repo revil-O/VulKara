@@ -111,6 +111,28 @@
           "licence_url": "https://creativecommons.org/licenses/by/4.0/",
           "licence_note": "By Philip Hofmann; VulKara downloads the weights unchanged from his release on first use.",
           "source_url": "https://github.com/Phhofm/models/releases/tag/4xBHI_dat2_real"
+        },
+        "detailed": {
+          "label": "Detailed (AI, very slow)",
+          "description": "SeedVR2-3B by ByteDance Seed, run by the MLX runtime: rebuilds faces, foliage and fine structure best of the three, but it invents detail. About 40 s for a result of 1024 pixels and 2 minutes for 2048 on a 16 GB Mac; the result is at most 2048 pixels on the longer side.",
+          "warning": "Invents detail: lettering, number plates and small structures can come out other than in the photo. Not for documents, text or evidence.",
+          "engine": "mlx",
+          "files": {
+            "seedvr2_ema_3b_fp16.safetensors": {
+              "url": "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/09ced71023636e9bc8cdf9cdecfb2625d1e691e8/seedvr2_ema_3b_fp16.safetensors",
+              "sha256": "2fd0e03a3dad24e07086750360727ca437de4ecd456f769856e960ae93e2b304"
+            },
+            "ema_vae_fp16.safetensors": {
+              "url": "https://huggingface.co/numz/SeedVR2_comfyUI/resolve/09ced71023636e9bc8cdf9cdecfb2625d1e691e8/ema_vae_fp16.safetensors",
+              "sha256": "20678548f420d98d26f11442d3528f8b8c94e57ee046ef93dbb7633da8612ca1"
+            }
+          },
+          "size_mb": 6947,
+          "max_output": 2048,
+          "licence": "Apache-2.0",
+          "licence_url": "https://huggingface.co/ByteDance-Seed/SeedVR2-3B",
+          "licence_note": "SeedVR2 by ByteDance Seed (Apache-2.0); VulKara downloads the weights unchanged from numz/SeedVR2_comfyUI on first use.",
+          "source_url": "https://huggingface.co/numz/SeedVR2_comfyUI/tree/09ced71023636e9bc8cdf9cdecfb2625d1e691e8"
         }
       }
     },
@@ -159,6 +181,14 @@
       "size_mb": 115,
       "range": "imagenet",
       "size": 1024,
+      "variants": {
+        "vision": {
+          "label": "Apple Vision (fast)",
+          "description": "Built into macOS: about 0.2 s per picture and hardly any memory. It keeps every thing in the foreground (a whole group, the plate beside the glass); in a picture without a clear subject it finds nothing, and its edges are a little softer than BiRefNet's.",
+          "helper": "subject-mask",
+          "size_mb": 0
+        }
+      },
       "licence": "MIT",
       "licence_url": "https://github.com/ZhengPeng7/BiRefNet/blob/main/LICENSE",
       "source_url": "https://huggingface.co/onnx-community/BiRefNet_lite-ONNX"

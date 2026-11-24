@@ -216,3 +216,26 @@ def test_a_4_bit_denoiser_comes_before_streaming_with_the_text_encoder_kept_in_8
     assert p["fits"] and p["quant"]["transformer"] == "q4" and p["quant"]["text_encoder"] != "q4"
     # a forced level stays as asked
     assert memory.fitting_plan(comps, "transformer", "flux2", 16, quant="none")["quant"]["transformer"] == "none"
+
+
+def test_chroma_is_streamed_rather_than_held_in_4_bit():
+    # Chroma1-Flash painted noise from a 4 bit transformer on a 16 GB Mac mini, streamed 16 bit was clean (7cr)
+    comps = dict(registry.ARCHS["chroma"]["fallback_params"])
+    assert not memory.fitting_plan(comps, "transformer", "chroma", 16)["fits"]  # the engine streams it
+    assert memory.fitting_plan(comps, "transformer", "flux1", 16)["quant"]["transformer"] == "q4"
+
+
+def test_sd35_large_is_streamed_rather_than_shrunk_close_to_the_budget():
+    # 8 bit in memory left 0.4 GB on a 16 GB Mac mini and swapped 5 GB at every load; streamed 16 bit none (7cr)
+    import importer
+    for arch, ram, streamed in (("sd35_large", 16, True), ("sd35_large", 32, False), ("sd35_medium", 16, False)):
+        info = {"arch": arch, "components": registry.ARCHS[arch]["fallback_params"], "denoiser": "transformer", "layout": "repo"}
+        p = importer.make_plan(info, "auto", ram)
+        assert bool(p.get("streamed")) is streamed, (arch, ram)
+        if streamed:
+            assert p["quant"]["transformer"] == "none"
+    # a level the user chose stays as asked
+    tight = {"quant": {"transformer": "q8"}, "budget_gb": 12.0, "est_peak_gb": 11.6}
+    assert memory.stream_first(registry.ARCHS["sd35_large"], tight, "transformer")
+    assert not memory.stream_first(registry.ARCHS["sd35_large"], tight, "transformer", quant="q8")
+

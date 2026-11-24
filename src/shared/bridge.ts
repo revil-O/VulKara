@@ -29,6 +29,7 @@ export function makeApi(call: Call, on: On, extra: BridgeExtra): VulkaraApi {
     tokens: {
       set: (service, token) => call('tokens:set', service, token),
       has: (service) => call('tokens:has', service),
+      check: (service) => call('tokens:check', service),
     },
     runtimes: {
       list: () => call('runtimes:list'),
@@ -144,6 +145,7 @@ export function makeApi(call: Call, on: On, extra: BridgeExtra): VulkaraApi {
     files: {
       url: (path) => extra.fileUrl(path),
       choose: (kind) => call('files:choose', kind),
+      chooseMany: () => call('files:chooseMany'),
       saveAs: (path, suggestedName) => call('files:saveAs', path, suggestedName),
       reveal: (path) => call('files:reveal', path),
       share: (path) => call('files:share', path),

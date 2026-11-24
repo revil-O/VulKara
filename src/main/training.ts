@@ -33,7 +33,7 @@ export interface TrainerDeps {
 }
 
 const IMAGE = /\.(png|jpe?g|webp|bmp)$/i
-const MLX_ARCHS = ['flux2_klein', 'krea2']
+const MLX_ARCHS = ['flux2_klein', 'krea2', 'z_image', 'ernie_image']
 
 /** The architectures a LoRA can be trained for. */
 export const TRAINABLE = ['sdxl', ...MLX_ARCHS]

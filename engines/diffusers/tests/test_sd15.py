@@ -92,3 +92,9 @@ def test_controlnets_for_sd15():
         controlnet.resolve("sd15", "sd1", "Tile")
 
 
+
+
+def test_sd21_plan_matches_its_measured_peak():
+    # MEASUREMENTS 7cr: SD 2.1 at 768², 5.8 GB in every picture on a Mac mini M4
+    p = memory.plan({"text_encoder": 0.34, "unet": 0.866, "vae": 0.084}, "unet", "sd2", 16)
+    assert p["activations_side"] == 768 and 5.6 <= p["est_peak_gb"] <= 6.0

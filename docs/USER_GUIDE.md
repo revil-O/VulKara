@@ -18,7 +18,7 @@ setting does, and where the app keeps its data.
 5. [Image to image](#5-image-to-image)
 6. [Inpainting](#6-inpainting)
 7. [AI Canvas](#7-ai-canvas)
-8. [Image to video](#8-image-to-video)
+8. [Video](#8-video)
 9. [Upscale](#9-upscale), [Enhance: photo tools](#enhance-photo-tools)
 10. [Restore](#10-restore)
 11. [Pose editor](#11-pose-editor)
@@ -444,20 +444,26 @@ The panel always explains which of these will happen.
   ![Extending with FLUX.2 [klein] 4B](screenshots/canvas_extend.jpg)
 - The canvas, including its pictures, view, prompt and model, is kept after a restart.
 
-## 8. Image to video
+## 8. Video
 
-![Image to video](screenshots/video.jpg)
+![Video](screenshots/video.jpg)
 
-Turns a picture into a short video. It needs the ComfyUI runtime and a Wan 2.2 model (Models → Recommended).
+Makes a short video. Two kinds of models do it (Models → Recommended):
 
-- **Start picture**: the first frame. The video gets its proportions.
-- **Prompt**: what happens, such as movement, camera and mood: *the astronaut slowly waters the plants, gentle
-  camera push in*.
+- **LTX-2.3** (MLX runtime): a video **with sound**, from the prompt alone or from a start picture. Gemma 3 12B reads
+  the prompt; it is a helper model of 8.1 GB, downloaded once with the button next to Generate (or on the Models page).
+  On a Mac mini M4 with 16 GB a two-second clip at 896 × 512 took about 5 minutes, a five-second clip about 10; it
+  needed 8 to 9.6 GB.
+- **Wan 2.2** (ComfyUI runtime): from a start picture, without sound. On an M2 with 24 GB a one-second clip at 480p
+  took about 8 minutes, a five-second clip 110 minutes (Wan 2.2 14B, 4 steps); the engine held 7 to 10 GB.
+
+- **Start picture**: the first frame; the video gets its proportions. Wan needs one, LTX-2.3 also starts from the
+  prompt alone.
+- **Prompt**: what happens, such as movement, camera, mood and, for LTX-2.3, the sound: *a red fox trots through
+  fresh snow at sunrise, soft crunching footsteps and distant birdsong*.
 - **Length**: 1–5 seconds.
-- **Resolution**: 480p or 720p.
-
-Video takes much longer than pictures. On an M2 with 24 GB a one-second clip at 480p took about 8 minutes, a
-five-second clip 110 minutes (Wan 2.2 14B, 4 steps); the engine held 7 to 10 GB.
+- **Resolution**: 480p or 720p (LTX-2.3 rounds the sides to steps of 64 px).
+- **With sound** (LTX-2.3): off makes the video without a sound track.
 
 ## 9. Upscale
 
@@ -507,6 +513,33 @@ download size, and below a line the licence, its note and the source.
   when first used. On a 16 GB Mac mini a 512 px photo became 2048 px in about 24 s, the first download included (MEASUREMENTS 7ce).
 
   ![Upscale ×4 with Natural (slow)](screenshots/enhance_natural.jpg)
+
+- *Detailed (AI, very slow)* uses SeedVR2-3B by ByteDance Seed (Apache-2.0), a diffusion model run by the MLX
+  runtime: it rebuilds faces, foliage and fine structure clearly better than the other two, but it **invents detail**:
+  lettering, number plates and small structures can come out other than in the photo (the **!** beside Character
+  says so). Not for documents, text or evidence. It is downloaded once (7.3 GB) when first used; the picture model
+  loaded before is freed while it runs. On a 16 GB Mac mini a 512 px photo became 1024 px in about 40 s and 2048 px in
+  about 2 minutes, at most 11.3 GB of memory; the result is at most 2048 px on the longer side (MEASUREMENTS 7cl).
+
+  ![Upscale ×4 with Detailed (AI, very slow)](screenshots/enhance_detailed.jpg)
+
+- **Character** (Remove background): *Standard* is BiRefNet; *Apple Vision (fast)* uses the subject finder built into
+  macOS, the same as *Select subject* in the mask brush: about 0.2 s instead of 5 s and hardly any memory instead of
+  about 9 GB, nothing to download. With one clear subject both cut equally well (Apple Vision's edge is a little
+  softer); with several things it keeps everything in the foreground (a whole group, the plate beside the glass) where
+  BiRefNet takes the most striking one, and in a picture without a clear subject it finds nothing and says so: then
+  take Standard (MEASUREMENTS 7cm).
+
+  ![Remove background with Apple Vision (fast)](screenshots/enhance_vision.jpg)
+
+**Several pictures at once.** *Several pictures …* in the empty picture field (or more than one picture dropped onto
+it) makes a batch: the chosen pictures, or every picture of a chosen folder (not its subfolders), up to 100, appear as
+a list. The settings on the right count for each; *Apply to all* puts one job per picture into the queue, and they run
+one after another. *Cancel the rest* takes out those still waiting. A picture the tool can not take (Apple Vision finds
+no subject) fails on its own with its message, the others go on. *Select objects* needs clicks on each picture and so
+does not work in a batch. On a 16 GB Mac mini Denoise took 66 s for 12 pictures of 1024 px.
+
+![A batch of pictures on Enhance](screenshots/enhance_batch.jpg)
 - **Enlarge** (tools that enlarge, such as Upscale ×4): the same preset tiles and slider as on the Upscale page; the
   result is that many times the size of your picture.
 - **Remove background**: *Transparent* gives a PNG with a transparent background, *Mask* the mask in black and white.
@@ -527,6 +560,13 @@ download size, and below a line the licence, its note and the source.
 ![Restore](screenshots/restore.jpg)
 
 ![An AI-made photo made old, and restored by VulKara: dust and scratches removed, details repaired, the face restored](images/restore_example.jpg)
+
+**Several pictures at once** works here too, as on Enhance: every picture is restored as a whole with the steps and
+the note set (a painted mask and the preview belong to one picture and are left out; the faces are found in each
+picture). The AI model is loaded once for the whole batch: on a 16 GB Mac mini six pictures with *Heavy damage* took
+153 s for the first and about 120 s for each of the others.
+
+![A batch of pictures on Restore](screenshots/restore_batch.jpg)
 
 Restores old photos: colour casts, faded colours, soft and blurred pictures and faces, scratches, creases, spots, holes,
 and black and white. Choose the photo (or drop it onto the field) and press **Restore** or ⌘↩. A black-and-white or
@@ -725,7 +765,7 @@ and disk for it.
 Teaches a model a person, an object or a style from your own pictures, and produces a new LoRA.
 
 1. **Name** the LoRA. A **trigger word** is made from the name (for example `paper_cranes_zqx`); you can change it.
-2. **Model to train on**: SDXL (Diffusers runtime), FLUX.2 [klein] or Krea 2 (MLX runtime).
+2. **Model to train on**: SDXL (Diffusers runtime), FLUX.2 [klein], Krea 2, Z-Image or ERNIE-Image (MLX runtime).
 3. **Pictures**: 10–30 good pictures are enough. Use **Add pictures** or **Add a folder**. With a folder, `.txt`
    files with the same name as a picture are used as its caption. Every caption starts with the trigger word.
    Describe in the captions what is *not* meant to be learned, such as background or clothing.
@@ -738,7 +778,17 @@ Teaches a model a person, an object or a style from your own pictures, and produ
    awake, and generating is paused during the training.
 
 When it is done, **Compare strengths** opens the new LoRA in the comparison. Rough times on an M2: SDXL about 2.5 s
-per step at 768 px, FLUX.2 [klein] 4B about 15 s, 9B about 30 s, Krea 2 about 45 s.
+per step at 768 px, FLUX.2 [klein] 4B about 15 s, 9B about 30 s, Krea 2 about 45 s; on the Mac mini M4 with 16 GB Z-Image Turbo about 17 s and ERNIE-Image Turbo about 21 s at 512 px.
+
+**Z-Image**: Z-Image Turbo and Z-Image (Base) can be trained too. For Turbo a helper adapter (ostris'
+`zimage_turbo_training_adapter`, Apache-2.0, 0.3 GB) is downloaded once into the helpers folder and checked; it keeps
+Turbo's few steps during training. It is made for short runs (a person, an object, a style); very long runs can still
+make Turbo lose them, so with more than *Standard* the note turns into a **!**. On a Mac with 16 GB the base is
+trained in 4 bit (about 10 GB, no swap), from 24 GB in 8 bit.
+**ERNIE-Image** (Turbo and Base) trains without a helper adapter, likewise in 4 bit on 16 GB (about 11 GB) and in
+8 bit from 24 GB.
+
+![Training with Z-Image Turbo](screenshots/training_zimage.jpg)
 
 ## 15. Models
 
@@ -803,7 +853,7 @@ the memory their plan was made for.
 | Family | Runtime | Notes | Model / pictures commercially |
 | --- | --- | --- | --- |
 | Stable Diffusion 1.5, 2.x | Diffusers | also inpainting checkpoints | yes / yes (Open RAIL, use restrictions) |
-| SDXL, incl. Turbo, Pony, Illustrious, NoobAI | Diffusers | LoRAs of Pony, Illustrious and NoobAI are told apart from plain SDXL ones; also inpainting checkpoints (9 channels) | yes / yes (Open RAIL++) |
+| SDXL, incl. Turbo, Pony, Illustrious, NoobAI | Diffusers | LoRAs of Pony, Illustrious and NoobAI are told apart from plain SDXL ones; also inpainting checkpoints (9 channels); a checkpoint file becomes a Diffusers folder once (at import, an older import on its first load), which needs less swap while loading on 16 GB | yes / yes (Open RAIL++) |
 | Stable Diffusion 3.5 Medium / Large | Diffusers | | with conditions (below USD 1 million revenue) |
 | FLUX.1 [schnell] / [dev] | Diffusers or MLX | also GGUF files | schnell yes / yes; dev no / yes |
 | Chroma (Chroma1-HD, -Base, -Flash, fine-tunes) | Diffusers | true guidance with a negative prompt (two passes per step, so slower than FLUX.1; Chroma1-Flash needs 12 steps and no guidance – about 7 minutes per picture at 1024 px on an M2 with 24 GB instead of about 52); computed in float16 on M1/M2, about 40 % faster than bfloat16; safetensors and GGUF; single files take FLUX.1's T5 and VAE | yes / yes (Apache 2.0) |
@@ -820,7 +870,8 @@ the memory their plan was made for.
 | Fibo 2.0 Edit Turbo (also Dev) | ComfyUI; MLX (8 bit) | Bria AI's 8B model; Qwen3-VL 4B reads the prompt and the picture (8 bit, on the CPU), the transformer in 8 bit, computed in float16; edits a picture by instruction (Image to image), only inside a mask (Inpainting, AI Canvas) and paints new pictures, 4 steps without guidance (Dev: 50 steps, guidance 5, two passes per step: about an hour per new picture, two per edit): about 6 minutes per edit and 3 per new picture at 1024 px on an M2 with 24 GB; an edit needs about 14.5 GB, so not for 16 GB Macs; there the MLX version runs (mflux-community's 8 bit files: about 11 GB, the text encoder only for the prompt, about 7 minutes per edit); up to four pictures together (More pictures), LoRAs in diffusers' or ComfyUI's layout (each runtime gets its own, converted once) | no / no (CC BY-NC 4.0) |
 | MOSS-Image (also the 8-step DMD version) | ComfyUI | text in pictures (English and Chinese), posters and layouts; Qwen 3.5 9B reads the prompt (4 bit, on the CPU), the transformer in 8 bit, computed in float16 (sizes up to 2048 px); the maker's settings: 50 steps, guidance 3, layer 22 skipped in the negative branch, about 48 s per step at 1024 px on an M2 with 24 GB (40 minutes per picture); the 8-step version without guidance about 4½ minutes; 8.4 GB at most on 16 GB; text to image, image to image and LoRAs; layouts as JSON (chapter 3) | yes / yes (Apache 2.0) |
 | AuraFlow, Pony V7 | ComfyUI; the repository Diffusers | on ComfyUI the transformer as GGUF (Pony's Q8_0 / Q4_0); prompts padded to 768 tokens as in Pony's workflow; about 50 s per step at 1024 px on an M2 with 24 GB; the repositories (fal/AuraFlow-v0.3, purplesmartai/pony-v7-base) on Diffusers, there 8 bit on 16 GB; LoRAs for ComfyUI work on both | with conditions (Pony License) |
-| Wan 2.2 5B / 14B (video) | ComfyUI | Image to video | yes / yes (Apache 2.0) |
+| Wan 2.2 5B / 14B (video) | ComfyUI | from a start picture | yes / yes (Apache 2.0) |
+| LTX-2.3 (video with sound) | MLX (ltx-2-mlx) | dgrauet's 4 bit MLX files (20.5 GB) and Gemma 3 12B as a helper model (8.1 GB); from the prompt or a start picture, 1–5 s at 24 fps, distilled to 8 + 3 steps; about 5 minutes for 2 s and 10 for 5 s at 896 × 512 on a Mac mini M4 with 16 GB, 9.6 GB at most | with conditions (below USD 10 million revenue) |
 
 The Licenses page has the full terms. *Preferred runtime* in Settings decides between Diffusers and MLX where both can
 run a model.
@@ -880,8 +931,8 @@ size. A model that needs more memory than the Mac has is marked so:
 
 | Group | Models |
 | --- | --- |
-| **Base models** | Stable Diffusion 1.5 (+ Inpainting), SD 2.1, SDXL 1.0 (+ Inpainting), SDXL Turbo, SD 3.5 Medium / Large, FLUX.1 schnell (4/8 bit), FLUX.1 dev (16/4 bit), Chroma1-HD, Chroma1-Flash (fast), Z-Image-Turbo, ERNIE-Image-Turbo, MOSS-Image, Fibo 2.0 Edit Turbo, FLUX.2 [klein] 4B / 9B, Wan 2.2 TI2V 5B / I2V 14B (video) |
-| **Community models** | GonzaLomo Chroma, DreamShaper 8, Realistic Vision 5.1, Counterfeit, DreamShaper XL Turbo, Juggernaut XL v7, epiCRealism XL, JANKU Illustrious XL, Anima Turbo, NetaYume Lumina v4, MOSS-Image 8-step (DMD) … |
+| **Base models** | Stable Diffusion 1.5 (+ Inpainting), SD 2.1, SDXL 1.0 (+ Inpainting), SDXL Turbo, SD 3.5 Medium / Large, FLUX.1 schnell (4/8 bit), Chroma1-Flash (fast), Z-Image-Turbo, ERNIE-Image-Turbo, MOSS-Image, Fibo 2.0 Edit Turbo, FLUX.2 [klein] 4B / 9B, LTX-2.3 (video) |
+| **Community models** | GonzaLomo Chroma, DreamShaper 8, Realistic Vision 5.1, Counterfeit, DreamShaper XL Turbo, Juggernaut XL v9, RealVisXL V5.0, Animagine XL 4.0, NoobAI-XL 1.1, JANKU Illustrious XL, Anima Turbo, NetaYume Lumina v4, MOSS-Image 8-step (DMD) … |
 | **Explicit models** | only listed when nudity is allowed in Settings |
 
 Some models need an access token (Settings → Access tokens) or a licence accepted on their Hugging Face page. The
@@ -1031,7 +1082,7 @@ its own without a title bar), so it never hides the app out of reach.
 - The side panel holds only buttons; prompt and settings are in the history.
 - **Save as**, **Show in Finder**, **Share** (macOS's share menu) and **Copy picture** (onto the clipboard).
 - **Use these settings**: prompt, settings and seed back into the form.
-- **Image to image**, **Inpaint**, **Image to video**, **Upscale** send the picture to that page of the main window.
+- **Image to image**, **Inpaint**, **Image to video**, **Upscale** send the picture to that page of the main window (Image to video opens the Video page).
 
 ## 19. Settings
 

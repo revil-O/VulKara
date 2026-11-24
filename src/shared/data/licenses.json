@@ -56,6 +56,24 @@
   },
   {
    "group": "Runtimes (installed on demand)",
+   "name": "ltx-2-mlx (LTX-2.3 on MLX)",
+   "license": "MIT",
+   "url": "https://github.com/dgrauet/ltx-2-mlx/blob/main/LICENSE"
+  },
+  {
+   "group": "Runtimes (installed on demand)",
+   "name": "mlx-arsenal",
+   "license": "Apache-2.0",
+   "url": "https://pypi.org/project/mlx-arsenal/"
+  },
+  {
+   "group": "Runtimes (installed on demand)",
+   "name": "PyAV (writes videos; its wheels bring FFmpeg's libraries, LGPL/GPL)",
+   "license": "BSD-3-Clause",
+   "url": "https://github.com/PyAV-Org/PyAV/blob/main/LICENSE.txt"
+  },
+  {
+   "group": "Runtimes (installed on demand)",
    "name": "gguf",
    "license": "MIT",
    "url": "https://github.com/ggml-org/llama.cpp/blob/master/LICENSE"
@@ -170,17 +188,6 @@
    "note": "Non-commercial use of the model. Pictures may be used commercially only by people and companies below USD 5 million annual revenue, with content filter measures and the AI disclosure the law requires; anything else needs a licence from Black Forest Labs. Distributing the model needs Black Forest Labs' attribution notice."
   },
   {
-   "group": "Recommended: FLUX 3",
-   "id": "FLUX-3-Image-Klein",
-   "title": "FLUX 3 Image Klein (Black Forest Labs, 16 bit)",
-   "source": "https://huggingface.co/black-forest-labs/flux-3-image-klein",
-   "license": "FLUX Kommunity License v1.0",
-   "license_url": "https://huggingface.co/black-forest-labs/flux-3-image-klein/blob/main/LICENSE.md",
-   "model": "no",
-   "outputs": "limited",
-   "note": "Non-commercial use of the model. Pictures may be used commercially only by people and companies below USD 5 million annual revenue, with content filter measures and the AI disclosure the law requires; anything else needs a licence from Black Forest Labs. Distributing the model needs Black Forest Labs' attribution notice."
-  },
-  {
    "group": "Recommended: FLUX.1",
    "id": "FLUX.1-schnell-Q4",
    "title": "FLUX.1 [schnell] (4 bit)",
@@ -204,28 +211,6 @@
   },
   {
    "group": "Recommended: FLUX.1",
-   "id": "FLUX.1-dev",
-   "title": "FLUX.1 [dev] (16 bit)",
-   "source": "https://huggingface.co/black-forest-labs/FLUX.1-dev",
-   "license": "FLUX.1 [dev] Non-Commercial License",
-   "license_url": "https://github.com/black-forest-labs/flux/blob/main/model_licenses/LICENSE-FLUX1-dev",
-   "model": "no",
-   "outputs": "yes",
-   "note": "The model only for non-commercial purposes; generated pictures may be used commercially."
-  },
-  {
-   "group": "Recommended: FLUX.1",
-   "id": "FLUX.1-dev-Q4",
-   "title": "FLUX.1 [dev] (4 bit)",
-   "source": "https://huggingface.co/city96/FLUX.1-dev-gguf",
-   "license": "FLUX.1 [dev] Non-Commercial License",
-   "license_url": "https://github.com/black-forest-labs/flux/blob/main/model_licenses/LICENSE-FLUX1-dev",
-   "model": "no",
-   "outputs": "yes",
-   "note": "The model only for non-commercial purposes; generated pictures may be used commercially."
-  },
-  {
-   "group": "Recommended: FLUX.1",
    "id": "FLUX.1-Fill-Q4",
    "title": "FLUX.1 Fill [dev] (4 bit)",
    "source": "https://huggingface.co/YarvixPA/FLUX.1-Fill-dev-GGUF",
@@ -234,17 +219,6 @@
    "model": "no",
    "outputs": "yes",
    "note": "The model only for non-commercial purposes; generated pictures may be used commercially."
-  },
-  {
-   "group": "Recommended: Chroma",
-   "id": "Chroma1-HD",
-   "title": "Chroma1-HD",
-   "source": "https://huggingface.co/lodestones/Chroma1-HD",
-   "license": "Apache License 2.0",
-   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
-   "model": "yes",
-   "outputs": "yes",
-   "note": ""
   },
   {
    "group": "Recommended: Chroma",
@@ -289,17 +263,6 @@
    "model": "yes",
    "outputs": "yes",
    "note": ""
-  },
-  {
-   "group": "Recommended: Fibo 2.0",
-   "id": "Fibo-2.0-Edit-Turbo",
-   "title": "Fibo 2.0 Edit Turbo",
-   "source": "https://huggingface.co/briaai/Fibo-2.0-edit-turbo",
-   "license": "Creative Commons Attribution-NonCommercial 4.0",
-   "license_url": "https://creativecommons.org/licenses/by-nc/4.0/",
-   "model": "no",
-   "outputs": "no",
-   "note": "Model and pictures for non-commercial use only; commercial use needs an agreement with Bria AI. ComfyUI files repackaged by Comfy-Org."
   },
   {
    "group": "Recommended: Fibo 2.0",
@@ -456,26 +419,15 @@
    "note": "Civitai permissions: Image, RentCivit. Selling generated pictures: allowed. Sharing merges / derivatives: allowed. The license of the base model applies as well."
   },
   {
-   "group": "Recommended: Wan",
-   "id": "Wan2.2-I2V-14B",
-   "title": "Wan 2.2 Image to Video (14B, 4 steps)",
-   "source": "https://huggingface.co/QuantStack/Wan2.2-I2V-A14B-GGUF",
-   "license": "Apache License 2.0",
-   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
-   "model": "yes",
-   "outputs": "yes",
-   "note": ""
-  },
-  {
-   "group": "Recommended: Wan",
-   "id": "Wan2.2-TI2V-5B",
-   "title": "Wan 2.2 Image to Video (5B)",
-   "source": "https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
-   "license": "Apache License 2.0",
-   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
-   "model": "yes",
-   "outputs": "yes",
-   "note": ""
+   "group": "Recommended: LTX",
+   "id": "LTX-2.3-MLX-4bit",
+   "title": "LTX-2.3 (video with sound, MLX, 4 bit)",
+   "source": "https://huggingface.co/Lightricks/LTX-2.3",
+   "license": "LTX-2 Community License Agreement",
+   "license_url": "https://github.com/Lightricks/LTX-2/blob/main/LICENSE-2",
+   "model": "limited",
+   "outputs": "limited",
+   "note": "Free use below USD 10 million annual revenue; companies above need a paid commercial licence from Lightricks. The use restrictions of Attachment A apply to the model and its outputs; Lightricks claims no rights in the outputs. Quantized to 4 bit for MLX by dgrauet (ltx-2.3-mlx-q4)."
   },
   {
    "group": "Recommended: Anima",
@@ -487,17 +439,6 @@
    "model": "no",
    "outputs": "yes",
    "note": "The model only for non-commercial purposes; generated pictures may be used for any purpose."
-  },
-  {
-   "group": "Recommended: Anima",
-   "id": "MiaoMiao-RealSkin-Anima",
-   "title": "MiaoMiao RealSkin (Anima 1.3)",
-   "source": "https://civitai.com/models/2026594",
-   "license": "Civitai model license (author's permissions)",
-   "license_url": "https://civitai.com/models/2026594",
-   "model": "no",
-   "outputs": "no",
-   "note": "Civitai permissions: RentCivit. Selling generated pictures: not allowed. Sharing merges / derivatives: not allowed. The license of the base model applies as well."
   },
   {
    "group": "Recommended: Lumina 2",
@@ -556,25 +497,47 @@
   },
   {
    "group": "Recommended: SDXL",
-   "id": "Juggernaut-XL-v7",
-   "title": "Juggernaut XL v7",
-   "source": "https://civitai.com/models/133005",
-   "license": "Civitai model license (author's permissions)",
-   "license_url": "https://civitai.com/models/133005",
-   "model": "no",
+   "id": "Juggernaut-XL-v9",
+   "title": "Juggernaut XL v9",
+   "source": "https://huggingface.co/RunDiffusion/Juggernaut-XL-v9",
+   "license": "CreativeML Open RAIL-M",
+   "license_url": "https://huggingface.co/spaces/CompVis/stable-diffusion-license",
+   "model": "yes",
    "outputs": "yes",
-   "note": "Civitai permissions: Image, RentCivit. Selling generated pictures: allowed. Sharing merges / derivatives: allowed. The license of the base model applies as well."
+   "note": "Use-based restrictions (Attachment A) apply to the model and its outputs."
   },
   {
    "group": "Recommended: SDXL",
-   "id": "epiCRealism-XL-v8",
-   "title": "epiCRealism XL v8",
-   "source": "https://civitai.com/models/277058",
-   "license": "Civitai model license (author's permissions)",
-   "license_url": "https://civitai.com/models/277058",
-   "model": "no",
+   "id": "RealVisXL-V5.0",
+   "title": "RealVisXL V5.0",
+   "source": "https://huggingface.co/SG161222/RealVisXL_V5.0",
+   "license": "CreativeML Open RAIL++-M",
+   "license_url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md",
+   "model": "yes",
    "outputs": "yes",
-   "note": "Civitai permissions: Image, RentCivit. Selling generated pictures: allowed. Sharing merges / derivatives: not allowed. The license of the base model applies as well."
+   "note": "Use-based restrictions (Attachment A) apply to the model and its outputs."
+  },
+  {
+   "group": "Recommended: SDXL",
+   "id": "Animagine-XL-4.0",
+   "title": "Animagine XL 4.0",
+   "source": "https://huggingface.co/cagliostrolab/animagine-xl-4.0",
+   "license": "CreativeML Open RAIL++-M",
+   "license_url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md",
+   "model": "yes",
+   "outputs": "yes",
+   "note": "Use-based restrictions (Attachment A) apply to the model and its outputs."
+  },
+  {
+   "group": "Recommended: SDXL",
+   "id": "NoobAI-XL-1.1",
+   "title": "NoobAI-XL 1.1",
+   "source": "https://huggingface.co/Laxhar/noobai-XL-1.1",
+   "license": "Fair AI Public License 1.0-SD",
+   "license_url": "https://freedevproject.org/faipl-1.0-sd/",
+   "model": "yes",
+   "outputs": "yes",
+   "note": "Use-based restrictions (Prohibited Uses) apply to the model and its outputs. A modified model stays under this licence; whoever lets others use the model over a network must offer them its source (the model). The outputs are not covered by the licence."
   },
   {
    "group": "Recommended: SDXL",
@@ -619,17 +582,6 @@
    "model": "no",
    "outputs": "yes",
    "note": "Civitai permissions: RentCivit, Image. Selling generated pictures: allowed. Sharing merges / derivatives: not allowed. The license of the base model applies as well."
-  },
-  {
-   "group": "Recommended: SDXL",
-   "id": "MoP-Mix-asap",
-   "title": "MoP Mix (asap)",
-   "source": "https://civitai.com/models/2128936",
-   "license": "Civitai model license (author's permissions)",
-   "license_url": "https://civitai.com/models/2128936",
-   "model": "no",
-   "outputs": "yes",
-   "note": "Civitai permissions: Image, RentCivit. Selling generated pictures: allowed. Sharing merges / derivatives: allowed. The license of the base model applies as well."
   },
   {
    "group": "Recommended: SDXL",
@@ -808,6 +760,17 @@
    "note": ""
   },
   {
+   "group": "Video",
+   "id": null,
+   "title": "LTX-2.3 (original weights)",
+   "source": "https://huggingface.co/Lightricks/LTX-2.3",
+   "license": "LTX-2 Community License Agreement",
+   "license_url": "https://github.com/Lightricks/LTX-2/blob/main/LICENSE-2",
+   "model": "limited",
+   "outputs": "limited",
+   "note": "Free use below USD 10 million annual revenue; companies above need a paid commercial licence from Lightricks. The use restrictions of Attachment A apply to the model and its outputs; Lightricks claims no rights in the outputs."
+  },
+  {
    "group": "ControlNet",
    "id": null,
    "title": "ControlNet Union SDXL (xinsir)",
@@ -920,6 +883,17 @@
   {
    "group": "Helper models",
    "id": null,
+   "title": "Gemma 3 12B (LTX-2.3 text encoder, MLX 4 bit)",
+   "source": "https://huggingface.co/mlx-community/gemma-3-12b-it-4bit",
+   "license": "Gemma Terms of Use",
+   "license_url": "https://gemma.ai/resources/terms/",
+   "model": "yes",
+   "outputs": "yes",
+   "note": "The Gemma Prohibited Use Policy applies; Google may restrict usage. Passing the model on needs the agreement and a Notice file; Google claims no rights in outputs."
+  },
+  {
+   "group": "Helper models",
+   "id": null,
    "title": "DDColor (colouring old photos, Restore)",
    "source": "https://huggingface.co/piddnad/ddcolor_modelscope",
    "license": "Apache License 2.0",
@@ -953,24 +927,13 @@
   {
    "group": "Helper models",
    "id": null,
-   "title": "RORem (object removal, Inpainting)",
-   "source": "https://huggingface.co/LetsThink/RORem",
-   "license": "Apache License 2.0 (base: SDXL Inpainting 0.1, CreativeML Open RAIL++-M)",
-   "license_url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md",
+   "title": "Z-Image Turbo training adapter (LoRA training)",
+   "source": "https://huggingface.co/ostris/zimage_turbo_training_adapter",
+   "license": "Apache License 2.0",
+   "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
    "model": "yes",
    "outputs": "yes",
-   "note": "Use-based restrictions (Attachment A) apply to the model and its outputs."
-  },
-  {
-   "group": "Helper models",
-   "id": null,
-   "title": "ObjectClear (object and shadow removal, Inpainting)",
-   "source": "https://huggingface.co/jixin0101/ObjectClear",
-   "license": "S-Lab License 1.0 (base: SDXL Inpainting 0.1, CreativeML Open RAIL++-M)",
-   "license_url": "https://github.com/zjx0101/ObjectClear/blob/main/LICENSE",
-   "model": "no",
-   "outputs": "no",
-   "note": "For non-commercial use only; the licence does not mention the pictures, so VulKara treats them as non-commercial too. The use-based restrictions of SDXL's licence (Attachment A) also apply. VulKara runs it with its own code and downloads the weights from the project once."
+   "note": ""
   },
   {
    "group": "Helper models",
@@ -1041,6 +1004,17 @@
   {
    "group": "Photo tools",
    "id": null,
+   "title": "Upscale ×4 (SwinIR): Detailed (AI, very slow) (seedvr2_ema_3b_fp16.safetensors, ema_vae_fp16.safetensors)",
+   "source": "https://huggingface.co/numz/SeedVR2_comfyUI/tree/09ced71023636e9bc8cdf9cdecfb2625d1e691e8",
+   "license": "Apache License 2.0",
+   "license_url": "https://huggingface.co/ByteDance-Seed/SeedVR2-3B",
+   "model": "yes",
+   "outputs": "yes",
+   "note": "SeedVR2 by ByteDance Seed (Apache-2.0); VulKara downloads the weights unchanged from numz/SeedVR2_comfyUI on first use."
+  },
+  {
+   "group": "Photo tools",
+   "id": null,
    "title": "JPEG cleanup (FBCNN)",
    "source": "https://github.com/jiaxi-jiang/FBCNN/releases/tag/v1.0",
    "license": "Apache License 2.0",
@@ -1081,6 +1055,28 @@
    "model": "no",
    "outputs": "no",
    "note": "For non-commercial use only: restored faces may not be used commercially. VulKara is free and downloads the weights from the project on first use."
+  },
+  {
+   "group": "Helper models",
+   "id": null,
+   "title": "RORem (object removal, Inpainting)",
+   "source": "https://huggingface.co/LetsThink/RORem",
+   "license": "Apache License 2.0 (base: SDXL Inpainting 0.1, CreativeML Open RAIL++-M)",
+   "license_url": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md",
+   "model": "yes",
+   "outputs": "yes",
+   "note": "Use-based restrictions (Attachment A) apply to the model and its outputs."
+  },
+  {
+   "group": "Helper models",
+   "id": null,
+   "title": "ObjectClear (object and shadow removal, Inpainting)",
+   "source": "https://huggingface.co/jixin0101/ObjectClear",
+   "license": "S-Lab License 1.0 (base: SDXL Inpainting 0.1, CreativeML Open RAIL++-M)",
+   "license_url": "https://github.com/zjx0101/ObjectClear/blob/main/LICENSE",
+   "model": "no",
+   "outputs": "no",
+   "note": "For non-commercial use only; the licence does not mention the pictures, so VulKara treats them as non-commercial too. The use-based restrictions of SDXL's licence (Attachment A) also apply. VulKara runs it with its own code and downloads the weights from the project once."
   },
   {
    "group": "Helper models",

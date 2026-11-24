@@ -15,6 +15,7 @@ import { engineCommand, runtimePython, type RuntimeId } from './runtimes'
 import { engineEnv, getSettings, onSettingChanged } from './settings'
 import { log, logOutput } from './log'
 import type { EngineEvent } from '@shared/types'
+import { photoToolEngine } from '@shared/engine_job'
 import { DIFFUSERS_NOTE, mlxOrDiffusers } from './mlx_fallback'
 import { processEnv } from './env'
 import { lineSplitter } from './tool_process'
@@ -24,7 +25,7 @@ import { t } from './i18n'
 const EVENT_PREFIX = '@vk '
 
 // only the MLX runtime loads these checkpoints
-const MLX_ONLY = ['krea2', 'ideogram4', 'flux3_klein', 'ernie_image', 'fibo2_mlx']
+const MLX_ONLY = ['krea2', 'ideogram4', 'flux3_klein', 'ernie_image', 'fibo2_mlx', 'ltx23']
 // what MLX runs as well as Diffusers (models in repository layout, text to image)
 const MLX_ALSO = ['flux1_schnell', 'flux1_dev', 'flux2_klein', 'z_image']
 
@@ -159,7 +160,8 @@ export function readManifest(modelDir: string): Manifest | undefined {
 export function engineFor(job: Record<string, unknown>): RuntimeId {
   if (job.upscale) return 'comfyui'  // enlarging needs no model of the user
   if (job.restore) return 'diffusers'  // correcting needs no model; the AI steps edit with FLUX.2 there
-  if (job.photo_tool) return 'diffusers'  // ONNX on the CPU with the Diffusers runtime's onnxruntime
+  // ONNX on the CPU with the Diffusers runtime's onnxruntime, PyTorch on the GPU; SeedVR2 with MLX
+  if (job.photo_tool) return photoToolEngine((job.photo_tool as Record<string, unknown>).variant)
   if (job.remove_object) return 'diffusers'  // LaMa (ONNX) or RORem (SDXL inpainting) with the Diffusers runtime
   const m = readManifest(String(job.model_dir ?? ''))
   if (!m) throw new Error(t('main.engines.modelGone'))

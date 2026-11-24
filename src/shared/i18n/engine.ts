@@ -28,6 +28,7 @@ const RULES: Rule[] = [
   [/^Unpacking the GGUF file for SSD streaming \(one-time\)$/, 'engine.unpackingGguf'],
   [/^Converting FP8 model to GGUF \(one-time\)$/, 'engine.convertingFp8'],
   [/^Converting FP8 to GGUF$/, 'engine.convertingFp8Import'],
+  [/^Converting the model file to a folder \(one-time\)$/, 'engine.convertingSingle'],
   [/^Preparing (.+) control image$/, 'engine.preparingControl', ['type']],
   [/^Encoding prompt$/, 'engine.encodingPrompt'],
   [/^Generating$/, 'engine.generating'],
@@ -51,6 +52,10 @@ const RULES: Rule[] = [
   [/^Faces not refined: (.*)$/, 'engine.facesNotRefined', ['reason']],
   [/^Outpaint LoRA not available: extended with FLUX\.2 \[klein\] 9B$/, 'engine.outpaintLoraMissing'],
   [/^ObjectClear kept the object: filled again without it$/, 'engine.objectclearKept'],
+  [/^Downloading SeedVR2 \(([\d.]+) GB, one-time\)$/, 'engine.downloadingSeedvr2', ['size']],
+  [/^Upscaling \(SeedVR2\)$/, 'engine.upscalingSeedvr2'],
+  [/^Decoding \(SeedVR2\)$/, 'engine.decodingSeedvr2'],
+  [/^The result is (\d+ × \d+): SeedVR2 makes at most (\d+) pixels on the longer side$/, 'engine.seedvr2Limit', ['size', 'max']],
   // notes of older jobs in the history (since 7ch klein 9B extends cleanly itself)
   [/^FLUX\.2 \[klein\] 9B extends less well/, 'engine.klein9ExtendsLess'],
   [/^LaMa not available \((.*)\), filling simply$/, 'engine.lamaMissing', ['reason']],
@@ -80,6 +85,11 @@ const RULES: Rule[] = [
   [/^Version (.+?) · (.*)$/, 'engine.version', ['name', 'note']],
   [/^Encoding (\d+) pictures?$/, 'engine.trainEncoding', ['n']],
   [/^Base model in (\d+) bit, (\d+) pictures$/, 'engine.trainBaseBits', ['bits', 'n']],
+  [/^Downloading the Z-Image Turbo training adapter \(0\.3 GB, one-time\)$/, 'engine.trainAdapterZimage'],
+  [/^Encoding the prompt \(Gemma 3 12B\)$/, 'engine.ltxEncoding'],
+  [/^Making the video \(LTX-2\.3, (\d+) × (\d+), (\d+) frames\)$/, 'engine.ltxMaking', ['width', 'height', 'frames']],
+  [/^Decoding the video$/, 'engine.ltxDecoding'],
+  [/^Decoding the video and the sound$/, 'engine.ltxDecodingSound'],
 ]
 
 /** The key and values of a known status line; a trailing " 42%" is kept apart. */

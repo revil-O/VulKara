@@ -43,6 +43,14 @@ def _hint(lm):
     return civitai.lora_hint(base) if base else None
 
 
+def _is_model(path):
+    try:
+        registry.detect_from_single_file(registry.read_safetensors_header(path), path)
+        return True
+    except (registry.UnsupportedModel, OSError, ValueError):
+        return False
+
+
 def lora_changes(folder, lm):
     """{field: (old, new)} for a LoRA, or {"error": text} when its file can not be read or placed."""
     file = os.path.normpath(os.path.join(folder, lm.get("file") or "lora.safetensors"))
@@ -51,7 +59,10 @@ def lora_changes(folder, lm):
     try:
         info = registry.inspect_lora(file, _hint(lm) or False)
     except (registry.UnsupportedModel, OSError, ValueError) as e:
-        return {"error": str(e)}
+        # a whole model filed as a LoRA before is_lora counted the majority (GhostMix v2): the app moves it to the trash,
+        # but only when the file is recognised as a model; anything else stays and is only reported
+        return {"error": str(e), "not_lora": True} if str(e) == registry.NOT_A_LORA and _is_model(file) \
+            else {"error": str(e)}
     out = {}
     if lm.get("family") != info["family"]:
         out["family"] = (lm.get("family"), info["family"])
@@ -220,7 +231,7 @@ def recheck(models_dir, loras_dir, apply=False, ram_gb=None):
                 continue
             item = {"type": kind, "folder": folder, "name": data.get("name") or entry}
             if "error" in changes:
-                item["error"] = changes["error"]
+                item.update(changes)
             else:
                 item["changes"] = {k: list(v) for k, v in changes.items()}
                 if kind == "model" and (changes.get("arch", (None, None))[1] == "chroma" or "unsupported" in changes):

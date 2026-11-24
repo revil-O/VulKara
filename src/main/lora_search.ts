@@ -195,14 +195,21 @@ export function pickLoraFile(files: string[]): string | undefined {
     ?? ok.find((f) => !f.includes('/')) ?? ok[0]
 }
 
+// parts a model needs beside it, never the model itself (FLUX's ae, SD 3.5's clip_g, Wan's umt5 …)
+const PART_FILE = /^(ae|vae|clip_[gl]|clip_vision|t5xxl|umt5|text_encoders?|llava)([-_.][^/]*)?\.(safetensors|gguf)$/i
+
 /**
- * What the import takes of a fine-tuned model's repository: the whole repository when it is in diffusers' layout
- * (file undefined), else a single checkpoint file at its top; null when neither is there.
+ * What the import takes of a fine-tuned model's repository: the whole repository when it is in diffusers' layout or
+ * one the MLX runtime reads (mflux's mflux_model.json, LTX-2.3's split_model.json, FLUX 3's config.json in an MLX repo;
+ * file undefined), else a checkpoint file at its top (safetensors, or GGUF – Q4_K_S first, it fits 16 GB); null when
+ * neither is there.
  */
-export function pickModelFile(files: string[]): { file?: string; files?: string[] } | null {
-  if (files.includes('model_index.json')) return {}
-  const ok = files.filter((f) => /\.safetensors$/i.test(f) && !f.includes('/') && !/lora/i.test(f))
-  return ok.length ? { file: ok[0], files: ok.slice(0, 30) } : null
+export function pickModelFile(files: string[], tags: string[] = []): { file?: string; files?: string[] } | null {
+  if (['model_index.json', 'mflux_model.json', 'split_model.json'].some((f) => files.includes(f))) return {}
+  if (files.includes('config.json') && tags.some((t) => t === 'mlx' || t === 'mflux')) return {}
+  const top = files.filter((f) => !f.includes('/') && !/lora/i.test(f) && !PART_FILE.test(f))
+  const ok = [...top.filter((f) => /\.safetensors$/i.test(f)), ...top.filter((f) => /\.gguf$/i.test(f))]
+  return ok.length ? { file: ok.find((f) => /q4_k_s\.gguf$/i.test(f)) ?? ok[0], files: ok.slice(0, 30) } : null
 }
 
 const NOT_A_MODEL = /control-?net|ip-?adapter|upscaler/i
@@ -246,7 +253,7 @@ export function parseHf(body: unknown, base: LoraBase, safe: boolean, assets: As
     const files = names.filter((f) => /\.safetensors$/i.test(f))
     // a model: not a LoRA, ControlNet, IP-Adapter or upscaler, which Hugging Face lists as fine-tunes too
     const pick = kind === 'model'
-      ? (tags.some((t) => t === 'lora' || NOT_A_MODEL.test(t)) || NOT_A_MODEL.test(repo) ? null : pickModelFile(names))
+      ? (tags.some((t) => t === 'lora' || NOT_A_MODEL.test(t)) || NOT_A_MODEL.test(repo) ? null : pickModelFile(names, tags))
       : { file: pickLoraFile(files), files: files.filter((f) => !/(^|\/)(diffusion_pytorch_model|model)(-\d+-of-\d+)?\.safetensors$/i.test(f)).slice(0, 30) }
     if (!pick || (kind === 'lora' && !pick.file)) continue
     const instance = card.instance_prompt
@@ -293,6 +300,12 @@ export function clearSearchCache(): void {
   thumbs.clear()
 }
 
+/** The search with "sd" written out ("sd3.5 large" → "stable diffusion 3.5 large"), or undefined without one. */
+export function spellSd(query: string): string | undefined {
+  const out = query.replace(/\bsd(?=\s|\d|$)/gi, 'stable diffusion ').replace(/\s+/g, ' ').trim()
+  return out !== query ? out : undefined
+}
+
 /** One page of LoRAs (or models) for a base. Throws with a readable message. */
 export async function searchLoras(req: LoraSearchRequest, opts: { fetcher: FetchLike; safe: boolean; assets: Asset[]; now?: number }): Promise<LoraSearchPage> {
   const base = loraBase(String(req?.base ?? ''))
@@ -311,6 +324,14 @@ export async function searchLoras(req: LoraSearchRequest, opts: { fetcher: Fetch
     page = source === 'civitai'
       ? parseCivitai((await getJson(opts.fetcher, civitaiUrl(base, query, cursor.c, opts.safe, kind))).body as Raw, base, opts.safe, opts.assets, kind)
       : await hfPage(base, query, cursor, kind, opts)
+    // Hugging Face searches the repository's name: "sd 3.5" misses stabilityai/stable-diffusion-3.5-large; the first
+    // page also asks with "stable diffusion" and puts those hits first
+    const spelled = query && source === 'hf' && !cursor.c && cursor.i === 0 ? spellSd(query) : undefined
+    if (spelled) {
+      const more = await hfPage(base, spelled, { i: 0 }, kind, opts)
+      const seen = new Set(more.hits.map((h) => h.ref))
+      page = { hits: [...more.hits, ...page.hits.filter((h) => !seen.has(h.ref))], cursor: page.cursor }
+    }
     if (cache.size > 200) cache.delete(cache.keys().next().value!)
     cache.set(key, { at: now, page })
   }

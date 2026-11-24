@@ -141,6 +141,9 @@ ARCHS = {
         "inpaint_pipeline": "StableDiffusion3InpaintPipeline",
         "denoiser": "transformer", "denoiser_class": "SD3Transformer2DModel",
         "base_repo": "stabilityai/stable-diffusion-3.5-large",
+        # 8 bit in memory swapped 5 GB at every load on a 16 GB Mac mini, 16 bit streamed none at about the same speed
+        # (MEASUREMENTS 7cr): streamed before it is shrunk (memory.stream_first)
+        "stream_before_quant": True,
         "torch_dtype": "bfloat16", "negative_prompt": True, "size_multiple": 16,
         "defaults": {"num_steps": 28, "guidance_scale": 3.5, "width": 1024, "height": 1024},
         "resolutions": _res(512, 1440),
@@ -523,6 +526,31 @@ ARCHS = {
         # one 4 bit expert (9.7 GB) plus its LoRA (1.2 GB) is resident at a time: counted as 16 bit equivalents
         "fallback_params": {"transformer": 5.4, "text_encoder": 2.9, "vae": 0.13},
     },
+    # LTX-2.3 (Lightricks, LTX-2 Community License: free below US$10M yearly revenue): a 22B audio-video transformer,
+    # video with sound from a prompt or a start picture. Only the MLX runtime runs it, with ltx-2-mlx (engines/mlx/
+    # ltx23.py) from dgrauet's 4 bit MLX repo; Gemma 3 12B (MLX 4 bit) encodes the text as a helper model. The
+    # distilled two-stage path: 8 + 3 steps, no guidance, 24 fps, sides in 64 px steps (MEASUREMENTS 7cp)
+    "ltx23": {
+        "family": "ltx", "label": "LTX-2.3 (video with sound)", "kind": "video",
+        "pipeline": None, "img2img_pipeline": None, "img2img": False,
+        "denoiser": "transformer", "denoiser_class": None,
+        "base_repo": "dgrauet/ltx-2.3-mlx-q4", "runtime": "mlx",
+        "plan_on_disk": True,  # ltx-2-mlx holds the 4 bit weights as they lie on disk
+        # its transformer blocks stream from the mapped file (low_ram_streaming): a quarter of it counted as resident;
+        # 2 s at 768 × 512 peaked at 8.0 GB on 16 GB in all, Gemma and the connector loaded one after the other (7cp)
+        "streamed_share": 0.25, "activations_gb": 1.0,
+        "user_loras": False,
+        "license": "LTX-2 Community License",
+        "licence": {"name": "LTX-2 Community License Agreement",
+                    "url": "https://github.com/Lightricks/LTX-2/blob/main/LICENSE-2"},
+        "prompt_hint": "Describe the scene, the motion and the sound (\"a fox trots through snow, crunching footsteps\")",
+        "torch_dtype": "bfloat16", "negative_prompt": False, "size_multiple": 64,
+        "defaults": {"num_steps": 11, "guidance_scale": 1.0, "width": 768, "height": 512, "num_frames": 49, "fps": 24},
+        "resolutions": _res(256, 1280),
+        # the files on disk as 16 bit equivalents: 4 bit transformer 11.3 GB; the text stage Gemma 4 bit 8.0 GB (then the
+        # connector, 6.3 GB, alone; both freed first); VAEs, vocoder, upscaler 2.8 GB
+        "fallback_params": {"transformer": 5.7, "text_encoder": 4.0, "vae": 1.4},
+    },
     # Ideogram 4 (two 9.3B transformers: conditional + unconditional for guidance, Qwen3-VL 8B text
     # encoder, FLUX.2 VAE). FP8 checkpoints; runs with the MLX runtime, mflux reads them as they are
     "ideogram4": {
@@ -593,6 +621,23 @@ def detect_flux3(config, modular_index=None):
     base = (config.get("variant") == "base" or config.get("flow_map") is False or model.endswith("-base")
             or (cls.startswith("Flux3") and "Distilled" not in cls))
     return "flux3_klein", (dict(FLUX3_BASE_DEFAULTS) if base else {})
+
+
+LTX23_FILES = ("transformer-distilled.safetensors", "connector.safetensors", "vae_decoder.safetensors",
+               "vae_encoder.safetensors", "audio_vae.safetensors", "vocoder.safetensors",
+               "spatial_upscaler_x2_v1_1.safetensors")
+
+
+def detect_ltx23(split_model, files=None):
+    """"ltx23" for an LTX-2.3 folder in ltx-2-mlx's split format (split_model.json) with the distilled transformer,
+    else None."""
+    split_model = split_model or {}
+    if split_model.get("format") != "split" or not str(split_model.get("model_version", "")).startswith("2.3"):
+        return None
+    if files is not None and "transformer-distilled.safetensors" not in files:
+        raise UnsupportedModel("This LTX-2.3 folder has no transformer-distilled.safetensors (the distilled model "
+                               "the MLX runtime runs)")
+    return "ltx23"
 
 
 def detect_mflux(meta):
@@ -788,8 +833,13 @@ LORA_MARKERS = (".lora_A.", ".lora_B.", ".lora_down.", ".lora_up.", ".lora.down.
                 ".lokr_", ".hada_")
 
 
+NOT_A_LORA = "Not a LoRA file"
+
+
 def is_lora(keys):
-    return any(m in k for k in keys for m in LORA_MARKERS)
+    # most keys, not any: some full checkpoints keep a merged LoRA's tensors beside the model (GhostMix v2: 216 of 1556)
+    keys = list(keys)
+    return sum(any(m in k for m in LORA_MARKERS) for k in keys) * 2 > len(keys)
 
 
 def _made_up(word):
@@ -1251,7 +1301,7 @@ def inspect_lora(path, family_hint=None):
     header = read_safetensors_json(path)
     shapes, meta = _shapes(header), header.get("__metadata__") or {}
     if not is_lora(_strip(shapes.keys())):
-        raise UnsupportedModel("Not a LoRA file")
+        raise UnsupportedModel(NOT_A_LORA)
     out = lora_identity(shapes, meta, family_hint)
     out.update(trigger_words=trigger_words_from_metadata(meta), params_m=round(_n_params(shapes) / 1e6, 1))
     return out

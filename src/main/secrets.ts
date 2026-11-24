@@ -6,6 +6,7 @@
 import { safeStorage } from 'electron'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { t } from './i18n'
 import { dataDir } from './paths'
 
 export type TokenService = 'huggingface' | 'civitai'
@@ -36,10 +37,21 @@ function writeAll(all: Record<string, string>): void {
   renameSync(tmp, file())
 }
 
+/** A pasted token without what often comes with it: "export HF_TOKEN=", "Bearer ", quotes. */
+export function cleanToken(raw: string): string {
+  return raw.trim().replace(/^export\s+/i, '').replace(/^[a-z_]*token\s*[=:]\s*/i, '').replace(/^bearer\s+/i, '')
+    .replace(/^["'`]+|["'`]+$/g, '').trim()
+}
+
+/** A Hugging Face access token: hf_ and letters or digits (37 characters today). */
+export const isHfToken = (value: string): boolean => /^hf_[A-Za-z0-9]{30,}$/.test(value)
+
 export function setToken(service: TokenService, token: string): 'stored' | 'session' | 'removed' {
   if (!SERVICES.includes(service)) throw new Error('unknown service')
+  const value = cleanToken(token)
+  // more than the token pasted (two tokens, a line of a file …) was stored once and refused by Hugging Face with 401
+  if (service === 'huggingface' && value && !isHfToken(value)) throw new Error(t('main.tokens.notHf'))
   const all = readAll()
-  const value = token.trim()
   if (!value) {
     delete all[service]
     delete session[service]
@@ -66,3 +78,18 @@ export function getToken(service: TokenService): string | undefined {
 }
 
 export const hasToken = (service: TokenService): boolean => !!getToken(service)
+
+// the account behind a token: 401 without a valid one
+const WHO = { huggingface: 'https://huggingface.co/api/whoami-v2', civitai: 'https://civitai.com/api/v1/me' }
+
+/** Whether the site takes the stored token; unknown without one or offline. */
+export async function checkToken(service: TokenService, fetcher: (url: string, init: RequestInit) => Promise<Response>): Promise<'valid' | 'refused' | 'unknown'> {
+  const token = SERVICES.includes(service) ? getToken(service) : undefined
+  if (!token) return 'unknown'
+  try {
+    const res = await fetcher(WHO[service], { headers: { Authorization: `Bearer ${token}` } })
+    return res.ok ? 'valid' : res.status === 401 ? 'refused' : 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}

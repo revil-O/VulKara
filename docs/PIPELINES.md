@@ -279,7 +279,8 @@ flowchart LR
 
 ### <img src="icons/clapperboard.svg" width="20" height="20" alt=""> Image to video
 
-1. Install the **ComfyUI** runtime and a **Wan 2.2** model (Models → Recommended).
+1. Install the **ComfyUI** runtime and import a **Wan 2.2** model (Models → Import, e.g. QuantStack/Wan2.2-I2V-A14B-GGUF
+   from Hugging Face; it needs 24 GB). Models → Recommended offers LTX-2.3 for video instead.
 2. Open **Video**, choose the **Start picture** and describe the movement, camera and mood.
 3. Choose **Length** (1–5 s) and **Resolution** (480p or 720p) and press **Generate**.
 

@@ -29,6 +29,8 @@ const NOTES = {
   krea: 'app.licenses.terms.krea',
   fluxKommunity: 'app.licenses.terms.fluxKommunity',
   pony: 'app.licenses.terms.pony',
+  ltx: 'app.licenses.terms.ltx',
+  gemma: 'app.licenses.terms.gemma',
 } as const satisfies Record<string, PlainKey>
 const note = (name: keyof typeof NOTES): string => translate('en', NOTES[name])
 
@@ -55,6 +57,8 @@ export const TERMS: Record<string, LicenceTerms> = {
   'flux-kommunity-license': { name: 'FLUX Kommunity License v1.0', url: 'https://huggingface.co/black-forest-labs/flux-3-image-klein/blob/main/LICENSE.md', model: 'no', outputs: 'limited', note: note('fluxKommunity') },
   'pony-license': { name: 'Pony License', url: 'https://huggingface.co/purplesmartai/pony-v7-base/blob/main/LICENSE', model: 'limited', outputs: 'limited', note: note('pony') },
   'krea-2-community-license': { name: 'Krea 2 Community License', url: 'https://www.krea.ai/krea-2-use-policy', model: 'limited', outputs: 'limited', note: note('krea') },
+  'ltx-2-community-license-agreement': { name: 'LTX-2 Community License Agreement', url: 'https://github.com/Lightricks/LTX-2/blob/main/LICENSE-2', model: 'limited', outputs: 'limited', note: note('ltx') },
+  gemma: { name: 'Gemma Terms of Use', url: 'https://gemma.ai/resources/terms/', model: 'yes', outputs: 'yes', note: note('gemma') },
 }
 
 const RANK: Record<Allowed, number> = { no: 0, limited: 1, unknown: 2, yes: 3 }
@@ -95,6 +99,7 @@ export function baseLicence(family: string, arch = '', pageBase = ''): { title: 
     case 'auraflow': return is('pony') ? { title: 'Pony V7', terms: TERMS['pony-license'] } : { title: 'AuraFlow', terms: TERMS['apache-2.0'] }
     case 'ideogram4': return { title: 'Ideogram 4', terms: TERMS['ideogram-4-non-commercial'] }
     case 'wan': return { title: 'Wan 2.2', terms: TERMS['apache-2.0'] }
+    case 'ltx': return { title: 'LTX-2.3', terms: TERMS['ltx-2-community-license-agreement'] }
     case 'qwen_image': return { title: 'Qwen-Image', terms: TERMS['apache-2.0'] }
     case 'qwen_image21': return { title: 'Qwen-Image 2.1', terms: TERMS['qwen-research'] }
     case 'z_image': return { title: 'Z-Image', terms: TERMS['apache-2.0'] }

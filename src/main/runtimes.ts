@@ -7,7 +7,7 @@ import { app, net } from 'electron'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { enginesDir } from './paths'
 import { runtimesDir } from './settings'
 import type { RuntimeInfo } from '@shared/api'
@@ -39,7 +39,8 @@ interface Runtime {
   comfyRelease?: string
   /** content of the ComfyUI release archive (archive_hash.treeHash) */
   comfyTree?: string
-  /** treeSha256: the content of the archive at that commit */
+  /** treeSha256: the content of the archive at that commit. ComfyUI's go to its custom_nodes, the others to
+   *  <runtime>/extensions (the engine puts their code on its path) */
   extensions?: { name: string; repo: string; commit: string; treeSha256: string }[]
 }
 
@@ -58,6 +59,11 @@ const CATALOG: Runtime[] = [
   {
     id: 'mlx', name: 'MLX', engine: 'mlx', versionPackage: 'mflux', python: PYTHON,
     versions: [{ kind: 'pypi', package: 'mflux' }],
+    // LTX-2.3 (engines/mlx/ltx23.py): ltx-2-mlx is not on PyPI, its pure-Python packages come from this commit
+    extensions: [{
+      name: 'ltx-2-mlx', repo: 'dgrauet/ltx-2-mlx', commit: 'b82b97e3d000e01361f8cfcb745244b15b89a521',
+      treeSha256: '2f43d6aaefd6d068a5fa51ccbd7b81e798fc3931c68f347e07e3059fdbb193c5',
+    }],
     description: () => t('main.runtimes.mlxDescription'),
   },
   {
@@ -317,15 +323,16 @@ async function installNow(id: RuntimeId, progress: Progress): Promise<{ version:
       await installArchive(`https://github.com/comfyanonymous/ComfyUI/archive/refs/tags/v${rt.comfyRelease}.zip`, dir, comfy,
         rt.comfyTree ?? '', `ComfyUI ${rt.comfyRelease}`)
     }
-    for (const ext of rt.extensions ?? []) {
-      const target = join(comfy, 'custom_nodes', ext.name)
-      const commitFile = join(target, '.installed_commit')
-      if (existsSync(commitFile) && readFileSync(commitFile, 'utf8').trim() === ext.commit) continue
-      progress(t('main.runtimes.downloading', { name: ext.name }), -1)
-      await installArchive(`https://github.com/${ext.repo}/archive/${ext.commit}.zip`, dir, target, ext.treeSha256, ext.name)
-      writeFileSync(commitFile, ext.commit)
-    }
     requirements.unshift('-r', join(comfy, 'requirements.txt'))
+  }
+  for (const ext of rt.extensions ?? []) {
+    const target = rt.comfyRelease ? join(dir, 'ComfyUI', 'custom_nodes', ext.name) : join(dir, 'extensions', ext.name)
+    const commitFile = join(target, '.installed_commit')
+    if (existsSync(commitFile) && readFileSync(commitFile, 'utf8').trim() === ext.commit) continue
+    mkdirSync(dirname(target), { recursive: true })
+    progress(t('main.runtimes.downloading', { name: ext.name }), -1)
+    await installArchive(`https://github.com/${ext.repo}/archive/${ext.commit}.zip`, dir, target, ext.treeSha256, ext.name)
+    writeFileSync(commitFile, ext.commit)
   }
   progress(t('main.runtimes.installingPackages'), -1)
   // the tested set and nothing else: every package at its locked version, also the ones that only come in through
@@ -363,7 +370,12 @@ export function engineCommand(id: RuntimeId, args: string[] = []): Command | und
   if (!rt || !python) return undefined
   const env: Record<string, string> = {}
   if (id === 'comfyui') env.VK_COMFY_RUNTIME = runtimeDir('comfyui')
-  // the MLX engine never downloads: nothing of it may reach the network
+  // the Hugging Face library of the MLX engine stays offline; only the pinned files a job needs (SeedVR2, the
+  // training adapter) come through pinned.fetch_urls, checked by SHA-256
   if (id === 'mlx' && !args.length) env.HF_HUB_OFFLINE = '1'
+  // macOS stops long GPU work of a process while the display is in use (Metal watchdog, ml-explore/mlx#3267, closed by
+  // MLX as won't fix): its maintainer's remedy, for the MLX engine and trainer only; the UI may react a little slower
+  // during such a job (LTX-2.3 failed in 2 of 3 clips without it, MEASUREMENTS 7cp)
+  if (id === 'mlx') env.AGX_RELAX_CDM_CTXSTORE_TIMEOUT = '1'
   return { command: python, args: [join(enginesDir(), rt.engine, 'main.py'), ...args], env }
 }

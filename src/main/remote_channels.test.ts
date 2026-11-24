@@ -13,7 +13,7 @@ describe('what the remote web UI may call', () => {
   })
 
   it('has nothing that changes the Mac, its settings or its secrets', () => {
-    for (const c of ['settings:set', 'settings:chooseFolder', 'tokens:set', 'files:choose', 'files:saveAs', 'files:reveal',
+    for (const c of ['settings:set', 'settings:chooseFolder', 'tokens:set', 'files:choose', 'files:chooseMany', 'files:saveAs', 'files:reveal',
       'assets:remove', 'assets:rename', 'assets:exportSingle', 'runtimes:install', 'training:start', 'app:openExternal', 'app:logs', 'app:clearPromptCache', 'dialog:ask']) {
       expect(REMOTE_CHANNELS.has(c)).toBe(false)
     }

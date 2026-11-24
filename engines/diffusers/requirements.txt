@@ -1,4 +1,4 @@
-# diffusers engine (SDXL, SD 3.5, FLUX.1, FLUX.2, Qwen-Image); runs in its own venv, see docs/Running_from_source.md
+# diffusers engine (SDXL, SD 3.5, FLUX.1, FLUX.2, Qwen-Image); runs in its own venv, see docs/DEVELOPMENT.md
 torch==2.14.1
 torchvision==0.29.1  # the Qwen3-VL processor of Qwen-Image 2.1
 diffusers==0.41.0  # 0.41: Qwen-Image 2.1; 1.0 drops QuantoConfig, which the 8-bit loading and its cache rely on

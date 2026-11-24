@@ -5,7 +5,7 @@
 # VulKara
 
 **Your local AI image generator with high privacy**<br>
-Text to image · Image to image · Inpainting · AI Canvas · Image to video · Upscale · Restore · Pose · Illusion · LoRAs · Training · Remote web UI
+Text to image · Image to image · Inpainting · AI Canvas · Video with sound · Upscale · Restore · Pose · Illusion · LoRAs · Training · Remote web UI
 
 [![Release](https://img.shields.io/github/v/release/revil-O/VulKara?label=release&color=c2662d)](https://github.com/revil-O/VulKara/releases/latest)
 ![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-111?logo=apple&logoColor=white)
@@ -82,7 +82,7 @@ it over your own network, as a web UI in the browser.
 
 ### <img src="docs/icons/boxes.svg" width="20" height="20" alt=""> Many models, one app
 SD 1.5 / 2.x, SDXL (also Pony, Illustrious, NoobAI), SD 3.5, FLUX.1, FLUX.2, FLUX 3 Image Klein, Chroma, Qwen-Image,
-Z-Image, Krea 2, Ideogram 4, ERNIE-Image, Anima, Lumina 2, Pony V7 (AuraFlow), MOSS-Image, Fibo 2.0 and Wan 2.2 video. Choose from a tested list, or import any model from Hugging Face, Civitai or a file.
+Z-Image, Krea 2, Ideogram 4, ERNIE-Image, Anima, Lumina 2, Pony V7 (AuraFlow), MOSS-Image, Fibo 2.0, and video with LTX-2.3 (with sound) and Wan 2.2. Choose from a tested list, or import any model from Hugging Face, Civitai or a file.
 The app speaks English, German, Spanish and Portuguese (Brazil and Portugal); a new language is a folder of JSON files.
 
 </td>
@@ -245,13 +245,16 @@ kinds of old photos, and your own templates.
 
 ### Video, upscale, pose and illusion
 
+<a href="docs/images/results/ltx23_space.mp4"><img src="docs/images/results/ltx23_space.jpg" alt="A five-second clip with sound made with LTX-2.3 in VulKara" width="640"></a><br>
+<sub>Made with VulKara on a Mac mini M4 with 16 GB: LTX-2.3 (MLX, 4 bit), 5 s with sound at 1280 × 704 from the prompt alone, about 19 minutes. Click for the clip.</sub>
+
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/video.jpg" alt="Image to video"></td>
+<td width="50%"><img src="docs/screenshots/video.jpg" alt="Video"></td>
 <td width="50%"><img src="docs/screenshots/upscale.jpg" alt="Upscale"></td>
 </tr>
 <tr>
-<td><b>Image to video</b> with Wan 2.2: a start picture and a description of the movement, 1–5 seconds at 480p or 720p.</td>
+<td><b>Video</b> with LTX-2.3: a clip with sound from a description alone or from a start picture, or with Wan 2.2 from a start picture; 1–5 seconds at 480p or 720p.</td>
 <td><b>Upscale</b> 2× or 4× with Real-ESRGAN, which adds detail instead of blur.</td>
 </tr>
 <tr>
@@ -452,6 +455,7 @@ Mac is never used or changed.
 | MOSS-Image (text in pictures; 50 steps or the 8-step DMD version, about 4½ min per picture on an M2) | ComfyUI | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | | | | | yes (Apache 2.0) |
 | Fibo 2.0 Edit Turbo (edits a picture by instruction, also inside a mask or up to four together; 4 steps, about 6 min per edit on an M2; ComfyUI from 20 GB, MLX on 16 GB) | ComfyUI, MLX | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | <img src="docs/icons/check.svg" width="14" height="14" alt="yes"> | | | | no (CC BY-NC 4.0) |
 | Wan 2.2 5B / 14B (video) | ComfyUI | video | | | | | yes (Apache 2.0) |
+| LTX-2.3 (video with sound from a prompt or a start picture; 4 bit, about 5 min for 2 s on a Mac mini M4 with 16 GB) | MLX | video | | | | | below USD 10 M revenue |
 
 Models are never part of the app. They are downloaded on demand from Hugging Face or Civitai, and their licences are
 shown on the Licenses page. LoRAs of families without a runtime in the app (HiDream, Hunyuan …) are shown

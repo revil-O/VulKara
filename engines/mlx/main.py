@@ -761,12 +761,63 @@ class MlxEngine:
         protocol.note("Prompt written by the enhancer: " + caption)
         return caption
 
+    def photo_tool(self, d):
+        """The Upscale tool's "Detailed" variant (seedvr2.py): no picture model is needed, the loaded one is freed first
+        (SeedVR2 takes 11 GB)."""
+        import seedvr2
+        self.unload()
+        t0 = time.time()
+        stop = (lambda: self.reader.stop_requested()) if self.reader is not None else None
+        path = seedvr2.run(d, IMAGES_DIR, stop=stop, state=self._state, progress=lambda p: protocol.progress(round(p, 1)),
+                           note=protocol.note, log=protocol.log)
+        if path is None:
+            raise StopRequested()
+        protocol.log("[photo tool] SeedVR2 done in %.1fs" % (time.time() - t0))
+        protocol.result(path)
+        return [path]
+
+    def _generate_ltx23(self, d, weights):
+        """A video with sound (ltx23.py): the loaded picture model is freed first; Gemma 3 12B is a helper model,
+        downloaded beforehand at its pinned commit."""
+        import helpers
+        import ltx23
+        import pinned
+        self.unload()
+        h = next(x for x in helpers.catalog() if x["id"] == ltx23.GEMMA_HELPER)
+        gemma = helpers.folder_of(h)
+        if not pinned.ready(h["repo"], gemma):
+            # the MLX engine never downloads (it runs without network): the Video page or Models does that
+            raise ValueError("LTX-2.3's text encoder (Gemma 3 12B) is not downloaded yet: download it on the Video page "
+                             "or on the Models page (Helper models)")
+        t0 = time.time()
+        stop = (lambda: self.reader.stop_requested()) if self.reader is not None else None
+        try:
+            path = ltx23.run(d, weights, gemma, IMAGES_DIR, stop=stop, state=self._state,
+                             progress=lambda p: protocol.progress(round(p, 1)), note=protocol.note, log=protocol.log)
+        except RuntimeError as e:
+            if "kIOGPUCommandBuffer" not in str(e):
+                raise
+            # the Metal watchdog (ml-explore/mlx#3267): said so instead of the driver's message
+            raise RuntimeError("macOS stopped the video because the screen needed the graphics processor at the same "
+                               "time (a known macOS limit for long GPU work). Try again; with the display asleep it "
+                               "does not happen") from e
+        if path is None:
+            raise StopRequested()
+        protocol.log("[mlx] LTX-2.3 video done in %.1fs" % (time.time() - t0))
+        protocol.result(path)
+        return [path]
+
     def generate(self, d):
+        if d.get("photo_tool"):
+            return self.photo_tool(d)
         model_dir = d.get("model_dir")
         if not model_dir or not os.path.isfile(os.path.join(model_dir, MANIFEST)):
             raise ValueError("Model not found, please re-import it")
         with open(os.path.join(model_dir, MANIFEST)) as f:
             m = json.load(f)
+        if m.get("arch") == "ltx23":
+            weights = m["weights_dir"] if os.path.isabs(m["weights_dir"]) else os.path.join(model_dir, m["weights_dir"])
+            return self._generate_ltx23(d, weights)
         loras = self._resolve_loras(d.get("loras"), m)
         defaults = m.get("defaults", {})
 

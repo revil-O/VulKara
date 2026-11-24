@@ -192,7 +192,7 @@ if (!app.requestSingleInstanceLock()) {
     void repaired.then(() => recheckLibrary(engineCommand('diffusers', ['recheck_loras']), engineEnv(), app.getPath('userData'), () => {
       for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('assets:change')
       sendToRemote('assets:change')
-    }))
+    }, (path) => shell.trashItem(path)))
   })
 
   // closing the window leaves VulKara in the menu bar with its jobs and the remote web UI; Quit (⌘Q, the menu bar menu)

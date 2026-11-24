@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 const dir = mkdtempSync(`${tmpdir()}/vk-runtimes-`)
 vi.mock('electron', () => ({ app: { getPath: () => dir, isPackaged: false, getAppPath: () => resolve('.') }, net: {} }))
 
-const { checkDownload, packageInstallError, updateTargets, staleRuntimes, runtimeDir, venvPython } = await import('./runtimes')
+const { checkDownload, packageInstallError, updateTargets, staleRuntimes, runtimeDir, venvPython, engineCommand } = await import('./runtimes')
 
 describe('the runtimes in the update check', () => {
   it('every runtime declares what identifies its version, with the range from its requirements', () => {
@@ -71,11 +71,24 @@ describe('runtimes from an earlier version', () => {
     expect(staleRuntimes()).toEqual(['mlx'])
     writeFileSync(join(rt, 'runtime.json'), JSON.stringify({ id: 'mlx', version: '0.20.0', installedAt: 1, lock: 'older' }))
     expect(staleRuntimes()).toEqual(['mlx'])
-    const lockFor = (python: string) => createHash('sha256').update(readFileSync(resolve('engines/mlx/constraints.txt'))).update(`${python},`).digest('hex')
+    // the MLX runtime brings ltx-2-mlx at a pinned commit (LTX-2.3): a new commit makes it stale too
+    const LTX = 'b82b97e3d000e01361f8cfcb745244b15b89a521'
+    const lockFor = (python: string, ext = LTX) => createHash('sha256').update(readFileSync(resolve('engines/mlx/constraints.txt'))).update(`${python},,${ext}`).digest('hex')
     // the same packages on the Python of an earlier version: made again on 3.11.18
     writeFileSync(join(rt, 'runtime.json'), JSON.stringify({ id: 'mlx', version: '0.20.0', installedAt: 1, lock: lockFor('3.11.17') }))
     expect(staleRuntimes()).toEqual(['mlx'])
+    writeFileSync(join(rt, 'runtime.json'), JSON.stringify({ id: 'mlx', version: '0.20.0', installedAt: 1, lock: lockFor('3.11.18', 'an-older-commit') }))
+    expect(staleRuntimes()).toEqual(['mlx'])
     writeFileSync(join(rt, 'runtime.json'), JSON.stringify({ id: 'mlx', version: '0.20.0', installedAt: 1, lock: lockFor('3.11.18') }))
     expect(staleRuntimes()).toEqual([])
+  })
+
+  it('starts the MLX engine and trainer with the Metal watchdog relaxed, the engine offline', () => {
+    // runtime.json and venv/bin/python of the runtime made in the test before
+    const engine = engineCommand('mlx')
+    expect(engine?.env).toMatchObject({ AGX_RELAX_CDM_CTXSTORE_TIMEOUT: '1', HF_HUB_OFFLINE: '1' })
+    const trainer = engineCommand('mlx', ['train', '/job.json'])
+    expect(trainer?.env.AGX_RELAX_CDM_CTXSTORE_TIMEOUT).toBe('1')
+    expect(trainer?.env.HF_HUB_OFFLINE).toBeUndefined()  // the trainer downloads its adapter
   })
 })

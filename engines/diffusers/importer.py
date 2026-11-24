@@ -331,6 +331,57 @@ def inspect_flux3(source, ref, token=None):
     return info
 
 
+# ------------------------------------------------------------ LTX-2.3 (ltx-2-mlx's split format)
+
+# what the distilled two-stage path reads (engines/mlx/ltx23.py): the dev transformer, its LoRAs and the other
+# upscalers of the repo are left out (about 39 GB less)
+LTX23_TEXT = ("config.json", "embedded_config.json", "quantize_config.json", "split_model.json",
+              "spatial_upscaler_x2_v1_1_config.json", "LICENSE", "README.md")
+
+
+def _ltx23_components(sizes):
+    """{component: billions of 16 bit parameters as large as the files}. The text stage is Gemma 3 12B (a helper, 8.0
+    GB in 4 bit), then the connector (6.3 GB) alone (engines/mlx/ltx23.py staged_encode); both are freed before the
+    transformer loads."""
+    def gb(*names):
+        return sum(sizes.get(f, 0) for f in names) / 1e9 / 2
+    rest = [f for f in registry.LTX23_FILES if f not in ("transformer-distilled.safetensors", "connector.safetensors")]
+    return {"transformer": gb("transformer-distilled.safetensors") or 5.7, "text_encoder": 4.0, "vae": gb(*rest) or 1.4}
+
+
+def inspect_ltx23(source, ref, token=None):
+    """inspect() for an LTX-2.3 repo or folder in ltx-2-mlx's split format, else None."""
+    if source == "hf":
+        try:
+            split = _hf_json(ref, "split_model.json", token)
+        except Exception:
+            return None
+        sizes = _hf_repo_info(ref, token)[1]
+        files = list(sizes)
+    else:
+        path = os.path.join(ref, "split_model.json")
+        if not os.path.isfile(path):
+            return None
+        split = _load_json(path)
+        files = [str(p.relative_to(ref)) for p in Path(ref).rglob("*") if p.is_file() and not p.name.startswith("._")]
+        sizes = {f: os.path.getsize(os.path.join(ref, f)) for f in files}
+    arch = registry.detect_ltx23(split, files)
+    if not arch:
+        return None
+    info = {"source": source, "ref": ref, "file": None, "arch": arch, "overrides": {}, "denoiser": "transformer",
+            "variant": None, "components": _ltx23_components(sizes)}
+    if source == "hf":
+        wanted = sorted(f for f in files if f in registry.LTX23_FILES or f in LTX23_TEXT)
+        missing = [f for f in registry.LTX23_FILES if f not in wanted]
+        if missing:
+            raise registry.UnsupportedModel("This LTX-2.3 repo lacks %s" % ", ".join(missing))
+        info.update(layout="repo", files=wanted, file_sizes={f: sizes.get(f, 0) for f in wanted},
+                    file_sha256=_hashes(ref, wanted), download_bytes=sum(sizes.get(f, 0) for f in wanted))
+    else:
+        info.update(layout="folder", download_bytes=0)
+    return info
+
+
 # ------------------------------------------------------------ folders mflux saved (Fibo 2.0)
 
 MFLUX_SKIP = re.compile(r"^(assets|gallery)/|\.(jpe?g|png|webp|gif|mp4)$|^README\.md$|^\.gitattributes$", re.I)
@@ -403,7 +454,7 @@ def inspect(source, ref, file=None, token=None, name_hint=""):
         try:
             model_index = _hf_json(ref, "model_index.json", token)
         except EntryNotFoundError:
-            found = inspect_flux3(source, ref, token) or inspect_mflux(source, ref, token)
+            found = inspect_ltx23(source, ref, token) or inspect_flux3(source, ref, token) or inspect_mflux(source, ref, token)
             if found:
                 return found
             raise registry.UnsupportedModel(_no_layout_message(ref, token))
@@ -425,7 +476,7 @@ def inspect(source, ref, file=None, token=None, name_hint=""):
 
     if source == "dir":
         if not os.path.isfile(os.path.join(ref, "model_index.json")):
-            found = inspect_flux3(source, ref) or inspect_mflux(source, ref)
+            found = inspect_ltx23(source, ref) or inspect_flux3(source, ref) or inspect_mflux(source, ref)
             if found:
                 return found
         model_index = _load_json(os.path.join(ref, "model_index.json"))
@@ -667,8 +718,11 @@ def make_plan(info, quant="auto", ram_gb=None):
         return plan
     if spec.get("plan_on_disk"):
         # FLUX 3 (flux3-mlx), Fibo 2.0 (mflux's saved files): the weights in memory as on disk, the text encoder only
-        # for encoding when both do not fit
-        return memory.plan(info["components"], info["denoiser"], spec["family"],
+        # for encoding when both do not fit; LTX-2.3 streams its transformer (streamed_share of it resident)
+        comps = dict(info["components"])
+        if spec.get("streamed_share"):
+            comps[info["denoiser"]] *= spec["streamed_share"]
+        return memory.plan(comps, info["denoiser"], spec["family"],
                            ram_gb if ram_gb is not None else memory.total_ram_gb(), quant="none", allow_staging=True,
                            staging_frees_denoiser=True, activations_gb=spec.get("activations_gb"))
     if spec.get("runtime") == "mlx":
@@ -682,9 +736,9 @@ def make_plan(info, quant="auto", ram_gb=None):
     planner = memory.plan if info.get("layout") == "single_full" else memory.fitting_plan
     plan = planner(info["components"], info["denoiser"], spec["family"], ram,
                    quant=quant, denoiser_fixed_gb=info.get("denoiser_fixed_gb"))
-    if plan["fits"] or not _streamable(info):
+    if (plan["fits"] and not memory.stream_first(spec, plan, info["denoiser"], quant)) or not _streamable(info):
         return plan
-    # too large for the memory: the engine then streams the denoiser block by block from the SSD, in 16 bit (a GGUF
+    # too large for the memory (or better streamed than shrunk): the engine then streams the denoiser block by block from the SSD, in 16 bit (a GGUF
     # file is unpacked for that once)
     # (engine.py); the model fits if that does
     comps = dict(info["components"])
@@ -789,6 +843,30 @@ class NotEnoughSpace(OSError):
     pass
 
 
+_IMPORTANT_FREE_JS = ('ObjC.import("Foundation"); function run(argv) { const r = $.NSURL.fileURLWithPath(argv[0])'
+                      '.resourceValuesForKeysError(["NSURLVolumeAvailableCapacityForImportantUsageKey"], null);'
+                      ' return String(r.objectForKey("NSURLVolumeAvailableCapacityForImportantUsageKey").js) }')
+
+
+def _important_free(folder):
+    """Free bytes as the Finder counts them: purgeable space (local Time Machine snapshots, caches) that macOS frees
+    for a download the user asked for. None when macOS does not answer."""
+    import subprocess
+    try:
+        out = subprocess.run(["/usr/bin/osascript", "-l", "JavaScript", "-e", _IMPORTANT_FREE_JS, str(folder)],
+                             capture_output=True, text=True, timeout=5)
+        return int(out.stdout.strip()) if out.returncode == 0 else None
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
+
+
+def free_bytes(folder):
+    """Free space for an install the user started (Apple: "important usage"); caches keep shutil's smaller figure."""
+    plain = shutil.disk_usage(folder).free
+    important = _important_free(folder)
+    return max(plain, important) if important else plain
+
+
 def ensure_install_room(folder):
     """Refuses an install (dry runs as well, so the finders show it) while the models disk has less than
     MIN_INSTALL_FREE_GB free."""
@@ -796,7 +874,7 @@ def ensure_install_room(folder):
     at = Path(folder)
     while not at.exists() and at.parent != at:
         at = at.parent
-    free_gb = shutil.disk_usage(str(at)).free / 1024 ** 3
+    free_gb = free_bytes(str(at)) / 1024 ** 3
     if free_gb < MIN_INSTALL_FREE_GB:
         # rounded down: 49.6 GB free must not read "50 GB"
         raise NotEnoughSpace("Only %d GB free on the models disk: models are installed with %d GB free or more"
@@ -808,7 +886,7 @@ def ensure_space(folder, need_bytes, what="this import"):
     (a full disk breaks downloads, caches and other apps)."""
     import shutil
     os.makedirs(folder, exist_ok=True)
-    free = shutil.disk_usage(folder).free
+    free = free_bytes(folder)
     if free - need_bytes < MIN_FREE_GB * 1024 ** 3:
         raise OSError("Not enough disk space for %s: needs about %.1f GB, %.1f GB free on the models disk "
                       "(%s). Free some space or choose another models folder in Settings."
@@ -1131,6 +1209,8 @@ def import_photo_tool(source, ref, name, dry_run=False):
 def run_import(source, ref, name, file=None, quant="auto", dry_run=False, force=False, token=None, root=None,
                meta_override=None, companions=None):
     token = token or os.environ.get("HF_TOKEN") or None
+    if source == "hf":
+        sys.stderr.write("[import] Hugging Face token: %s\n" % ("given" if token else "none"))  # never the value
     if source == "merge":
         # LoRAs baked into a new model (merge.py); ref is the spec file the app wrote
         import merge
@@ -1260,6 +1340,9 @@ def run_import(source, ref, name, file=None, quant="auto", dry_run=False, force=
         with open(target / MANIFEST, "w") as f:
             json.dump(manifest, f, indent=1)
         _add_preview(target, MANIFEST, manifest, token)
+        if migrate_single_file(str(target), status=progress):
+            manifest = _load_json(target / MANIFEST)
+        migrate_fp32(str(target), status=progress)
     except BaseException:
         shutil.rmtree(target, ignore_errors=True)
         raise
@@ -1704,6 +1787,109 @@ def migrate_fp8(model_dir, progress_cb=None):
     return True
 
 
+def _fp32(path):
+    try:
+        return "F32" in convert_gguf.safetensors_dtypes(path)
+    except (OSError, ValueError, registry.UnsupportedModel):
+        return False
+
+
+def migrate_single_file(model_dir, status=None):
+    """Converts an SDXL checkpoint file (layout single_full), or an SD 1.x / 2.x one in 32 bit, to a Diffusers folder
+    in 16 bit, once, and drops the file. Moving the SDXL pipeline from the file to the GPU added 1.2-2.7 GB swap on a
+    16 GB Mac, from the folder about 1; a 32-bit SD 1.x file went 20-29 % over its plan while it loaded (MEASUREMENTS
+    7cr). A folder also gets the plan in stages. Returns True when the manifest changed; on any error the model stays
+    as it was."""
+    path = os.path.join(model_dir, MANIFEST)
+    with open(path) as f:
+        m = json.load(f)
+    spec = registry.ARCHS.get(m.get("arch")) or {}
+    if m.get("layout") != "single_full" or m.get("file_format") != "safetensors" \
+            or spec.get("family") not in ("sdxl", "sd1", "sd2"):
+        return False
+    src = m["file"] if os.path.isabs(m["file"]) else os.path.join(model_dir, m["file"])
+    if not os.path.isfile(src) or free_bytes(model_dir) < os.path.getsize(src) + MIN_FREE_GB * 1024 ** 3:
+        return False  # no room for the folder next to the file (and the margin of every import): loads from the file
+    if spec["family"] != "sdxl" and not _fp32(src):
+        return False  # a 16-bit SD 1.x / 2.x file loads well as it is
+    weights = os.path.join(model_dir, "weights")
+    tmp = weights + ".partial"
+    # a weights folder while the manifest still names the file: a conversion stopped before the manifest was written
+    for leftover in (tmp, weights):
+        shutil.rmtree(leftover, ignore_errors=True)
+    if status:
+        status("Converting the model file to a folder (one-time)")
+    try:
+        import diffusers
+        import torch
+        pipe = getattr(diffusers, spec["pipeline"]).from_single_file(
+            src, config=os.path.join(model_dir, m["base_dir"]), dtype=torch.float16, **spec.get("pipeline_kwargs", {}))
+        pipe.save_pretrained(tmp, safe_serialization=True)
+        del pipe
+        parts = [c for c in m["components"] if not _has_weights(Path(tmp) / c)]
+        if parts or not os.path.isfile(os.path.join(tmp, "model_index.json")):
+            raise RuntimeError("converted folder lacks %s" % (parts or "model_index.json"))
+        os.replace(tmp, weights)
+    except Exception as e:
+        shutil.rmtree(tmp, ignore_errors=True)
+        sys.stderr.write("[import] %s stays a single file: %s\n" % (os.path.basename(model_dir), e))
+        return False
+    base = os.path.join(model_dir, m["base_dir"])
+    for k in ("file", "file_format", "base_dir", "linked_files"):
+        m.pop(k, None)
+    m.update(layout="repo", weights_dir="weights", variant=None, converted_from="single file")  # sha256 stays (Civitai)
+    m["plan"] = make_plan({"arch": m["arch"], "components": m["components"], "denoiser": m["denoiser"],
+                           "layout": "repo"}, m.get("quant_request") or "auto")
+    m["min_ram_gb"] = m["plan"]["min_ram_gb"]
+    with open(path + ".tmp", "w") as f:
+        json.dump(m, f, indent=1)
+    os.replace(path + ".tmp", path)
+    # our copy or link only (a link leaves the user's own file where it is), then the configs the file needed
+    inside = lambda p: os.path.commonpath([os.path.abspath(p), os.path.abspath(model_dir)]) == os.path.abspath(model_dir)
+    if inside(src):
+        os.remove(src)
+    if inside(base):
+        shutil.rmtree(base, ignore_errors=True)
+    return True
+
+
+def migrate_fp32(model_dir, status=None):
+    """Saves the 32-bit weights of an SD 1.x / 2.x Diffusers folder (Realistic Vision 5.1, Counterfeit, DucHaiten)
+    once in 16 bit, the precision they run in: half the disk, and the first picture no longer converts them while it
+    loads (20-29 % over the plan, MEASUREMENTS 7cr). Only folders inside the model's own folder; a file that fails
+    stays as it was. Returns True when a file was converted."""
+    with open(os.path.join(model_dir, MANIFEST)) as f:
+        m = json.load(f)
+    if m.get("layout") != "repo" or (registry.ARCHS.get(m.get("arch")) or {}).get("family") not in ("sd1", "sd2"):
+        return False
+    weights = os.path.abspath(os.path.join(model_dir, m.get("weights_dir") or "weights"))
+    if os.path.commonpath([weights, os.path.abspath(model_dir)]) != os.path.abspath(model_dir):
+        return False  # the user's own folder, taken over in place
+    files = [p for p in Path(weights).rglob("*.safetensors")
+             if not p.name.startswith("._") and _fp32(str(p))]
+    if not files or free_bytes(model_dir) < max(p.stat().st_size for p in files) // 2 + 1024 ** 3:
+        return False
+    import torch
+    from safetensors.torch import load_file, save_file
+    if status:
+        status("Saving the model in 16 bit (one-time)")
+    done = False
+    for p in files:
+        tmp = str(p) + ".partial"
+        try:
+            meta = registry.read_safetensors_json(str(p)).get("__metadata__")
+            t = {k: v.half() if v.dtype == torch.float32 else v for k, v in load_file(str(p)).items()}
+            save_file(t, tmp, metadata=meta)
+            del t
+            os.replace(tmp, p)
+            done = True
+        except Exception as e:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+            sys.stderr.write("[import] %s stays in 32 bit: %s\n" % (p, e))
+    return done
+
+
 def main(argv):
     p = argparse.ArgumentParser(prog="import_model")
     p.add_argument("--source", choices=["hf", "file", "dir", "civitai", "tool", "toolfile", "helper", "merge"], required=True)
@@ -1732,5 +1918,8 @@ def main(argv):
         emit("__import_error__", {"code": "lora", "message": str(e)})
         sys.exit(4)
     except Exception as e:
-        emit("__import_error__", {"code": type(e).__name__, "message": str(e)})
+        code = type(e).__name__
+        if code == "GatedRepoError" and os.environ.get("HF_TOKEN"):
+            code = "TokenRejected"  # sent, still refused: the token, not a missing one (accepted licence: see the page)
+        emit("__import_error__", {"code": code, "message": str(e)})
         raise

@@ -18,7 +18,7 @@ import { useQueueStore } from '../stores/queue'
 import { useImportsStore } from '../stores/imports'
 import { cleanError } from '../stores/runtimes'
 import { guidanceHint, stepsHint } from '../util/model_fit'
-import { MAX_LORAS, MODES, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, buildRemoveJob, modelDefaults, emptyForm, formProblem, lorasFor, modelsFor, keepsPicture, takesFaceDetail, takesReferences, takesTurbo, takesUpsampler, turboLora, upsamplerHelper, removes, removeHelper, removeMethods, TURBO, type GenerateForm, type Mode } from '../util/job_form'
+import { MAX_LORAS, MODES, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, buildRemoveJob, modelDefaults, emptyForm, formProblem, lorasFor, modelsFor, keepsPicture, takesFaceDetail, takesReferences, takesTurbo, takesUpsampler, takesSound, fixedSampling, turboLora, upsamplerHelper, requiredHelper, removes, removeHelper, removeMethods, TURBO, type GenerateForm, type Mode } from '../util/job_form'
 import { MAX_REFERENCES } from '@shared/engine_job'
 import { DEFAULT_SIZES, RATIOS, ratioOf, sizeForRatio } from '../util/sizes'
 import { CONSENT_QUESTION } from '@shared/content_policy'
@@ -195,16 +195,17 @@ async function promptFromPicture(): Promise<void> {
 const stopDescribing = (): void => { void window.vk.caption.stop() }
 const problem = computed(() => formProblem(props.mode, form, model.value, hasMask.value))
 
-// FLUX 3's prompt upsampler and ERNIE-Image's prompt enhancer are helper models: downloaded here or on the Models page
-// (the MLX engine never downloads)
-const PUP = computed(() => upsamplerHelper(model.value?.meta))
+// FLUX 3's prompt upsampler, ERNIE-Image's prompt enhancer and LTX-2.3's text encoder are helper models: downloaded
+// here or on the Models page (the MLX engine never downloads)
+const needsHelper = computed(() => !!requiredHelper(model.value?.meta))
+const PUP = computed(() => requiredHelper(model.value?.meta) || upsamplerHelper(model.value?.meta))
 // the texts of the option: ERNIE's enhancer has its own
 const up = (key: string): string => t(`generate.upsample.${key}${model.value?.meta.arch === 'ernie_image' ? 'Ernie' : ''}` as PlainKey)
 const imports = useImportsStore()
 const pupInstalled = ref<boolean | null>(null)
 async function checkPup(): Promise<void> {
   try {
-    pupInstalled.value = takesUpsampler(model.value?.meta)
+    pupInstalled.value = takesUpsampler(model.value?.meta) || needsHelper.value
       ? (await window.vk.helpers.list()).find((h) => h.id === PUP.value)?.installed ?? false
       : null
   } catch {
@@ -279,6 +280,7 @@ async function generate(): Promise<void> {
   error.value = problem.value
   if (!error.value && fastOn.value && !turbo.value) error.value = t('generate.fast.missing')
   if (!error.value && props.mode === 'text' && form.upsample && pupInstalled.value === false) error.value = up('missing')
+  if (!error.value && needsHelper.value && pupInstalled.value === false) error.value = t('generate.helper.missing')
   if (!error.value && removing.value && (form.removeMethod === 'rorem' || shadows.value) && helperInstalled.value === false) {
     error.value = shadows.value ? t('generate.remove.shadowsMissing') : t('generate.remove.missing')
   }
@@ -391,10 +393,10 @@ const labelPreview = computed(() => {
             <HintBadge above :text="up('hint')" />
           </label>
           <button
-            v-if="mode === 'text' && form.upsample && pupInstalled === false" class="btn small" :disabled="pupDownloading"
-            @click="downloadPup"
+            v-if="((mode === 'text' && form.upsample) || needsHelper) && pupInstalled === false" class="btn small"
+            :disabled="pupDownloading" @click="downloadPup"
           >
-            {{ pupDownloading ? t('generate.upsample.downloading') : up('download') }}
+            {{ pupDownloading ? t('generate.upsample.downloading') : needsHelper ? t('generate.helper.download') : up('download') }}
           </button>
           <template v-if="mode === 'image' && !remote">
             <button v-if="!describing" class="btn small" :disabled="!form.inputImage || queue.open.length > 0 || sending" @click="promptFromPicture">
@@ -507,6 +509,9 @@ const labelPreview = computed(() => {
               </select>
               <small class="dim">{{ t('generate.panel.resolutionHint') }}</small>
             </label>
+            <label v-if="takesSound(model?.meta)" class="check">
+              <input v-model="form.videoSound" type="checkbox" /> {{ t('generate.panel.sound') }}
+            </label>
           </template>
 
           <label v-if="mode === 'illusion'" class="field">
@@ -560,11 +565,11 @@ const labelPreview = computed(() => {
             />
           </div>
 
-          <div v-if="offDefaults && suggested" class="defaults">
+          <div v-if="offDefaults && suggested && !fixedSampling(model?.meta)" class="defaults">
             <button class="btn small" @click="model && applyDefaults(form, model)">{{ t('generate.panel.modelDefaults') }}</button>
             <HintBadge notice :text="suggestText" />
           </div>
-          <label class="field">
+          <label v-if="!fixedSampling(model?.meta)" class="field">
             <span>
               <span class="label-row">{{ t('generate.panel.steps') }}
                 <template v-if="stepsFit">
@@ -586,7 +591,7 @@ const labelPreview = computed(() => {
               {{ turboDownloading ? t('generate.upsample.downloading') : t('generate.fast.download') }}
             </button>
           </div>
-          <label class="field">
+          <label v-if="!fixedSampling(model?.meta)" class="field">
             <span>
               <span class="label-row">{{ t('generate.panel.guidance') }}
                 <template v-if="guidanceFit">
