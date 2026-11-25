@@ -8,7 +8,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { appUpdateBusy, bindWindow, fileAccess, navigate, queueStatus, registerIpc, repairRuntimes, sendToRemote, shutdown } from './ipc'
 import { remoteRunning, startRemote, stopRemote } from './remote'
-import { logTo } from './log'
+import { log, logTo } from './log'
+import { linkRoute } from './deeplink'
 import { PAGE_URL, PRELOAD, RENDERER_DIR } from './pages'
 import { engineEnv, getSettings, onSettingChanged } from './settings'
 import { mainLanguage, setMainLang, t } from './i18n'
@@ -62,6 +63,8 @@ function applyLanguage(): void {
 }
 
 let main: BrowserWindow | undefined
+// the page of a vulkara:// link that came before the main window was there (a link can start VulKara)
+let linked: string | undefined
 
 /** The main window, made again if it was closed (VulKara keeps running in the menu bar), on a page of it. */
 function showMain(route?: string): void {
@@ -75,6 +78,25 @@ function showMain(route?: string): void {
   main.show()
   main.focus()
   if (route) navigate(route)
+}
+
+/** The page of a vulkara:// link in the main window. By the address, not by a message: the page may still be loading
+ *  or waiting for its language and would miss a message. While the splash is up the window stays hidden (it shows when
+ *  the splash ends). */
+function openLink(route: string): void {
+  if (!main || main.isDestroyed()) {
+    main = createWindow(false, false, route)
+    return
+  }
+  if (main.webContents.isLoading()) {
+    void main.loadURL(`${PAGE_URL}#${route}`)  // it shows itself when it is ready, or after the splash
+    return
+  }
+  void main.webContents.executeJavaScript(`location.hash = ${JSON.stringify(route)}`)
+  if (splashWindow()) return
+  if (main.isMinimized()) main.restore()
+  main.show()
+  main.focus()
 }
 
 /** The app menu (in the app's language) and the menu bar icon with what runs now. */
@@ -151,6 +173,14 @@ function createWindow(behindSplash: boolean, inactive = false, route?: string): 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
+  // vulkara:// links (Hugging Face "Use this model"): only the import of a repository, checked in deeplink.ts
+  app.on('open-url', (event, link) => {
+    event.preventDefault()
+    const route = linkRoute(link)
+    if (!route) return log(`[link] ignored: ${link.slice(0, 200)}`)
+    if (app.isReady() && main) openLink(route)
+    else linked = route  // the main window takes it when it is made
+  })
   app.on('second-instance', () => {
     const splash = splashWindow()
     if (splash) splash.focus()
@@ -180,11 +210,12 @@ if (!app.requestSingleInstanceLock()) {
     if (!app.isPackaged && existsSync(icon)) app.dock?.setIcon(icon)
     // --no-splash: straight to the main window (automated runs; it keeps them from coming to the front)
     if (process.argv.includes('--no-splash')) {
-      main = createWindow(false, true)
+      main = createWindow(false, true, linked)
     } else {
       openSplash(windowBackground(), () => { if (main && !main.isDestroyed()) main.show() })
-      main = createWindow(true)
+      main = createWindow(true, false, linked)
     }
+    linked = undefined
     // the Dock icon: the main window again (the monitor window may still be open)
     app.on('activate', () => { if (!splashWindow()) showMain() })
     // once, in the background (after the runtimes are whole): installed LoRAs and models checked with the current

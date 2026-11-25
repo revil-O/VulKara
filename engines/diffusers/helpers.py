@@ -53,8 +53,8 @@ def install(helper_id, report=None, token=None):
         pinned.fetch(h["repo"], restore.COLOR_PIN[0], {restore.COLOR_FILE: restore.COLOR_PIN[1]}, folder, report=say)
     elif kind == "faces":
         import restore
-        pinned.fetch_urls({f: u for f, (u, _) in restore.FACE_FILES.items()},
-                          {f: d for f, (_, d) in restore.FACE_FILES.items()}, folder)
+        files = restore.FACE_SETS[h["id"]]
+        pinned.fetch_urls({f: u for f, (u, _) in files.items()}, {f: d for f, (_, d) in files.items()}, folder)
     elif kind == "preprocess":
         import preprocess
         preprocess.ensure_model(h["name_in_engine"])

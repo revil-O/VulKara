@@ -591,7 +591,7 @@ every page that takes a picture.
 | **Repair damage (AI)** | A FLUX.2 model edits the photo (Models → Recommended: FLUX.2 [klein]). **Steps of the model** 2–12. Without paint it repaints the whole photo: soft clothing, leaves and backgrounds get real detail, but faces may become other people's; the faces are therefore taken from the photo before the repair when *Restore faces* is on. **Consistency LoRA (FLUX.2 [klein] 4B)**, on by default: lrzjason's LoRA (Apache-2.0, 0.4 GB, downloaded once) keeps the repair closer to the photo, scratches go more thoroughly; it needs about 1.7 GB more memory. Other models repair without it. With FLUX.2 [klein] 9B a black-and-white or sepia photo gets a note: 9B tints it in the repair, 4B with the consistency LoRA keeps its colour. |
 | **Remove dust and scratches** | Without a model of yours: small specks and thin scratches that stand out from calm surroundings are found and filled from what is around them (LaMa). Leaves and fabric are left alone, as are the eyes and the mouth. **Sensitivity** 0–100 % (default 50 %); a higher one finds fainter specks, now and then a small detail of the photo too (the preview shows it). |
 | **Rebuild soft details (AI)** | Real-ESRGAN (the Upscale helper, 64 MB) rebuilds edges and textures of the whole photo: it is made as much smaller as it is soft (**Softness of the photo** × 1.25–3, default × 2) and four times larger again. **Strength** 20–100 %. It sharpens what the photo still shows; texture that is lost entirely (fabric, leaves) only *Repair damage (AI)* makes up. |
-| **Restore faces (AI)** | CodeFormer (0.4 GB, downloaded once) restores blurred faces, taken from the photo before the AI steps. **Faithful to the photo** 50–100 % (default 90 %): lower values make up more detail. **Strength** 20–100 % (default 60 %). Faces smaller than about 14 pixels are left alone. CodeFormer's licence allows non-commercial use only. |
+| **Restore faces (AI)** | CodeFormer (0.4 GB, downloaded once) restores blurred faces, taken from the photo before the AI steps. **Faithful to the photo** 50–100 % (default 90 %): lower values make up more detail. **Strength** 20–100 % (default 60 %). Faces smaller than about 14 pixels are left alone. CodeFormer's licence allows non-commercial use only. **Face model**: CodeFormer (default, sharper, more contrast, smooths older skin) or RestoreFormer++ (0.3 GB, downloaded once, Apache-2.0: softer, keeps more of the lines of older faces; Faithful does not apply to it). Both take about a third of a second per face. |
 | **Colour a black-and-white photo** | DDColor (0.9 GB, downloaded once) adds colour to the brightness of the photo, so no shape or detail can change. **Colour strength** 50–150 %. |
 | **Less grain, sharper details** | Without a model: the brightness is denoised and its edges sharpened, the colour only smoothed a little. **Strength** 10–100 %. |
 
@@ -964,6 +964,10 @@ words of a LoRA. A Hugging Face repository without a complete model (no diffuser
 GGUF quantizations) answers with the list of its model files and their sizes; a click on a file checks that one.
 **Download** (Hugging Face, Civitai) or **Import** (file, folder) then starts it; the name field and the compression
 menu next to it are optional.
+
+**From a Hugging Face page**: a `vulkara://import/hf?repo=owner/name` link (from 0.11.0, e.g. "Use this model"
+on Hugging Face once VulKara is listed there) opens Add with the repository filled in and checks it; it is downloaded
+only when you click Download. Any other link is ignored.
 
 What happens on import:
 

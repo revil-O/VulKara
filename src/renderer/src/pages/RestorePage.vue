@@ -46,6 +46,12 @@ const GUARDS = { lock: true, maxChange: 0.06, checkFaces: true, colorStrength: 1
 // the AI steps for soft photos and faces, with the strengths that kept faces closest to themselves (MEASUREMENTS.md)
 // CodeFormer's licence is non-commercial: a build with commercialModelsOnly does not restore faces
 const FACES = !EDITION.commercialModelsOnly
+// the face model as the select shows it: CodeFormer whenever RestoreFormer++ is not chosen (options from a template, the
+// history or the web UI may say 'codeformer' or nothing)
+const faceModel = computed({
+  get: () => (opts.value.faceModel === 'restoreformer' ? 'restoreformer' : 'codeformer'),
+  set: (v: string) => { opts.value.faceModel = v === 'restoreformer' ? 'restoreformer' : undefined },
+})
 const AI_STEPS = { correctStrength: 0.8, dust: true, dustSensitivity: 0.5, details: true, detailLevel: 2, detailStrength: 1, faces: FACES, faceFidelity: 0.9, faceStrength: 0.6, scale: 1 as const }
 const TEMPLATES: RestoreTemplate[] = [
   { name: 'Black and white, damaged', correct: true, repair: true, colorize: false, ...GUARDS, note: 'an old black-and-white photograph' }, // i18n-ok
@@ -385,7 +391,14 @@ function open(q: QueuedJob, file: string): void {
             <HintBadge :text="t('restore.facesHint')" />
           </label>
           <template v-if="opts.faces">
-            <SliderRow v-model="opts.faceFidelity" class="indent" :label="t('restore.faithful')" :min="0.5" :max="1" :step="0.05" :format="percent" :fallback="0.9" />
+            <label class="field indent sub">
+              <span>{{ t('restore.faceModel') }} <HintBadge :text="t('restore.faceModelHint')" /></span>
+              <select v-model="faceModel" class="entry">
+                <option value="codeformer">{{ t('restore.faceModelCodeformer') }}</option>
+                <option value="restoreformer">{{ t('restore.faceModelRestoreformer') }}</option>
+              </select>
+            </label>
+            <SliderRow v-if="faceModel === 'codeformer'" v-model="opts.faceFidelity" class="indent" :label="t('restore.faithful')" :min="0.5" :max="1" :step="0.05" :format="percent" :fallback="0.9" />
             <SliderRow v-model="opts.faceStrength" class="indent" :label="t('restore.strength')" :min="0.2" :max="1" :step="0.05" :format="percent" :fallback="0.6" />
           </template>
           <label class="check"><input v-model="opts.colorize" type="checkbox" /> {{ t('restore.colorize') }}</label>
@@ -517,6 +530,11 @@ function open(q: QueuedJob, file: string): void {
 
 .indent {
   margin-left: 24px;
+}
+
+/* a choice among the sliders of a step: its label as plain as theirs */
+.field.sub > span {
+  font-weight: inherit;
 }
 
 .guard {

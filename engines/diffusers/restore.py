@@ -59,6 +59,13 @@ FACE_FILES = {
                     "face_detection_yunet/face_detection_yunet_2023mar.onnx",
                     "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"),
 }
+# RestoreFormer++ (Apache-2.0), the second face model: softer than CodeFormer, keeps more of the age lines (7cv); its
+# helper holds only the network, the face detector comes from CodeFormer's folder (detector_path, 0.2 MB)
+RF_HELPER, RF_MODEL = "restoreformerpp", "restoreformer_pp.ckpt"
+RF_FILES = {RF_MODEL: ("https://github.com/wzhouxiff/RestoreFormerPlusPlus/releases/download/v1.0.0/"
+                       "RestoreFormer%2B%2B.ckpt",
+                       "613fe52805f86bf8c2bffff08ae9f7a0b99f408be1bf221767af6183038be3a2")}
+FACE_SETS = {FACE_HELPER: FACE_FILES, RF_HELPER: RF_FILES}  # the files of each face helper, by helper id
 # where the eyes, nose and mouth corners of a face sit in CodeFormer's 512 px square (the FFHQ alignment)
 FACE_TEMPLATE = np.array([[192.98138, 239.94708], [318.90277, 240.1936], [256.63416, 314.01935],
                           [201.26117, 371.41043], [313.08905, 371.15118]], np.float32)
@@ -398,6 +405,7 @@ def details(img, level=2.0, strength=1.0, scale=1, report=None, stop=None):
 
 
 _face_net = None
+_rf_net = None
 
 
 def detector_path():
@@ -449,11 +457,11 @@ def consistency_lora(scale=1.0, report=None):
     return {"file": file, "scale": scale, "name": "Consistency LoRA", "trigger_words": [], "plan_gb": CONSISTENCY_GB}
 
 
-def _face_files(report=None):
+def _face_files(report=None, helper=FACE_HELPER):
     import helpers
-    folder = helper_folder(FACE_HELPER)
-    if not all(os.path.isfile(os.path.join(folder, f)) for f in FACE_FILES):
-        helpers.install(FACE_HELPER, report=report)
+    folder = helper_folder(helper)
+    if not all(os.path.isfile(os.path.join(folder, f)) for f in FACE_SETS[helper]):
+        helpers.install(helper, report=report)
     return folder
 
 
@@ -473,6 +481,18 @@ def _codeformer(device, report=None):
         desc = spandrel.ModelLoader().load_from_file(os.path.join(folder, FACE_MODEL))
         _face_net = desc.model.to(device).eval()
     return _face_net
+
+
+def _restoreformer(device, report=None):
+    """RestoreFormer++ through our own loader on spandrel's parts (restoreformer.py), kept loaded."""
+    global _rf_net
+    if _rf_net is None:
+        import restoreformer
+        folder = _face_files(report, RF_HELPER)
+        if report:
+            report("Loading the face model")
+        _rf_net = restoreformer.load(os.path.join(folder, RF_MODEL), RF_FILES[RF_MODEL][1]).to(device)
+    return _rf_net
 
 
 def find_faces(rgb, detector, min_spread=FACE_MIN):
@@ -498,19 +518,22 @@ def _restore_face(net, face, fidelity, device):
     return out.round().astype(np.uint8)
 
 
-def restore_faces(img, source=None, fidelity=0.9, strength=0.6, device="cpu", report=None, points=None):
-    """Faces restored by CodeFormer and blended into img. source: the picture the faces are taken from (the photo
-    before Real-ESRGAN, at img's size or smaller); fidelity 0.5..1: higher keeps more of the face as it is; strength
-    0..1; points: the faces' landmarks in img's pixels as the user placed them (None: found here). Returns (picture,
-    number of faces)."""
-    net = _codeformer(device, report)
-    folder = _face_files(report)
+def restore_faces(img, source=None, fidelity=0.9, strength=0.6, device="cpu", report=None, points=None,
+                  model="codeformer"):
+    """Faces restored by CodeFormer (model "restoreformer": RestoreFormer++) and blended into img. source: the picture
+    the faces are taken from (the photo before Real-ESRGAN, at img's size or smaller); fidelity 0.5..1 (CodeFormer
+    only): higher keeps more of the face as it is; strength 0..1; points: the faces' landmarks in img's pixels as the
+    user placed them (None: found here). Returns (picture, number of faces)."""
+    if model == "restoreformer":
+        net, detector = _restoreformer(device, report), detector_path()
+    else:
+        net, detector = _codeformer(device, report), os.path.join(_face_files(report), FACE_DETECTOR)
     if source is None:
         source = img
     base = to_array(img).astype(np.float32)
     h, w = base.shape[:2]
     src = to_array(source.resize((w, h), Image.LANCZOS) if source.size != (w, h) else source)
-    found = find_faces(src, os.path.join(folder, FACE_DETECTOR)) if points is None else \
+    found = find_faces(src, detector) if points is None else \
         [np.asarray(p, np.float32).reshape(5, 2) for p in points]
     gray = is_grayscale(source)
     fade = _face_fade(strength)

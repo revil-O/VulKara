@@ -340,6 +340,25 @@ const VM = [
   ['Virtual machine quit', 47.4, 189, 24.3, 16.1, 18],
 ]
 
+// removing an object, Mac mini M4 16 GB, the eleven cases of 7bz (MEASUREMENTS 7cu):
+// [way, note, cases, removed, s per picture (from, to), GB at most]
+const REMOVE = [
+  ['LaMa', 'Inpainting → Remove', 11, 11, 1.9, 9.5, 7.9],
+  ['RORem', 'Inpainting → Remove', 11, 11, 26.4, 32.8, 10.0],
+  ['FLUX.2 [klein] 4B + fal remove LoRA', '4 steps (distilled)', 11, 0, 77.7, 119.0, 11.9],
+  ['FLUX.2 [klein] Base 4B + fal remove LoRA', '50 steps, guidance 4', 3, 3, 1658, 2585, 10.0],
+  ['FLUX.2 [klein] Base 4B + fal remove LoRA', '20 steps, guidance 4', 3, 2, 664, 1037, 10.0],
+]
+
+// faces, Mac mini M4 16 GB, six AI portraits made old, Restore's face step (MEASUREMENTS 7cv):
+// [model, strength, mean face PSNR, mean face SSIM, cases closest to the truth, s per face]
+const FACES = [
+  ['CodeFormer', 0.6, 27.17, 0.707, 5, 0.37],
+  ['RestoreFormer++', 0.6, 26.77, 0.698, 1, 0.35],
+  ['CodeFormer', 1.0, 26.24, 0.681, 5, 0.37],
+  ['RestoreFormer++', 1.0, 25.50, 0.658, 1, 0.35],
+]
+
 // the site's Content-Security-Policy allows no inline styles: every position becomes a class in charts.css
 let RULES = []
 const at = (css) => { RULES.push(css); return 'p' + (RULES.length - 1) }
@@ -697,6 +716,45 @@ function intelTable() {
     </section>`
 }
 
+function removeTable() {
+  const rows = REMOVE.map(([way, note, cases, removed, from, to, peak]) => `
+          <tr data-tip="${esc(`${way} (${note}): ${removed} of ${cases} objects removed, ${fmt(from)}–${fmt(to)} s per picture, at most ${fmt(peak)} GB. MEASUREMENTS 7cu`)}" tabindex="0">
+            <td>${esc(way)}<small>${esc(note)}</small></td>
+            <td class="bars"><span class="mbar b ${at(`width:${pct(removed, cases)}%`)}"></span></td>
+            <td class="num">${fmt(from)}–${fmt(to)}</td><td class="num">${fmt(peak)}</td><td class="num">${removed} / ${cases}</td>
+          </tr>`).join('')
+  return `
+    <section class="chart" id="remove">
+      <h2>Removing an object: LaMa, RORem and FLUX.2 [klein] with fal's remove LoRA</h2>
+      <p class="sub">The eleven photos and masks of the earlier comparison on a Mac mini M4 with 16 GB, in the app; klein worked on a crop with the object in a red frame, as the LoRA's model card shows. On the 4-step klein 4B the LoRA only took the frame away; on the undistilled FLUX.2 [klein] Base 4B, which fal runs it on, it removed the objects cleanly, but at half an hour a picture against half a minute for RORem, which removed them as well. VulKara keeps LaMa and RORem. The LoRA file on Hugging Face is cut short; only its ComfyUI copy loads. The bars are the share of objects removed.</p>
+      <table class="micro">
+        <thead><tr><th>Way</th><th>removed</th><th class="num">s per picture</th><th class="num">GB at most</th><th class="num">removed</th></tr></thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+    </section>`
+}
+
+function facesTable() {
+  const max = Math.max(...FACES.map((r) => r[2]))
+  const rows = FACES.map(([model, strength, psnr, ssim, best, sec]) => `
+          <tr data-tip="${esc(`${model} at strength ${Math.round(strength * 100)} %: face PSNR ${fmt(psnr)} dB, SSIM ${ssim.toFixed(3)}, closest to the truth in ${best} of 6 cases, ${fmt(sec)} s per face. MEASUREMENTS 7cv`)}" tabindex="0">
+            <td>${esc(model)}<small>strength ${Math.round(strength * 100)} %</small></td>
+            <td class="bars"><span class="mbar b ${at(`width:${pct(psnr, max)}%`)}"></span></td>
+            <td class="num">${fmt(psnr)}</td><td class="num">${ssim.toFixed(3)}</td><td class="num">${best} / 6</td><td class="num">${fmt(sec)}</td>
+          </tr>`).join('')
+  return `
+    <section class="chart" id="faces">
+      <h2>Faces: CodeFormer against RestoreFormer++</h2>
+      <p class="sub">Six portraits made with FLUX.2 [klein] 4B as the truth, made old (three times smaller, softened, grain, JPEG, every other one grey) and restored by Restore's face step on a Mac mini M4 with 16 GB, the faces compared with the truth. Neither model invents anything. CodeFormer is sharper and closer by the numbers but smooths older skin; RestoreFormer++ is softer and keeps more of the lines of older faces. Since 0.11.0 Restore offers both. The bars are the mean face PSNR (dB).</p>
+      <table class="micro">
+        <thead><tr><th>Model</th><th>face PSNR</th><th class="num">dB</th><th class="num">SSIM</th><th class="num">closest</th><th class="num">s per face</th></tr></thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+    </section>`
+}
+
 function vmTable() {
   const max = Math.max(...VM.map((r) => r[1]))
   const rows = VM.map(([label, step, whole, read, peak, swap]) => `
@@ -708,7 +766,7 @@ function vmTable() {
   return `
     <section class="chart" id="vm">
       <h2>Beside a running virtual machine</h2>
-      <p class="sub">A FLUX.1 [dev] fine-tune as GGUF Q8_0 (12.7 GB) on the M2 with 24 GB, 1024 px, 2 steps, planned 18.2 GB, beside a virtual machine holding about 16 GB. A running machine is not idle: it takes its memory back at once, and the GPU waits for the swap, busy for a few seconds and then idle for over 30. Quitting it made each step 1.7 times as fast; other programs still held memory, so 47 s is not yet a quiet Mac. From the next version on a job notes when macOS reads more than 1 GB per step back from the swap. The bars are the seconds per step.</p>
+      <p class="sub">A FLUX.1 [dev] fine-tune as GGUF Q8_0 (12.7 GB) on the M2 with 24 GB, 1024 px, 2 steps, planned 18.2 GB, beside a virtual machine holding about 16 GB. A running machine is not idle: it takes its memory back at once, and the GPU waits for the swap, busy for a few seconds and then idle for over 30. Quitting it made each step 1.7 times as fast; other programs still held memory, so 47 s is not yet a quiet Mac. Since 0.11.0 a job notes when macOS reads more than 1 GB per step back from the swap. The bars are the seconds per step.</p>
       <table class="micro">
         <thead><tr><th>Run</th><th>per step</th><th class="num">s/step</th><th class="num">s for 2 steps</th><th class="num">GB read</th><th class="num">GB from the swap</th></tr></thead>
         <tbody>${rows}
@@ -725,7 +783,7 @@ export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }
     planChart('plan-after', 'Plans brought to the measurements', 'SD 1.5 planned at its own size with fused attention, ComfyUI models with the plan of a model held whole (shown in the benchmark since 0.7.5). The ComfyUI figures are the middle of two runs. Qwen-Image 2.1 streamed: the blocks kept in memory were not counted while denoising (planned 9.1 GB before). ComfyUI on 16 GB: the text encoder and the model planned apart, as ComfyUI loads them (MOSS-Image 14 GB before, NetaYume 11.6). Fibo 2.0: the activations of an edit counted (12.1 GB planned before).', PLAN_AFTER, '7p'),
     planChart('plan-m4', 'On a 16 GB Mac: Mac mini M4', 'VulKara 0.7.11 on an Apple M4 with 16 GB (the other charts: the M2, 16 GB simulated there); from MOSS-Image on, test builds after it (MEASUREMENTS 7ah, 7ba–7bl). The plan against what the engine used, 1024 px (Fibo 768 px), with the seconds per step or per picture. Fibo 2.0 on MLX started 6.3 GB short and read 18.9 GB back from the swap: slower than on the M2 (7ba). Above their plan and open: FLUX.1 [schnell] 8 bit streamed (3.9 GB), NetaYume v4 (1.8 GB), FLUX.1 Fill (0.9 GB) (7bf, 7bj).', PLAN_M4, '7af'),
     planChart('plan-list', 'The recommended list on a 16 GB Mac', 'The models kept in the recommended list of 0.10.0, five pictures each on a Mac mini M4 with 16 GB in the app (Hardware → Benchmark, the model\'s own settings, 1024 px unless named), the highest peak of pictures 2–5 against the plan, with the time per picture. The target: at most 10 % over the plan and at most 2 GB swap added. epiCRealism XL v8, MoP Mix asap, MiaoMiao RealSkin, FLUX.1 [dev] and its Q4 missed it and left the list, Chroma1 HD too; four SD 1.5 models in 32 bit are saved in 16 bit and the SDXL single files turned into folders once, at the import or the first load (MEASUREMENTS 7cq, 7cr).', RECOMMENDED, '7cq'),
-    onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), vmTable(), intelTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
+    onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), removeTable(), facesTable(), vmTable(), intelTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
   const tileHtml = tiles()
   const css = RULES.map((r, i) => `.bench-page .p${i}{${r}}`).join('\n') + '\n'
   const cssV = createHash('sha256').update(css).digest('hex').slice(0, 10)

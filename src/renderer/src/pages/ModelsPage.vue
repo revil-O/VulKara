@@ -4,6 +4,7 @@ import { EDITION } from '@shared/edition'
 // Models and LoRAs: what is installed, what is recommended, and adding more from Hugging Face, Civitai or disk.
 // Nothing is part of the app; every model is downloaded or imported here.
 import { computed, nextTick, onActivated, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Boxes, Check, CircleAlert, Download, ExternalLink, FileDown, FolderOpen, FolderSearch, Layers, Pencil, Search, Square, Trash2, X } from '@lucide/vue'
 import LoraFinder from '../components/LoraFinder.vue'
 import HintBadge from '../components/HintBadge.vue'
@@ -338,6 +339,18 @@ async function choose(): Promise<void> {
 
 // only the answer to the latest check counts (an earlier one can arrive later)
 let checkGen = 0
+// a vulkara:// link (Hugging Face "Use this model", checked in the main process): the repository filled in and checked;
+// it is downloaded only when the user clicks Download
+const route = useRoute()
+const router = useRouter()
+watch(() => route.query.hf, (hf) => {
+  if (typeof hf !== 'string' || !hf || remote) return
+  Object.assign(add, { source: 'hf', ref: hf, file: '', name: '' })
+  tab.value = 'add'
+  void router.replace({ query: {} })
+  void check()
+}, { immediate: true })
+
 async function check(): Promise<void> {
   reset()
   const mine = ++checkGen

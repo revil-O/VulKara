@@ -127,7 +127,7 @@ def test_the_helper_catalog_matches_what_the_engines_download():
             assert h["revision"] == all_pins[h["repo"]]["revision"], h["id"]
         if h["kind"] == "faces":  # GitHub releases: every file with an https URL and its SHA-256
             import restore
-            assert all(u.startswith("https://github.com/") and len(d) == 64 for u, d in restore.FACE_FILES.values())
+            assert all(u.startswith("https://github.com/") and len(d) == 64 for u, d in restore.FACE_SETS[h["id"]].values())
         if h["kind"] == "rorem":  # pinned in remove.py, every file by its SHA-256
             import remove
             assert h["repo"] == remove.REPO and len(remove.PIN[0]) == 40

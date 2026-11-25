@@ -75,6 +75,10 @@
    "name": "CodeFormer (rostos)",
    "description": "Restaura rostos borrados de fotos antigas, com o YuNet para encontrá-los (Restaurar). Licença não comercial."
   },
+  "restoreformerpp": {
+   "name": "RestoreFormer++ (rostos)",
+   "description": "Segundo modelo de rostos de Restaurar: mais suave que o CodeFormer e mantém mais as rugas dos rostos mais velhos. Apache-2.0."
+  },
   "klein4b_consistency": {
    "name": "LoRA de consistência para FLUX.2 [klein] 4B (Restaurar)",
    "description": "Mantém o FLUX.2 [klein] 4B próximo da foto ao reparar: os arranhões somem melhor (Restaurar, opção LoRA de consistência). LoRA de lrzjason, Apache-2.0."
@@ -284,6 +288,7 @@
   "SeedVR2 by ByteDance Seed (Apache-2.0); VulKara downloads the weights unchanged from numz/SeedVR2_comfyUI on first use.": "SeedVR2 da ByteDance Seed (Apache-2.0); o VulKara baixa os pesos sem alterações de numz/SeedVR2_comfyUI no primeiro uso.",
   "Free use below USD 10 million annual revenue; companies above need a paid commercial licence from Lightricks. The use restrictions of Attachment A apply to the model and its outputs; Lightricks claims no rights in the outputs.": "Uso livre abaixo de US$ 10 milhões de receita anual; empresas acima disso precisam de uma licença comercial paga da Lightricks. As restrições de uso do Anexo A valem para o modelo e seus resultados; a Lightricks não reivindica direitos sobre os resultados.",
   "Free use below USD 10 million annual revenue; companies above need a paid commercial licence from Lightricks. The use restrictions of Attachment A apply to the model and its outputs; Lightricks claims no rights in the outputs. Quantized to 4 bit for MLX by dgrauet (ltx-2.3-mlx-q4).": "Uso livre abaixo de US$ 10 milhões de receita anual; empresas acima disso precisam de uma licença comercial paga da Lightricks. As restrições de uso do Anexo A valem para o modelo e seus resultados; a Lightricks não reivindica direitos sobre os resultados. Quantizado em 4 bits para MLX por dgrauet (ltx-2.3-mlx-q4).",
-  "The Gemma Prohibited Use Policy applies; Google may restrict usage. Passing the model on needs the agreement and a Notice file; Google claims no rights in outputs.": "Vale a Gemma Prohibited Use Policy; o Google pode restringir o uso. Quem redistribuir o modelo deve incluir o acordo e um arquivo Notice; o Google não reivindica direitos sobre os resultados."
+  "The Gemma Prohibited Use Policy applies; Google may restrict usage. Passing the model on needs the agreement and a Notice file; Google claims no rights in outputs.": "Vale a Gemma Prohibited Use Policy; o Google pode restringir o uso. Quem redistribuir o modelo deve incluir o acordo e um arquivo Notice; o Google não reivindica direitos sobre os resultados.",
+  "Apache-2.0, no limits on the outputs. VulKara downloads the weights from the project on first use and reads them as numbers only (no executable code).": "Apache-2.0, sem restrições para os resultados. O VulKara baixa os pesos do projeto no primeiro uso e os lê só como números (sem código executável)."
  }
 }

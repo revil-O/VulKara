@@ -43,8 +43,8 @@ function dirBytes(dir: string): number {
 /** Does the job need a helper whose licence forbids commercial use (CodeFormer, ObjectClear)? A build with
  *  commercialModelsOnly refuses it, whatever sent it (remote web UI, a job from the history). */
 export const usesNonCommercialHelper = (job: Pick<Job, 'restore' | 'removeObject'>): boolean =>
-  // as the engine reads it: any true value of faces runs CodeFormer
-  !!job.restore?.faces || job.removeObject?.method === 'objectclear'
+  // as the engine reads it: any true value of faces runs CodeFormer, unless RestoreFormer++ (Apache-2.0) is chosen
+  (!!job.restore?.faces && job.restore.faceModel !== 'restoreformer') || job.removeObject?.method === 'objectclear'
 
 /** The revision pinned.py's mark in a helper's folder was written for, '' when there is none. */
 function markedRevision(folder: string): string {

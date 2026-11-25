@@ -8,6 +8,8 @@ encoders are "staged" they are only loaded to encode a new prompt and freed befo
 denoising. The denoiser stays loaded meanwhile (reloading it per prompt would cost far
 more time), so during encoding both are resident, just without the activations.
 """
+import re
+
 import compat
 
 # macOS and the app itself need a reserve; on small Macs it is a fixed amount, on big ones a share
@@ -148,6 +150,49 @@ def short_of(need_gb, held_gb, total_gb=None):
     if short <= (SHORT_IDLE_SMALL_GB if total <= SMALL_MAC_GB else SHORT_IDLE_GB):
         return head + "macOS moves other programs to the swap, the picture is usually as fast"
     return head + "this picture may take many times longer, close other programs or wait for the other engine's job"
+
+
+# this much read back from the swap per step means other programs fight the job for memory: beside a running VM a FLUX
+# step took 81.6 instead of 47.4 s and read 59 GB back for two steps (MEASUREMENTS 7ct); a quiet Mac reads none
+SWAP_IN_PER_STEP_GB = 1.0
+
+
+def swapped_in_gb():
+    """Everything macOS has read back from the swap since it started (vm_stat "Swapins"), None where unknown.
+    psutil's swap figure counts every page-in, also of mapped model files, so it can not tell this."""
+    import subprocess
+    try:
+        out = subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=2).stdout
+        page = int(re.search(r"page size of (\d+) bytes", out).group(1))
+        return int(re.search(r"Swapins:\s+(\d+)", out).group(1)) * page / 1024 ** 3
+    except (OSError, subprocess.SubprocessError, AttributeError, ValueError):
+        return None
+
+
+class SwapWatch:
+    """A note once per job when macOS reads more than SWAP_IN_PER_STEP_GB per step back from the swap. too_big: the
+    job's own plan does not fit the memory budget (or streams), so it swaps by itself; other programs are then not
+    the cause and the note says what helps instead."""
+
+    def __init__(self, read=swapped_in_gb, too_big=False):
+        self.read = read
+        self.too_big = too_big
+        self.start = read()
+        self.noted = False
+
+    def check(self, steps_done):
+        if self.noted or self.start is None or steps_done < 2:  # the first step also warms the GPU up
+            return None
+        now = self.read()
+        if now is None or (now - self.start) / steps_done < SWAP_IN_PER_STEP_GB:
+            return None
+        self.noted = True
+        if self.too_big:
+            return ("macOS read %.0f GB back from the swap during %d steps: this job needs more memory than the Mac "
+                    "has free; a smaller size or 8 or 4 bit makes it faster" % (now - self.start, steps_done))
+        return ("macOS read %.0f GB back from the swap during %d steps: other programs (a running virtual machine, "
+                "for example) hold the memory this job needs; closing them makes the picture several times faster"
+                % (now - self.start, steps_done))
 
 
 def _is_text_encoder(name):

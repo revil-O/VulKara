@@ -615,7 +615,7 @@ admiten una imagen.
 | **Reparar daños (IA)** | Un modelo FLUX.2 edita la foto (Modelos → Recomendados: FLUX.2 [klein]). **Pasos del modelo** 2–12. Sin pintura, repinta toda la foto: la ropa suave, las hojas y los fondos reciben detalle real, pero las caras pueden convertirse en las de otras personas; por eso, cuando *Restaurar caras (IA)* está activado, las caras se toman de la foto antes de la reparación. **LoRA de consistencia (FLUX.2 [klein] 4B)**, activada por defecto: la LoRA de lrzjason (Apache-2.0, 0,4 GB, se descarga una vez) mantiene la reparación más cerca de la foto y los arañazos desaparecen mejor; necesita unos 1,7 GB más de memoria. Otros modelos reparan sin ella. Con FLUX.2 [klein] 9B y una foto en blanco y negro o en sepia aparece un aviso: 9B la tiñe al repararla, 4B con el LoRA de consistencia mantiene su color. |
 | **Quitar polvo y arañazos** | Sin ningún modelo tuyo: las motas pequeñas y los arañazos finos que destacan sobre un entorno uniforme se detectan y se rellenan con lo que los rodea (LaMa). Las hojas y la tela no se tocan, ni tampoco los ojos y la boca. **Sensibilidad** 0–100 % (por defecto 50 %); una mayor detecta motas más tenues y, de vez en cuando, también algún detalle pequeño de la foto (la vista previa lo muestra). |
 | **Reconstruir detalles suaves (IA)** | Real-ESRGAN (el modelo auxiliar de Ampliar, 64 MB) reconstruye los bordes y las texturas de toda la foto: la reduce en la medida en que está borrosa (**Suavidad de la foto** × 1,25–3, por defecto × 2) y la vuelve a ampliar cuatro veces. **Intensidad** 20–100 %. Afina lo que la foto aún muestra; la textura que se ha perdido por completo (tela, hojas) solo la inventa *Reparar daños (IA)*. |
-| **Restaurar caras (IA)** | CodeFormer (0,4 GB, se descarga una vez) restaura caras borrosas, tomadas de la foto antes de los pasos con IA. **Fiel a la foto** 50–100 % (por defecto 90 %): los valores más bajos inventan más detalle. **Intensidad** 20–100 % (por defecto 60 %). Las caras de menos de unos 14 píxeles no se tocan. La licencia de CodeFormer solo permite el uso no comercial. |
+| **Restaurar caras (IA)** | CodeFormer (0,4 GB, se descarga una vez) restaura caras borrosas, tomadas de la foto antes de los pasos con IA. **Fiel a la foto** 50–100 % (por defecto 90 %): los valores más bajos inventan más detalle. **Intensidad** 20–100 % (por defecto 60 %). Las caras de menos de unos 14 píxeles no se tocan. La licencia de CodeFormer solo permite el uso no comercial. **Modelo de caras**: CodeFormer (por defecto, más nítido, más contraste, alisa la piel mayor) o RestoreFormer++ (0,3 GB, se descarga una vez, Apache-2.0: más suave, conserva más las arrugas de las caras mayores; «Fiel a la foto» no se aplica a él). Ambos tardan un tercio de segundo por cara. |
 | **Colorear una foto en blanco y negro** | DDColor (0,9 GB, se descarga una vez) añade color a la luminosidad de la foto, así que ninguna forma ni detalle puede cambiar. **Intensidad del color** 50–150 %. |
 | **Menos grano, detalles más nítidos** | Sin modelo: se reduce el ruido de la luminosidad y se enfocan sus bordes; el color solo se suaviza un poco. **Intensidad** 10–100 %. |
 
@@ -1008,6 +1008,10 @@ repositorio de Hugging Face sin un modelo completo (sin estructura de Diffusers,
 cuantizaciones GGUF) responde con la lista de sus archivos de modelo y sus tamaños; un clic en un archivo comprueba ese.
 **Descargar** (Hugging Face, Civitai) o **Importar** (archivo, carpeta) lo inicia después; el campo de nombre y el menú
 de compresión de al lado son opcionales.
+
+**Desde una página de Hugging Face**: un enlace `vulkara://import/hf?repo=propietario/nombre` (desde 0.11.0, p. ej.
+«Use this model» en Hugging Face cuando VulKara aparezca allí) abre Añadir con el repositorio ya escrito y lo
+comprueba; solo se descarga cuando pulsas Descargar. Cualquier otro enlace se ignora.
 
 Qué ocurre al importar:
 

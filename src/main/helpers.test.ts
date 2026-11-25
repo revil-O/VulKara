@@ -72,6 +72,8 @@ describe('helper models', () => {
     // the engine runs CodeFormer for any true value: 1 or 'yes' sent by hand are refused too
     expect(usesNonCommercialHelper({ restore: { faces: 1 } as never })).toBe(true)
     expect(usesNonCommercialHelper({ removeObject: { method: 'rorem' } })).toBe(false)
+    // RestoreFormer++ is Apache-2.0
+    expect(usesNonCommercialHelper({ restore: { faces: true, faceModel: 'restoreformer' } as never })).toBe(false)
     expect(usesNonCommercialHelper({ restore: { faces: false } as never })).toBe(false)
     expect(usesNonCommercialHelper({})).toBe(false)
   })

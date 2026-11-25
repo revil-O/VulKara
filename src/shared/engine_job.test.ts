@@ -55,7 +55,7 @@ describe('removing an object for the engine', () => {
 describe('Restore jobs for the engine', () => {
   it('fills in the defaults of the AI steps an older job or template does not have', () => {
     const r = toEngineJob(BASE).restore as Record<string, unknown>
-    expect(r).toMatchObject({ correct_strength: 0.8, details: false, detail_level: 2, detail_strength: 1, faces: false, face_fidelity: 0.9, face_strength: 0.6, scale: 1, consistency: false })
+    expect(r).toMatchObject({ correct_strength: 0.8, details: false, detail_level: 2, detail_strength: 1, faces: false, face_model: 'codeformer', face_fidelity: 0.9, face_strength: 0.6, scale: 1, consistency: false })
     expect(r.preview).toBeUndefined()
     expect(r.face_points).toBeUndefined()
   })
@@ -64,10 +64,10 @@ describe('Restore jobs for the engine', () => {
     const points: [number, number][][] = [[[1, 2], [3, 4], [5, 6], [7, 8], [9, 10]]]
     const job: Job = {
       ...BASE,
-      restore: { ...BASE.restore!, details: true, detailLevel: 2.5, detailStrength: 0.7, faces: true, faceFidelity: 1, faceStrength: 0.5, scale: 2, consistency: true, facePoints: points, preview: { x: 10, y: 20, w: 300, h: 300 } },
+      restore: { ...BASE.restore!, details: true, detailLevel: 2.5, detailStrength: 0.7, faces: true, faceModel: 'restoreformer', faceFidelity: 1, faceStrength: 0.5, scale: 2, consistency: true, facePoints: points, preview: { x: 10, y: 20, w: 300, h: 300 } },
     }
     const r = toEngineJob(job).restore as Record<string, unknown>
-    expect(r).toMatchObject({ details: true, detail_level: 2.5, detail_strength: 0.7, faces: true, face_fidelity: 1, face_strength: 0.5, scale: 2, consistency: true })
+    expect(r).toMatchObject({ details: true, detail_level: 2.5, detail_strength: 0.7, faces: true, face_model: 'restoreformer', face_fidelity: 1, face_strength: 0.5, scale: 2, consistency: true })
     expect(r.face_points).toEqual(points)
     expect(r.preview).toEqual({ x: 10, y: 20, w: 300, h: 300 })
   })

@@ -125,7 +125,9 @@ export interface RestoreOptions {
   detailStrength?: number
   /** faces restored by CodeFormer */
   faces?: boolean
-  /** 0.5..1: higher keeps more of the face as it is, lower makes up more detail */
+  /** the face model: CodeFormer (default, sharper) or RestoreFormer++ (softer, keeps the lines of older faces) */
+  faceModel?: 'codeformer' | 'restoreformer'
+  /** 0.5..1 (CodeFormer only): higher keeps more of the face as it is, lower makes up more detail */
   faceFidelity?: number
   /** 0..1, blended with the photo */
   faceStrength?: number

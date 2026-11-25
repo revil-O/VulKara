@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.11.0 – 2026-11-25
+
+- **RestoreFormer++ as a second face model in Restore.** Under "Restore faces" a choice between CodeFormer (sharper,
+  more contrast, smooths older skin) and RestoreFormer++ (softer, keeps more of the lines of older faces); CodeFormer
+  stays the default, "Faithful" applies to it only. Both take about a third of a second per face (MEASUREMENTS 7cv).
+  RestoreFormer++ (Apache-2.0, 281 MB) downloads once from the authors' release; its SHA-256 is checked again before
+  every load, it is read with an unpickler that takes tensors only (as CodeFormer's file), and it runs through a small
+  loader of VulKara's own on spandrel's RestoreFormer parts (spandrel knows only the first RestoreFormer). Its results
+  are not limited to non-commercial use, unlike CodeFormer's.
+- **Open a Hugging Face model in VulKara.** VulKara answers `vulkara://import/hf?repo=owner/name` links: Models → Add
+  opens with the repository filled in and checks it; nothing is downloaded until you click Download, and any other
+  link is ignored (written to the log). The page https://www.vulkara.net/hf/?model_id=owner/name hands such a link to
+  the app and offers the download when VulKara is missing: the way for "Use this model" on Hugging Face model pages,
+  which still needs VulKara's entry in Hugging Face's list of local apps.
+- **A note when other programs push a picture into the swap.** When macOS reads more than 1 GB per step back from
+  the swap during a Diffusers job, the job shows once how much and suggests closing other programs (or, when the job
+  itself needs more than the Mac has, a smaller size or 8 or 4 bit): beside a running virtual machine a FLUX.1 [dev]
+  fine-tune took 81.6 instead of 47.4 s per step, its GPU busy for a few seconds and then waiting for over 30
+  (MEASUREMENTS 7ct).
+- **Security update: Electron 44.11.6.** From 44.11.3: among others, Web Worker requests to the app's own schemes no
+  longer bypass their handlers, and a dangling pointer after choosing a folder is fixed (44.11.4–44.11.6, 2026-11-18
+  to 11-24).
+- **A dangling link where the helper models live is named.** The content filter said only "File exists" when the
+  helpers' folder (e.g. `~/VulKara/annotators`) was a link to a folder that is gone; it now names the link and its
+  target. The picture stays hidden then, as the filter could not check it.
+
 ## 0.10.5 – 2026-11-24
 
 - **Preparation for a build for Intel Macs.** `VK_ARCH=x64` builds an edition without MLX and ComfyUI (Apple's MLX

@@ -3183,6 +3183,77 @@ filter could not check the result": `~/VulKara/annotators` is a dangling link in
 app's folder, which is gone, and `mkdir(exist_ok=True)` raises on it (the test profile's default models folder;
 the user's own profile keeps its helpers elsewhere).
 
+## 7cu. Remove object: LaMa, RORem and FLUX.2 [klein] 4B with fal's remove LoRA (0.11.0, 2026-11-25, Mac mini M4 16 GB)
+
+The eleven cases of 7bz (five photos 3.4–19 MP, six 1024² pictures with masks of 3–50 %), released app 0.10.5 from
+its DMG with its own profile, queue lock held only by this run (no okAI job), swap 2.09 GB before and 2.34 GB after.
+LaMa and RORem through Inpainting → Remove; klein through Image to image on a crop of twice the mask box (long side
+1024) with a red frame of 6 px around the grown box, prompt "Remove the highlighted object from the scene", the
+model's own 4 steps, guidance 1, seed 1, LoRA scale 1.1 (all as on the model card), then only the grown, softened
+mask area pasted back into the original.
+
+| Way | time per picture | peak | removed |
+| --- | --- | --- | --- |
+| LaMa | 1.9–9.5 s (first 9.5 s with loading) | 1.2–7.9 GB | 11 of 11, as in 7bz |
+| RORem | 26.4–32.8 s | 9.5–10.0 GB | 11 of 11, as in 7bz |
+| klein 4B + remove LoRA | 77.7–119.0 s | 10.2–11.9 GB | 0 of 11 |
+
+klein took the red frame away in every case but left the object: the bicycle (case 00) kept everything but a
+smeared rear wheel, the vase (01) became a pale ghost, the cat, dancer, coins, laptop, camera, the cat beside the dog
+and the horse stayed as they were. LaMa and RORem looked as in 7bz.
+
+Two findings on the LoRA itself: `flux-object-remove-lora.safetensors` on Hugging Face (revision 0e3f5879, 58 441 728
+bytes) is cut short: its header lists 76 021 760 bytes of tensors, the file holds 58 424 416, and the Diffusers
+reader refuses it ("incomplete metadata, file not fully covered"). The second file,
+`kDEkt5q7tDLKOpQJIVMPx_pytorch_lora_weights_comfy_converted.safetensors` (76 038 936 bytes, SHA-256 dc197de6…88ec),
+is complete, holds the same 136 F32 tensors as `diffusion_model.…` and loads; this run used it. And the model card
+runs it on fal's endpoint `flux-2-klein/4b/base/edit/lora`, i.e. on FLUX.2 [klein] **Base** 4B (undistilled, 50
+steps, guidance 4 per its model card), not on the 4-step klein 4B tested here.
+
+Probe on the base model (same day, same app and crops, FLUX.2 [klein] Base 4B imported through the app: 14.9 GB,
+8-bit plan, not streamed; its own defaults 50 steps, guidance 4; three cases):
+
+| Case | time | peak | removed |
+| --- | --- | --- | --- |
+| 00 bicycle (1024 × 688) | 1823 s | 9.6 GB | yes, wheels' shadows too, road and grass continue |
+| 01 vase (688 × 1024) | 1658 s | 9.0 GB | yes, wall and table edge clean (the cast shadow outside the mask stays) |
+| 10 laptop, mask 50 % (1024²) | 2585 s | 10.0 GB | yes, wood grain and gaps continue |
+
+So the LoRA works on the base model it was trained for, and not on the distilled one. On the M4 16 GB it takes
+28–43 minutes per picture against 2–10 s (LaMa) and 26–33 s (RORem), which removed these three cases as well.
+
+With 20 steps instead of 50 (same day, guidance 4, queue lock taken after an okAI test): bicycle 680 s and vase
+664 s, both removed as cleanly as with 50 steps; the laptop (mask 50 %) 1037 s, only its screen removed, the base with
+keyboard and trackpad stayed. Peaks 9.0–10.0 GB. Fewer steps cost the large object, and even 20 steps take 11–17
+minutes per picture.
+
+## 7cv. Faces: CodeFormer against RestoreFormer++ (0.11.0, 2026-11-25, Mac mini M4 16 GB)
+
+Six portraits made with FLUX.2 [klein] 4B (896 × 1152, its own 4 steps; five single faces, one couple) as the truth,
+made old (three times smaller, softened, grain, JPEG 35, back to size; every other one grey), then Restore's
+`restore_faces` of the released 0.10.5 engine on MPS with its defaults (faithful 90 %) at strength 0.6 (the default)
+and 1.0. RestoreFormer++ = the authors' release v1.0.0 (`RestoreFormer++.ckpt`, Apache-2.0, 294 MB, SHA-256
+613fe528…e3a2) through a small loader of our own on spandrel's RestoreFormer parts (spandrel 0.4.2 knows only v1: the
+++ decoder also attends at 32 px, on the encoder's features of that size, with 4 heads instead of 8); the file is read
+with `weights_only` (its pickle holds only plain tensors), all 441 tensors in place. Queue lock held only by this run.
+
+PSNR / SSIM of the face squares against the truth:
+
+| Case | CodeFormer 0.6 | RestoreFormer++ 0.6 | CodeFormer 1.0 | RestoreFormer++ 1.0 |
+| --- | --- | --- | --- | --- |
+| 0 elderly woman | 29.17 / 0.766 | 28.61 / 0.760 | 27.57 / 0.729 | 26.87 / 0.712 |
+| 1 man, beard (grey) | 25.50 / 0.666 | 24.96 / 0.649 | 24.80 / 0.647 | 23.66 / 0.610 |
+| 2 woman, glasses | 25.80 / 0.657 | 25.16 / 0.646 | 24.87 / 0.633 | 23.76 / 0.612 |
+| 3 man, dark skin (grey) | 28.36 / 0.717 | 27.84 / 0.710 | 27.76 / 0.701 | 26.75 / 0.685 |
+| 4 woman, park | 29.55 / 0.797 | 29.22 / 0.778 | 28.41 / 0.773 | 27.80 / 0.732 |
+| 5 couple, faces ~200 px (grey) | 24.64 / 0.640 | 24.83 / 0.642 | 24.02 / 0.602 | 24.18 / 0.599 |
+
+Both take 0.33–0.38 s per face; Metal held 2.9 GB with both loaded; RestoreFormer++ loads in 0.3 s. Seen at full
+size: neither invents anything (no changed eyes, glasses or jewellery, grey stays grey), both lose the freckles of
+case 2. CodeFormer is sharper and has more contrast but smooths older skin (case 0 loses wrinkles); RestoreFormer++ is
+softer, keeps more of the age lines (cases 0 and 5) and looks flatter on case 3. CodeFormer is closer to the truth in
+five of six cases by the numbers, RestoreFormer++ only on the small faces of the couple.
+
 ## 8. Earlier references (from the user guide and the changelog)
 
 - Training on the M2 (2025–26): SDXL about 2.5 s per step at 768 px, FLUX.2 [klein] 4B about 15 s, 9B about 30 s,

@@ -36,6 +36,8 @@ module.exports = {
     onlyLoadAppFromAsar: true,
     grantFileProtocolExtraPrivileges: false,
   },
+  // vulkara://import/hf?repo=… (Hugging Face "Use this model"), handled in src/main/deeplink.ts
+  protocols: [{ name: 'VulKara', schemes: ['vulkara'] }],
   mac: {
     // VK_ARCH=x64: the Intel-Mac build (src/shared/edition.ts)
     target: [{ target: 'dmg', arch: [process.env.VK_ARCH === 'x64' ? 'x64' : 'arm64'] }],

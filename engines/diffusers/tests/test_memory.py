@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 # Copyright (C) 2026 Oliver Schmidt
+import pytest
+
 import memory
 import registry
 
@@ -239,3 +241,36 @@ def test_sd35_large_is_streamed_rather_than_shrunk_close_to_the_budget():
     assert memory.stream_first(registry.ARCHS["sd35_large"], tight, "transformer")
     assert not memory.stream_first(registry.ARCHS["sd35_large"], tight, "transformer", quant="q8")
 
+
+
+def test_a_job_hears_once_when_other_programs_push_it_into_the_swap():
+    reads = iter([10.0, 10.5, 70.0, 130.0])  # GB read back from the swap: at the start, after step 2, 3, 4
+    watch = memory.SwapWatch(read=lambda: next(reads))
+    assert watch.check(1) is None  # the first step warms up
+    assert watch.check(2) is None  # 0.25 GB per step: a quiet Mac
+    note = watch.check(3)
+    assert note and "60 GB back from the swap during 3 steps" in note
+    assert watch.check(4) is None  # once per job
+
+
+def test_a_job_too_big_for_the_mac_is_not_told_to_blame_other_programs():
+    reads = iter([10.0, 70.0])
+    note = memory.SwapWatch(read=lambda: next(reads), too_big=True).check(3)
+    assert note and "needs more memory than the Mac has free" in note and "other programs" not in note
+
+
+def test_without_vm_stat_no_note_and_no_error():
+    watch = memory.SwapWatch(read=lambda: None)
+    assert watch.check(5) is None
+
+
+def test_the_real_swap_figure_reads_on_this_mac():
+    assert memory.swapped_in_gb() >= 0
+
+
+def test_a_dangling_helpers_link_is_named(monkeypatch, tmp_path):
+    import paths
+    (tmp_path / "annotators").symlink_to(tmp_path / "gone")
+    monkeypatch.setenv("VK_HELPERS_DIR", str(tmp_path))
+    with pytest.raises(FileNotFoundError, match="annotators is a link to .*gone, which does not exist"):
+        paths.helpers_dir("annotators")

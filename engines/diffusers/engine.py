@@ -2036,7 +2036,7 @@ class DiffusersEngine:
 
     def _details_and_faces(self, out, face_source, opts, box):
         """Restore's AI steps on a soft photo: its detail rebuilt by Real-ESRGAN (or the photo only enlarged), its faces
-        restored by CodeFormer from face_source, the photo before any AI step."""
+        restored by CodeFormer (or RestoreFormer++) from face_source, the photo before any AI step."""
         import restore as rs
         from PIL import Image
         scale = 2 if int(opts.get("scale", 1) or 1) == 2 else 1
@@ -2057,7 +2057,7 @@ class DiffusersEngine:
             points = _face_points(opts.get("face_points"), box, out.width / face_source.width)
             out, count = rs.restore_faces(out, face_source, float(opts.get("face_fidelity", 0.9)),
                                           float(opts.get("face_strength", 0.6)), self.device, report=self._state,
-                                          points=points)
+                                          points=points, model=opts.get("face_model") or "codeformer")
             protocol.log("[restore] %d face(s) restored" % count)
             if not count and not box:
                 protocol.note("No face was found that is large enough to restore (at least %d pixels from the eyes "
@@ -2124,11 +2124,18 @@ class DiffusersEngine:
 
         sync = torch.mps.synchronize if self.device == "mps" else (lambda: None)
 
+        plan = getattr(model, "plan", None) or {}
+        swap = memory.SwapWatch(too_big=bool(plan.get("streamed")) or plan.get("est_peak_gb", 0) > plan.get("budget_gb", 1e9))
+
         def on_step(p, i, t, kwargs):
             sync()  # MPS runs asynchronously: report a step once it is really done
             total = getattr(p, "_num_timesteps", None) or steps
             if not quiet:
                 protocol.progress(round(100.0 * (i + 1) / total, 1))
+                fighting = swap.check(i + 1)
+                if fighting:
+                    protocol.note(fighting)
+                    protocol.log("[diffusers] " + fighting)
             if reader is not None and reader.stop_requested():
                 p._interrupt = True
             if i + 1 >= total or getattr(p, "_interrupt", False):

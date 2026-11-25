@@ -61,7 +61,7 @@ export function toEngineJob(job: Job): Record<string, unknown> {
       correct: r.correct, repair: r.repair, colorize: r.colorize, color_strength: r.colorStrength, sharpen: r.sharpen, sharpness: r.sharpness,
       lock: r.lock, max_change: r.maxChange, rules: r.rules, check_faces: r.checkFaces,
       correct_strength: r.correctStrength ?? 0.8, dust: !!r.dust, dust_sensitivity: r.dustSensitivity ?? 0.5, details: !!r.details, detail_level: r.detailLevel ?? 2,
-      detail_strength: r.detailStrength ?? 1, faces: !!r.faces, face_fidelity: r.faceFidelity ?? 0.9,
+      detail_strength: r.detailStrength ?? 1, faces: !!r.faces, face_model: r.faceModel === 'restoreformer' ? 'restoreformer' : 'codeformer', face_fidelity: r.faceFidelity ?? 0.9,
       face_strength: r.faceStrength ?? 0.6, scale: r.scale === 2 ? 2 : 1, preview: r.preview,
       face_points: r.facePoints, consistency: !!r.consistency,
     }

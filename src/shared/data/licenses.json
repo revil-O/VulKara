@@ -1059,6 +1059,17 @@
   {
    "group": "Helper models",
    "id": null,
+   "title": "RestoreFormer++ (faces, Restore)",
+   "source": "https://github.com/wzhouxiff/RestoreFormerPlusPlus/releases/tag/v1.0.0",
+   "license": "Apache-2.0",
+   "license_url": "https://github.com/wzhouxiff/RestoreFormerPlusPlus/blob/main/LICENSE",
+   "model": "no",
+   "outputs": "yes",
+   "note": "Apache-2.0, no limits on the outputs. VulKara downloads the weights from the project on first use and reads them as numbers only (no executable code)."
+  },
+  {
+   "group": "Helper models",
+   "id": null,
    "title": "RORem (object removal, Inpainting)",
    "source": "https://huggingface.co/LetsThink/RORem",
    "license": "Apache License 2.0 (base: SDXL Inpainting 0.1, CreativeML Open RAIL++-M)",

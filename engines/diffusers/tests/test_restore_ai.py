@@ -128,6 +128,65 @@ def test_faces_are_restored_only_where_they_are_and_by_the_strength(monkeypatch,
     assert 100 < np.asarray(weak)[150, 150, 0] < 200
 
 
+def test_restoreformer_is_chosen_by_model_and_finds_faces_with_the_detector_alone(monkeypatch, tmp_path):
+    import torch
+
+    class Net:
+        def __call__(self, t, weight=0.5):
+            return (torch.ones_like(t), None)  # RestoreFormer answers (picture, None)
+
+    def no_codeformer(device, report=None):
+        raise AssertionError("CodeFormer must not be loaded for RestoreFormer++")
+
+    monkeypatch.setattr(rs, "_codeformer", no_codeformer)
+    monkeypatch.setattr(rs, "_restoreformer", lambda device, report=None: Net())
+    monkeypatch.setattr(rs, "detector_path", lambda: str(tmp_path / "yunet.onnx"))
+    seen = []
+    pts = np.array([[130, 135], [170, 135], [150, 155], [135, 175], [165, 175]], np.float32)
+    monkeypatch.setattr(rs, "find_faces", lambda rgb, path: seen.append(path) or [pts])
+    img = Image.fromarray(np.full((400, 400, 3), 60, np.uint8))
+    out, n = rs.restore_faces(img, strength=1.0, model="restoreformer")
+    assert n == 1 and np.asarray(out)[150, 150, 0] > 200 and seen == [str(tmp_path / "yunet.onnx")]
+
+
+def test_restoreformer_net_has_the_release_layout():
+    """The 441 tensors of RestoreFormer++.ckpt (v1.0.0, without its "vqvae." prefix) and nothing else; the decoder's
+    second attention level takes the encoder's block_4 features."""
+    import torch
+    import restoreformer
+    net = restoreformer.RestoreFormerPP().eval()
+    keys = set(net.state_dict())
+    assert len(keys) == 441
+    assert {"decoder.up.4.attn.2.q.weight", "decoder.up.5.attn.0.q.weight", "encoder.down.5.attn.1.q.weight",
+            "quantize.embedding.weight"} <= keys and not any(k.startswith("encoder.down.4.attn") for k in keys)
+    assert net.decoder.up[4].attn[0].head_size == 4
+    with torch.inference_mode():
+        out = net(torch.zeros(1, 3, 64, 64))[0]
+    assert out.shape == (1, 3, 64, 64)
+
+
+def test_restoreformer_refuses_a_swapped_or_crafted_file(tmp_path):
+    """Its weights are a pickle: a file without the release's SHA-256 is not read at all, and even one that matches a
+    given hash is read with spandrel's unpickler, which refuses anything but tensors (a global like os.system)."""
+    import hashlib
+    import os
+    import pickle
+    import pytest
+    import torch
+    import restoreformer
+
+    class Evil:
+        def __reduce__(self):
+            return (os.system, ("true",))
+
+    path = tmp_path / "restoreformer_pp.ckpt"
+    torch.save({"vqvae.x": Evil()}, path, pickle_protocol=2)
+    with pytest.raises(ValueError, match="SHA-256"):
+        restoreformer.load(str(path), "0" * 64)
+    with pytest.raises(pickle.UnpicklingError, match="forbidden"):
+        restoreformer.load(str(path), hashlib.sha256(path.read_bytes()).hexdigest())
+
+
 def test_small_faces_are_left_alone():
     assert rs.FACE_MIN >= 10
 
