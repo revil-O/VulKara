@@ -46,7 +46,7 @@
 
   <header class="top">
     <div class="wrap">
-      <span class="brandbox"><a class="brand" href="../es/"><img src="../assets/icon.svg" width="30" height="30" alt="">VulKara</a><a class="ver" href="../changes/" title="Cambios" aria-label="Cambios: v0.11.1">v0.11.1</a></span>
+      <span class="brandbox"><a class="brand" href="../es/"><img src="../assets/icon.svg" width="30" height="30" alt="">VulKara</a><a class="ver" href="../changes/" title="Cambios" aria-label="Cambios: v0.11.2">v0.11.2</a></span>
       <nav aria-label="VulKara">
         <a href="#features">Funciones</a>
         <a href="#models">Modelos</a>
@@ -151,6 +151,36 @@
             </article>
           </div>
           <p class="fine">Probado en un Mac mini M4 con 16 GB: funcionan FLUX.1 [dev], Krea 2 y Qwen-Image 2.1. El streaming cambia velocidad por tamaño: los modelos grandes tardan minutos por imagen.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="intel" aria-labelledby="intel-title">
+      <div class="wrap">
+        <div class="stream">
+          <div class="head">
+            <span class="eyebrow"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20v2"/><path d="M12 2v2"/><path d="M17 20v2"/><path d="M17 2v2"/><path d="M2 12h2"/><path d="M2 17h2"/><path d="M2 7h2"/><path d="M20 12h2"/><path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>Mac con Intel</span>
+            <h2 id="intel-title">Tu Mac con Intel también crea imágenes.</h2>
+            <p>VulKara tiene una versión propia para Mac con procesador Intel: la misma app, la misma privacidad, con Stable Diffusion 1.x, 2.x y SDXL en el procesador. Descarga <b>VulKara-…-x64.dmg</b> o deja que Homebrew elija la correcta.</p>
+          </div>
+          <div class="points">
+            <article>
+              <div class="tile"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20v2"/><path d="M12 2v2"/><path d="M17 20v2"/><path d="M17 2v2"/><path d="M2 12h2"/><path d="M2 17h2"/><path d="M2 7h2"/><path d="M20 12h2"/><path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg></div>
+              <h3>SD 1.5, SD 2.x y SDXL</h3>
+              <p>Miles de modelos y LoRAs de Civitai y Hugging Face, inpainting, ControlNet y restauración, calculados por el procesador Intel. Probado en un MacBook Pro 2017 con 8 GB.</p>
+            </article>
+            <article>
+              <div class="tile"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></div>
+              <h3>Segura por diseño</h3>
+              <p>PyTorch 2.2.2 es el último para Mac con Intel, así que esta versión solo lee <code>.safetensors</code> y <code>.gguf</code>, ningún archivo pickle, y no ejecuta código que venga con un modelo.</p>
+            </article>
+            <article>
+              <div class="tile"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg></div>
+              <h3>Misma descarga, mismas actualizaciones</h3>
+              <p>Firmada y notarizada por Apple, se actualiza sola como la versión para Apple silicon, y Homebrew instala la correcta: <code>brew install --cask revil-O/tap/vulkara</code>.</p>
+            </article>
+          </div>
+          <p class="fine">Sin GPU lleva tiempo: SD 1.5 a 512 px unos 15–17 s por paso en un MacBook Pro 2017. MLX, ComfyUI y los modelos más nuevos (FLUX, Qwen-Image, vídeo) necesitan Apple silicon.</p>
         </div>
       </div>
     </section>
@@ -307,8 +337,8 @@
           </article>
           <article class="card">
             <div class="tile"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12.296 3.464 3.02 3.956"/><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m6.18 5.276 3.1 3.899"/></svg></div>
-            <h3>Imagen a vídeo</h3>
-            <p>Da vida a una imagen con Wan 2.2: describe el movimiento y obtén de 1 a 5 segundos en 480p o 720p.</p>
+            <h3>Vídeo con sonido</h3>
+            <p>LTX-2.3 crea un clip con sonido solo a partir de una descripción o de una imagen: hasta 20 segundos, 24 o 30 fps, 1080p desde 24 GB. Wan 2.2 da vida a una imagen en 1–5 segundos.</p>
           </article>
           <article class="card">
             <div class="tile"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></svg></div>
@@ -341,14 +371,14 @@
             <p>SD 1.5, SDXL (también Pony, Illustrious, NoobAI), SD 3.5, FLUX.1, FLUX.2, FLUX 3, Chroma, Qwen-Image, Z-Image, Krea 2, Ideogram 4, Anima y Wan 2.2 para vídeo. Descarga directa desde una lista de modelos probados, importación desde Hugging Face o Civitai (puede hacer falta un token de API) por enlace (URL o creador/nombre del modelo) o desde un archivo de modelo ya descargado.</p>
           </article>
           <article class="card">
-            <div class="tile"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/></svg></div>
-            <h3>Prompt desde imagen <span class="new">Nuevo</span></h3>
-            <p>Elige una imagen en Imagen a imagen y pulsa <b>Prompt desde imagen</b>: Qwen3-VL 2B describe motivo, entorno, luz, colores, estilo y cámara en un párrafo, en el Mac, en unos 15 segundos en un Mac mini M4 con 16 GB. Cámbialo y genera.</p>
+            <div class="tile"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg></div>
+            <h3>Versiones de Civitai <span class="new">Nuevo</span></h3>
+            <p>Las LoRAs y los modelos de Civitai suelen tener varias versiones. Elige la que quieras en la tarjeta, ten dos versiones lado a lado, y la página LoRA te avisa cuando sale una más nueva.</p>
           </article>
           <article class="card">
-            <div class="tile"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg></div>
-            <h3>Barra de menús y Monitor <span class="new">Nuevo</span></h3>
-            <p>Cierra la ventana y VulKara sigue en marcha con su icono en la barra de menús: la tarea en curso, su progreso, lo que espera. <b>Monitor</b> muestra la tarea frente a su plan de memoria y, en el Mac medido, frente a las mediciones de su modelo.</p>
+            <div class="tile"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12.296 3.464 3.02 3.956"/><path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z"/><path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m6.18 5.276 3.1 3.899"/></svg></div>
+            <h3>Vídeos más largos con LTX-2.3 <span class="new">Nuevo</span></h3>
+            <p>Clips con sonido de hasta 20 segundos, a 24 o 30 fotogramas por segundo, y 1080p en Mac con 24 GB o más. En un Mac mini M4 con 16 GB, 20 s tardaron unos 35 minutos.</p>
           </article>
           <article class="card full">
             <div class="tile"><svg class="ico" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg></div>

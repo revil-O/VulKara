@@ -8,7 +8,7 @@
 Text to image · Image to image · Inpainting · AI Canvas · Video with sound · Upscale · Restore · Pose · Illusion · LoRAs · Training · Remote web UI
 
 [![Release](https://img.shields.io/github/v/release/revil-O/VulKara?label=release&color=c2662d)](https://github.com/revil-O/VulKara/releases/latest)
-![macOS](https://img.shields.io/badge/macOS-Apple%20silicon-111?logo=apple&logoColor=white)
+![macOS](https://img.shields.io/badge/macOS-Apple%20silicon%20%C2%B7%20Intel-111?logo=apple&logoColor=white)
 ![Electron](https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white)
 ![Vue](https://img.shields.io/badge/Vue-3.5-42b883?logo=vuedotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
@@ -42,8 +42,22 @@ The app and its user guide in **English** · [Deutsch](docs/de/USER_GUIDE.md) ·
 > (tested on a Mac mini M4: FLUX.1 [dev], Krea 2, Qwen-Image 2.1). Automatic, nothing to set up.
 > [How it works](#big-models-on-small-macs-ssd-streaming)
 
+> [!IMPORTANT]
+> **<img src="docs/icons/cpu.svg" width="16" height="16" alt=""> Now for Intel Macs too.** VulKara has a build of its own for Macs with an Intel
+> processor: the same app and the same privacy, with Stable Diffusion 1.x, 2.x and SDXL, thousands of models and LoRAs,
+> inpainting, ControlNet and restore, computed by the processor. Download `VulKara-<version>-x64.dmg` from the
+> [releases](https://github.com/revil-O/VulKara/releases/latest), or `brew install --cask revil-O/tap/vulkara`, which
+> picks the right one. Signed, notarized and self-updating like the Apple silicon version. [What it can do](#requirements)
+
 > [!NOTE]
-> **<img src="docs/icons/sparkles.svg" width="16" height="16" alt=""> New in 0.7.0: FLUX 3 Image Klein.** Black Forest Labs' newest model on the MLX runtime, for text to
+> **<img src="docs/icons/layers.svg" width="16" height="16" alt=""> New in 0.11.2: Civitai versions.** Pick the version of a LoRA or model you want on its
+> card, keep two versions side by side, and the LoRA page tells you when a newer one is out.
+>
+> **<img src="docs/icons/clapperboard.svg" width="16" height="16" alt=""> New in 0.11.1: longer videos.** LTX-2.3 makes clips with sound up to 20 seconds, at 24 or
+> 30 fps, and 1080p on Macs with 24 GB or more; a finer depth model for depth control pictures; updates wait for running
+> work. [Video](#video-upscale-pose-and-illusion) · [Changelog](CHANGELOG.md)
+>
+> **<img src="docs/icons/sparkles.svg" width="16" height="16" alt=""> Since 0.7.0: FLUX 3 Image Klein.** Black Forest Labs' newest model on the MLX runtime, for text to
 > image and edits with a reference picture, with LoRAs and an optional **prompt upsampler** that turns a short prompt
 > into the full scene description FLUX 3 is trained on. The 6 and 8 bit versions run on a Mac with 16 GB.
 > [Text to image](#text-to-image) · [Supported models](#supported-models)
@@ -106,7 +120,8 @@ hands and faces, ControlNet, hidden-pattern illusions and 4× upscaling.
 
 ### <img src="docs/icons/layers.svg" width="20" height="20" alt=""> LoRAs, understood
 LoRAs are found for each model on Civitai and Hugging Face, checked for the model they really belong to, converted
-from ComfyUI, ai-toolkit and PEFT formats, described
+from ComfyUI, ai-toolkit and PEFT formats, installed in the Civitai version you pick (two side by side if you like, with a
+hint when a newer one is out), described
 with their makers' settings and example prompts, compared side by side, and trained from your own pictures.
 
 </td>
@@ -254,7 +269,7 @@ kinds of old photos, and your own templates.
 <td width="50%"><img src="docs/screenshots/upscale.jpg" alt="Upscale"></td>
 </tr>
 <tr>
-<td><b>Video</b> with LTX-2.3: a clip with sound from a description alone or from a start picture, or with Wan 2.2 from a start picture; 1–5 seconds at 480p or 720p.</td>
+<td><b>Video</b> with LTX-2.3: a clip with sound from a description alone or from a start picture, up to 20 seconds at 24 or 30 fps, 480p, 720p and on Macs with 24 GB also 1080p; or with Wan 2.2 from a start picture, 1–5 seconds.</td>
 <td><b>Upscale</b> 2× or 4× with Real-ESRGAN, which adds detail instead of blur.</td>
 </tr>
 <tr>
@@ -423,7 +438,7 @@ The language of the app is chosen at the top right of the Start page or in **Set
 
 | | Minimum | Recommended |
 | --- | --- | --- |
-| Mac | Apple silicon (M1) | M2 Pro / Max or newer |
+| Mac | Apple silicon (M1), or an Intel Mac with its own build (below) | M2 Pro / Max or newer |
 | Memory | 8 GB (SD 1.5) | 24–32 GB or more (SDXL, FLUX, Qwen-Image, video); larger models stream from the SSD on smaller Macs |
 | Storage | 5 GB | 50 GB or more for several models; external drives work; a fast internal SSD for the streaming cache |
 | System | macOS 14 (Sonoma) or newer | current macOS |
