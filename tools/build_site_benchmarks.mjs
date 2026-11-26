@@ -359,6 +359,32 @@ const FACES = [
   ['RestoreFormer++', 1.0, 25.50, 0.658, 1, 0.35],
 ]
 
+// upscalers on five JPEG photos, 512 px to 2048 px, Mac mini M4 16 GB (MEASUREMENTS 7cw):
+// [model, licence, s per 512² tile, GB Metal, s per photo (from, to), seen]
+const UPSCALE = [
+  ['Real-ESRGAN x4plus', 'BSD-3-Clause, in VulKara', 3.70, 4.45, 3.7, 3.7, 'smooth'],
+  ['4x-UltraSharp', 'CC BY-NC-SA 4.0', 3.55, 4.46, 3.5, 3.5, 'sharp, waxy faces on JPEG'],
+  ['4xBHI_dat2_real', 'in VulKara', 15.22, 11.45, 32.0, 34.8, 'the most natural'],
+  ['4xNomos2_hq_dat2', 'CC BY 4.0', 14.56, 11.45, 32.0, 32.2, 'stripes on JPEG, clean on PNG'],
+]
+
+// Depth Anything V2 for depth control pictures, Mac mini M4 16 GB (MEASUREMENTS 7cx):
+// [model, licence, s to load, s per picture (from, to), GB Metal]
+const DEPTH = [
+  ['Small', 'Apache-2.0, the default', 0.5, 0.06, 0.23, 1.29],
+  ['Base', 'CC BY-NC 4.0, since 0.11.1', 0.8, 0.16, 0.22, 1.50],
+  ['Large', 'CC BY-NC 4.0, not offered', 2.1, 0.50, 0.67, 3.33],
+]
+
+// LTX-2.3 with sound on a Mac mini M4 16 GB (MEASUREMENTS 7cy): [case, size, frames, s, GB peak, swap]
+const LTX = [
+  ['5 s, 30 fps', '768 × 512', 153, 571, 9.10, 'flat'],
+  ['10 s, 24 fps', '768 × 512', 241, 933, 9.10, 'flat'],
+  ['20 s, 24 fps', '768 × 512', 481, 2079, 9.11, 'flat'],
+  ['5 s, 720p, 24 fps', '1280 × 704', 121, 1091, 10.95, 'flat'],
+  ['5 s, 1080p, 24 fps', '1920 × 1088', 121, 3362, 15.96, '+1.5 GB'],
+]
+
 // the site's Content-Security-Policy allows no inline styles: every position becomes a class in charts.css
 let RULES = []
 const at = (css) => { RULES.push(css); return 'p' + (RULES.length - 1) }
@@ -755,6 +781,66 @@ function facesTable() {
     </section>`
 }
 
+function upscaleTable() {
+  const max = Math.max(...UPSCALE.map((r) => r[5]))
+  const rows = UPSCALE.map(([model, licence, tile, metal, from, to, seen]) => `
+          <tr data-tip="${esc(`${model} (${licence}): ${fmt(tile)} s per 512 px tile, ${fmt(metal)} GB, ${fmt(from)}–${fmt(to)} s per photo; ${seen}. MEASUREMENTS 7cw`)}" tabindex="0">
+            <td>${esc(model)}<small>${esc(licence)}; ${esc(seen)}</small></td>
+            <td class="bars"><span class="mbar b ${at(`width:${pct(to, max)}%`)}"></span></td>
+            <td class="num">${fmt(metal)}</td><td class="num">${from === to ? fmt(from) : `${fmt(from)}–${fmt(to)}`}</td>
+          </tr>`).join('')
+  return `
+    <section class="chart" id="upscale">
+      <h2>Upscalers: 4x-UltraSharp and 4xNomos2 against VulKara's two</h2>
+      <p class="sub">Five web photos (512 px, JPEG quality 60) enlarged to 2048 px on a Mac mini M4 with 16 GB, through the photo tools with the same tiling. 4x-UltraSharp is as fast as Real-ESRGAN and sharper on cars and façades, but turns faces on JPEG pictures into waxy masks. 4xNomos2 paints stripes on JPEG's 8 px grid (its author's own ONNX file does too: it is made for clean originals) and is clean on PNG. Neither was added; Real-ESRGAN and 4xBHI_dat2 stay. The bars are the seconds per photo.</p>
+      <table class="micro">
+        <thead><tr><th>Model</th><th>per photo</th><th class="num">GB</th><th class="num">s per photo</th></tr></thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+    </section>`
+}
+
+function depthTable() {
+  const max = Math.max(...DEPTH.map((r) => r[5]))
+  const rows = DEPTH.map(([model, licence, load, from, to, metal]) => `
+          <tr data-tip="${esc(`Depth Anything V2 ${model} (${licence}): loads in ${fmt(load)} s, ${fmt(from, 2)}–${fmt(to, 2)} s per picture, ${fmt(metal, 2)} GB. MEASUREMENTS 7cx`)}" tabindex="0">
+            <td>${esc(model)}<small>${esc(licence)}</small></td>
+            <td class="bars"><span class="mbar b ${at(`width:${pct(metal, max)}%`)}"></span></td>
+            <td class="num">${fmt(load)}</td><td class="num">${fmt(metal, 2)}</td><td class="num">${fmt(from, 2)}–${fmt(to, 2)}</td>
+          </tr>`).join('')
+  return `
+    <section class="chart" id="depth">
+      <h2>Depth maps: Depth Anything V2 Small, Base and Large</h2>
+      <p class="sub">The depth map of a control picture made from a photo, five photos on a Mac mini M4 with 16 GB. All three place people, cars and buildings right; Base and Large draw single strands of hair, plants and thin poles where Small rounds them off. Since 0.11.1 a Depth control made from a photo can use Base (downloaded once, 390 MB, non-commercial licence); Small stays the default. The bars are the memory (GB).</p>
+      <table class="micro">
+        <thead><tr><th>Model</th><th>memory</th><th class="num">s to load</th><th class="num">GB</th><th class="num">s per picture</th></tr></thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+    </section>`
+}
+
+function ltxTable() {
+  const max = Math.max(...LTX.map((r) => r[3]))
+  const rows = LTX.map(([label, size, frames, sec, peak, swap]) => `
+          <tr data-tip="${esc(`LTX-2.3, ${label} (${size}, ${frames} frames): ${Math.round(sec / 60)} min, at most ${fmt(peak)} GB, swap ${swap}. MEASUREMENTS 7cy`)}" tabindex="0">
+            <td>${esc(label)}<small>${esc(size)}, ${frames} frames</small></td>
+            <td class="bars"><span class="mbar b ${at(`width:${pct(sec, max)}%`)}"></span></td>
+            <td class="num">${fmt(peak)}</td><td class="num">${esc(swap)}</td><td class="num">${Math.round(sec / 60)}</td>
+          </tr>`).join('')
+  return `
+    <section class="chart" id="ltx">
+      <h2>LTX-2.3: longer clips, larger sizes, 30 fps</h2>
+      <p class="sub">LTX-2.3 with sound (MLX, 4 bit) on a Mac mini M4 with 16 GB, the fox prompt, from the start to the saved video. The length does not raise the memory, only the time; 30 fps is a quarter more frames at the same memory. 720p fits easily; 1080p filled the 16 GB, swapped and took 56 minutes for 5 seconds. Since 0.11.1 LTX-2.3 makes up to 20 seconds at 24 or 30 fps, and 1080p on Macs with 24 GB or more. The bars are the minutes.</p>
+      <table class="micro">
+        <thead><tr><th>Clip</th><th>time</th><th class="num">GB at most</th><th class="num">swap</th><th class="num">min</th></tr></thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+    </section>`
+}
+
 function vmTable() {
   const max = Math.max(...VM.map((r) => r[1]))
   const rows = VM.map(([label, step, whole, read, peak, swap]) => `
@@ -783,7 +869,7 @@ export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }
     planChart('plan-after', 'Plans brought to the measurements', 'SD 1.5 planned at its own size with fused attention, ComfyUI models with the plan of a model held whole (shown in the benchmark since 0.7.5). The ComfyUI figures are the middle of two runs. Qwen-Image 2.1 streamed: the blocks kept in memory were not counted while denoising (planned 9.1 GB before). ComfyUI on 16 GB: the text encoder and the model planned apart, as ComfyUI loads them (MOSS-Image 14 GB before, NetaYume 11.6). Fibo 2.0: the activations of an edit counted (12.1 GB planned before).', PLAN_AFTER, '7p'),
     planChart('plan-m4', 'On a 16 GB Mac: Mac mini M4', 'VulKara 0.7.11 on an Apple M4 with 16 GB (the other charts: the M2, 16 GB simulated there); from MOSS-Image on, test builds after it (MEASUREMENTS 7ah, 7ba–7bl). The plan against what the engine used, 1024 px (Fibo 768 px), with the seconds per step or per picture. Fibo 2.0 on MLX started 6.3 GB short and read 18.9 GB back from the swap: slower than on the M2 (7ba). Above their plan and open: FLUX.1 [schnell] 8 bit streamed (3.9 GB), NetaYume v4 (1.8 GB), FLUX.1 Fill (0.9 GB) (7bf, 7bj).', PLAN_M4, '7af'),
     planChart('plan-list', 'The recommended list on a 16 GB Mac', 'The models kept in the recommended list of 0.10.0, five pictures each on a Mac mini M4 with 16 GB in the app (Hardware → Benchmark, the model\'s own settings, 1024 px unless named), the highest peak of pictures 2–5 against the plan, with the time per picture. The target: at most 10 % over the plan and at most 2 GB swap added. epiCRealism XL v8, MoP Mix asap, MiaoMiao RealSkin, FLUX.1 [dev] and its Q4 missed it and left the list, Chroma1 HD too; four SD 1.5 models in 32 bit are saved in 16 bit and the SDXL single files turned into folders once, at the import or the first load (MEASUREMENTS 7cq, 7cr).', RECOMMENDED, '7cq'),
-    onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), removeTable(), facesTable(), vmTable(), intelTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
+    onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), removeTable(), facesTable(), upscaleTable(), depthTable(), ltxTable(), vmTable(), intelTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
   const tileHtml = tiles()
   const css = RULES.map((r, i) => `.bench-page .p${i}{${r}}`).join('\n') + '\n'
   const cssV = createHash('sha256').update(css).digest('hex').slice(0, 10)
