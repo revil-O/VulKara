@@ -868,7 +868,11 @@
    "noDescription": "Die Ersteller haben keine Beschreibung verfasst.",
    "aboutVersion": "Über diese Version",
    "commercialUse": "Kommerzielle Nutzung, wie die Ersteller sie erlauben: {uses}.",
-   "licence": "Lizenz: {licence}."
+   "licence": "Lizenz: {licence}.",
+   "newer": {
+    "one": "Eine neuere Version gibt es bei Civitai",
+    "other": "{n} neuere Versionen gibt es bei Civitai"
+   }
   },
   "recommended": {
    "title": "Empfohlene Einstellungen",
@@ -1059,7 +1063,14 @@
    "install": "Installieren",
    "openPage": "Seite öffnen",
    "loading": "Wird geladen …",
-   "loadMore": "Mehr laden"
+   "loadMore": "Mehr laden",
+   "version": {
+    "one": "Version ({n} bei Civitai)",
+    "other": "Version ({n} bei Civitai)"
+   },
+   "otherBase": "für eine andere Basis",
+   "versionInstalled": "installiert",
+   "otherVersionInstalled": "Installiert (andere Version)"
   }
  },
  "training": {
@@ -2044,7 +2055,8 @@
    "notReadyBuiltAny": "Ein Paket ist für diesen Mac (Apple Silicon, Python 3.11) nicht fertig gebaut verfügbar, und VulKara kompiliert keine Pakete: Versuch es später mit „Aktualisieren“ oder melde es. ({message})"
   },
   "appUpdate": {
-   "restarting": "VulKara startet für sein Update neu, sobald die Warteschlange leer ist; füge Bilder nach dem Neustart hinzu."
+   "restarting": "VulKara startet für sein Update neu, sobald die Warteschlange leer ist; füge Bilder nach dem Neustart hinzu.",
+   "waiting": "Das Update wartet auf die laufenden Arbeiten und startet VulKara dann neu; starte Neues danach oder wähle auf der Update-Karte „Nicht warten“."
   },
   "updates": {
    "notChecked": "noch nicht geprüft",

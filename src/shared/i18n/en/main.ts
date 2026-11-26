@@ -71,6 +71,7 @@ export default {
     notReadyBuiltAny: 'A package is not available ready-built for this Mac (Apple silicon, Python 3.11), and VulKara does not compile packages: try Update later, or report it. ({message})',
   },
   appUpdate: {
+    waiting: "The update waits for the running work and then restarts VulKara; start new work after it, or choose Don't wait on the update card.",
     restarting: 'VulKara restarts for its update as soon as the queue is empty; add pictures after the restart.',
   },
   updates: {

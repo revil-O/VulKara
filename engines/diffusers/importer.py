@@ -1094,7 +1094,9 @@ def import_civitai(ref, name, quant="auto", dry_run=False, force=False, token=No
         summary = {"type": "lora" if is_lora else "checkpoint", "source": "civitai",
                    "label": "%s · %s (%s)" % (c["name"], c["version_name"], c["base_model"]),
                    "arch": c["arch"], "download_gb": round(c["size_bytes"] / 1024 ** 3, 1),
-                   "file": c["file_name"], "trigger_words": c["trigger_words"], "note": c.get("note") or ""}
+                   "file": c["file_name"], "trigger_words": c["trigger_words"], "note": c.get("note") or "",
+                   "model_id": c["model_id"], "version_id": c["version_id"], "model_name": c["name"],
+                   "version_name": c["version_name"], "versions": c.get("versions") or []}
         if not is_lora and c["arch"] in registry.ARCHS:
             spec = registry.ARCHS[c["arch"]]
             # a single file: GGUF and FP8 (stored as 8 bit GGUF) take the size of the file; where it does not fit,

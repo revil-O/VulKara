@@ -18,7 +18,7 @@ import { openLink } from '../util/links'
 import { isRemote } from '../remote_vk'
 import { num, t, type PlainKey } from '../i18n'
 import type { HelperModel, ImportInfo, ImportJob, ImportRequest, PhotoTool, RecommendedTool } from '@shared/api'
-import { baseOfAsset, type FindKind } from '@shared/lora_bases'
+import { baseOfAsset, installName, type FindKind } from '@shared/lora_bases'
 import { familyTitle } from '@shared/lora_fit'
 import type { Asset } from '@shared/types'
 import { curatedDescription, helperGroup } from '../util/data_texts'
@@ -365,9 +365,22 @@ async function check(): Promise<void> {
   }
 }
 
+/** Civitai: check another version of the model (the link then names it). */
+function pickVersion(id: number): void {
+  const c = info.value?.civitai
+  if (!c || id === c.versionId) return
+  add.ref = `https://civitai.com/models/${c.modelId}?modelVersionId=${id}`
+  void check()
+}
+
 async function startImport(force = false): Promise<void> {
+  // Civitai without a name of the user's: the model's name, with the version when that name is taken (another version)
+  const c = info.value?.civitai
+  const named = c?.modelName ? installName({ title: c.modelName, version: c.versionName }, assets.all, info.value!.kind) : ''
+  const civitaiName = named && named !== c?.modelName ? named : ''
   try {
-    await imports.add({ ...request(), force }, add.name.trim() || add.file.trim().split('/').pop() || add.ref.trim().split('/').filter(Boolean).pop() || add.ref)
+    // request.name is the folder's name (the second argument only the title in the downloads)
+    await imports.add({ ...request(), force, ...(add.name.trim() || !civitaiName ? {} : { name: civitaiName }) }, add.name.trim() || civitaiName || add.file.trim().split('/').pop() || add.ref.trim().split('/').filter(Boolean).pop() || add.ref)
   } catch (err) {
     addError.value = cleanError(err)
     return
@@ -621,6 +634,14 @@ async function startImport(force = false): Promise<void> {
               <span v-if="info.gated" class="tag warn">{{ t('models.add.gated') }}</span>
               <HintBadge v-if="info.gated" start :text="t('models.add.gatedHint')" />
             </p>
+            <label v-if="info.civitai && info.civitai.versions.length > 1" class="version">
+              <span class="dim">{{ t('lora.finder.version', { n: info.civitai.versions.length }) }}</span>
+              <select :value="info.civitai.versionId" @change="pickVersion(Number(($event.target as HTMLSelectElement).value))">
+                <option v-for="v in info.civitai.versions" :key="v.id" :value="v.id" :disabled="!v.usable">
+                  {{ [v.name ?? v.id, v.baseModel, v.usable ? '' : v.reason].filter(Boolean).join(' · ') }}
+                </option>
+              </select>
+            </label>
             <p v-if="info.triggerWords?.length" class="dim">{{ t('models.add.triggerWords', { words: info.triggerWords.join(', ') }) }}</p>
             <p v-if="info.note" class="dim intro-line">{{ t('models.add.note') }} <HintBadge notice start :text="info.note" /></p>
             <p v-if="info.fits === false" class="warn-text">
@@ -653,6 +674,11 @@ section {
   gap: 8px;
 }
 
+.info .version {
+  display: grid;
+  gap: 2px;
+  max-width: 520px;
+}
 .note {
   display: flex;
   align-items: center;

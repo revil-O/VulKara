@@ -351,6 +351,10 @@ function updateStop(): void {
 
 // the update waits for the running work (updateWork): checked every 2 s
 let updateWaiting: ReturnType<typeof setInterval> | undefined
+/** No new work while an update waits for the running one: it would wait for that too, and Stop would miss it. */
+const holdForUpdate = (): void => {
+  if (updateWaiting) throw new Error(t('main.appUpdate.waiting'))
+}
 const updateState = (): AppUpdateState => ({ ...appUpdate().status(), ...(updateWaiting ? { waiting: true, work: updateWork() } : {}) })
 
 // newer versions of the runtimes' key packages: public PyPI and GitHub lists, no token is sent
@@ -471,7 +475,10 @@ export function registerIpc(): void {
   handle('runtimes:list', () => listRuntimes().map((r) => ({
     ...r, installing: installing.has(r.id) ? lastStage[r.id] ?? t('main.status.starting') : undefined, error: installError[r.id],
   })))
-  handle('runtimes:install', (id: RuntimeId) => runInstall(id))
+  handle('runtimes:install', (id: RuntimeId) => {
+    holdForUpdate()
+    return runInstall(id)
+  })
   handle('runtimes:remove', (id: RuntimeId) => {
     if (installing.has(id)) throw new Error(t('main.runtimes.beingInstalled'))
     if (busy()) throw new Error(t('main.runtimes.busyRemove'))
@@ -497,10 +504,13 @@ export function registerIpc(): void {
     stopWaiting()
     // a job queued while the update downloaded finishes first; the new version starts after the quit
     const quitWhenIdle = (): void => { if (updateWork().length) setTimeout(quitWhenIdle, 2000); else app.quit() }
-    void appUpdate().install(quitWhenIdle)
+    // also when install() does nothing (no release, one already on its way): the card leaves its waiting list
+    void appUpdate().install(quitWhenIdle).finally(() => send('app:updateChanged', updateState()))
   }
   // nothing runs: at once; else the running work back, and with 'after' or 'stop' the update waits for it to end
   handle('app:installUpdate', (mode?: unknown) => {
+    // without a newer version nothing waits and nothing is stopped
+    if (!appUpdate().status().available) return []
     if (mode === 'stop') updateStop()
     const work = updateWork()
     if (!work.length) {
@@ -530,6 +540,7 @@ export function registerIpc(): void {
   scheduleUpdateChecks()
 
   const addJob = (job: Omit<Job, 'id'>, count?: number): string[] => {
+    holdForUpdate()
     if (trainer.running) throw new Error(t('main.queue.training'))
     if (installing.size) throw new Error(t('main.queue.installing'))
     if (exporting) throw new Error(t('main.queue.exporting'))
@@ -601,6 +612,7 @@ export function registerIpc(): void {
   })
   // a model in folder layout written as one original-layout checkpoint (engines/diffusers/export_single.py)
   handle('assets:exportSingle', async (modelId: string) => {
+    holdForUpdate()
     if (exporting) throw new Error(t('main.assets.exportingAlready'))
     if (installing.size) throw new Error(t('main.assets.exportInstalling'))
     if (busy()) throw new Error(t('main.assets.exportBusy'))
@@ -612,6 +624,7 @@ export function registerIpc(): void {
       : { canceled: true, filePath: '' }
     if (res.canceled || !res.filePath) return ''
     if (exporting || installing.size || busy()) throw new Error(t('main.assets.exportStarted'))
+    holdForUpdate()  // the update may have started waiting while the save dialog was open
     const out = res.filePath
     const command = engineCommand('diffusers', ['export_single', model.folder, out])
     if (!command) throw new Error(t('main.assets.exportNeedsDiffusers'))
@@ -627,6 +640,7 @@ export function registerIpc(): void {
 
   // LoRAs baked into a new model (engines/diffusers/merge.py), run by the import queue like an import
   handle('assets:bake', (modelId: string, loras: { id: string; scale: number }[], name: string) => {
+    holdForUpdate()
     if (installing.size) throw new Error(t('main.assets.bakeInstalling'))
     if (queue.busy) throw new Error(t('main.assets.bakeBusy'))
     const all = listAssets()
@@ -655,6 +669,7 @@ export function registerIpc(): void {
   // to the Trash and it is imported again from its source under the same name (removed first: the names would collide)
   const reimporting = new Set<string>()
   handle('assets:reimport', async (id: string) => {
+    holdForUpdate()
     if (queue.busy) throw new Error(t('main.assets.reimportBusy'))
     if (installing.size) throw new Error(t('main.assets.importInstalling'))
     const model = listAssets().find((a) => a.type === 'model' && a.id === String(id))
@@ -684,6 +699,7 @@ export function registerIpc(): void {
         throw new Error(t('main.assets.tooLittleRam', { title: model.title, need: info.minRamGb ?? '?', have: macModel().ramGb }))
       }
       if (queue.busy || installing.size) throw new Error(t('main.assets.reimportStarted'))
+      holdForUpdate()  // before the model goes to the Trash: the update may have started waiting during the dry run
       stopEngines()  // an engine may hold files of the model open
       await removeAsset(model.id, (path) => shell.trashItem(path))
       send('assets:change')
@@ -708,6 +724,7 @@ export function registerIpc(): void {
   }
   handle('imports:inspect', (req: ImportRequest) => imports.inspect(checked(req)))
   handle('imports:add', (req: ImportRequest, title: string) => {
+    holdForUpdate()
     if (installing.size) throw new Error(t('main.assets.importInstalling'))
     const clean = checked(req)
     return imports.add(clean, publicRef(String(title || clean.ref)))
@@ -722,6 +739,7 @@ export function registerIpc(): void {
   // helper models (Models → Installed → Helper models)
   handle('helpers:list', () => listHelpers(enginesDir(), helpersDir()))
   handle('helpers:install', (id: string) => {
+    holdForUpdate()
     if (installing.size) throw new Error(t('main.helpers.installing'))
     const h = listHelpers(enginesDir(), helpersDir()).find((x) => x.id === id)
     if (!h) throw new Error(t('main.helpers.unknown'))
@@ -743,18 +761,21 @@ export function registerIpc(): void {
   const toolsDir = (): string => join(helpersDir(), 'photo_tools')
   handle('tools:list', () => ({ installed: installedTools(toolsDir()), recommended: recommendedTools(enginesDir(), toolsDir()) }))
   handle('tools:install', (id: string) => {
+    holdForUpdate()
     if (installing.size) throw new Error(t('main.tools.installing'))
     const tool = recommendedTools(enginesDir(), toolsDir()).find((r) => r.id === id)
     if (!tool) throw new Error(t('main.tools.unknown'))
     return imports.add({ source: 'tool', ref: tool.id, quant: 'auto' }, tool.name)
   })
   handle('tools:importFile', async () => {
+    holdForUpdate()
     if (!win) return undefined
     if (installing.size) throw new Error(t('main.assets.importInstalling'))
     const res = await dialog.showOpenDialog(win, {
       properties: ['openFile'], filters: [{ name: t('main.dialogs.photoModels'), extensions: ['pth', 'pt', 'safetensors', 'onnx'] }],
     })
     if (res.canceled || !res.filePaths[0]) return undefined
+    holdForUpdate()  // the update may have started waiting while the open dialog was open
     return imports.add({ source: 'toolfile', ref: res.filePaths[0], quant: 'auto' }, basename(res.filePaths[0]))
   })
   handle('tools:remove', async (folder: string) => {
@@ -947,15 +968,23 @@ export function registerIpc(): void {
   const readLicence = (folder: string, manifest: string) =>
     fetchLicence(folder, manifest, (url, headers) => fetchPage(url, headers, false), tokens(), getSettings().hashLookups)
   handle('loras:details', (id: string) => loraDetails(loraFolder(String(id))))
+  // a Civitai LoRA's page is read again once per session, so that a newer version of it shows (LoraInfo.newer)
+  const infoChecked = new Set<string>()
   handle('loras:info', async (id: string, refresh?: boolean) => {
     const folder = loraFolder(String(id))
     const cached = cachedInfo(folder)
-    if (cached && !refresh) return cached
-    return fetchInfo(folder, async (url, headers) => {
-      const text = await fetchPage(url, headers, true)
-      if (text === undefined) throw new Error(t('main.fetch.loraGone'))
-      return text
-    }, tokens(), !getSettings().allowExplicit)
+    if (cached && !refresh && (cached.source !== 'civitai' || infoChecked.has(folder))) return cached
+    infoChecked.add(folder)
+    try {
+      return await fetchInfo(folder, async (url, headers) => {
+        const text = await fetchPage(url, headers, true)
+        if (text === undefined) throw new Error(t('main.fetch.loraGone'))
+        return text
+      }, tokens(), !getSettings().allowExplicit)
+    } catch (err) {
+      if (cached && !refresh) return cached  // offline: what was read before
+      throw err
+    }
   })
   handle('loras:setTriggerWords', (id: string, words: string[]) => {
     const saved = setTriggerWords(loraFolder(String(id)), Array.isArray(words) ? words : [])
@@ -975,6 +1004,7 @@ export function registerIpc(): void {
   handle('loras:thumb', (url: string) => previewPicture(String(url ?? ''), { fetcher: publicFetch, safe: !getSettings().allowExplicit }))
   handle('training:state', () => trainer.state())
   handle('training:start', (request: TrainingRequest) => {
+    holdForUpdate()
     if (queue.busy) throw new Error(t('main.training.queueBusy'))
     const foreign = typeof request?.baseModel === 'string' ? foreignRefusalOf(request.baseModel) : undefined
     if (foreign) throw new Error(foreign)
@@ -1005,6 +1035,7 @@ export function registerIpc(): void {
   })
 
   handle('caption:image', async (path: string) => {
+    holdForUpdate()
     if (typeof path !== 'string' || !isAbsolute(path) || !/\.(png|jpe?g|webp|bmp|tiff?|heic)$/i.test(path) || !existsSync(path)) throw new Error(t('main.files.choosePicture'))
     fileAccess.check(path)
     if (busy() || captioning) throw new Error(t('main.caption.busy'))
@@ -1102,6 +1133,9 @@ export function bindWindow(w: BrowserWindow): void {
 }
 
 export function shutdown(): void {
+  // a waiting update must not start its download while the app quits
+  clearInterval(updateWaiting)
+  updateWaiting = undefined
   exporting?.kill()
   monitor.stop()
   trainer.stop()

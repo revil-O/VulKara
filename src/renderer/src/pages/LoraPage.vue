@@ -8,6 +8,8 @@ import PageFrame from '../components/PageFrame.vue'
 import JobGallery from '../components/JobGallery.vue'
 import BakeDialog from '../components/BakeDialog.vue'
 import { useAssetsStore } from '../stores/assets'
+import { useImportsStore } from '../stores/imports'
+import { installName, isInstalled } from '@shared/lora_bases'
 import { useHandoffStore } from '../stores/handoff'
 import { useQueueStore } from '../stores/queue'
 import { cleanError } from '../stores/runtimes'
@@ -99,6 +101,23 @@ async function loadInfo(refresh = false): Promise<void> {
     infoState.value = ''
   }
 }
+
+const imports = useImportsStore()
+const newerError = ref('')
+/** A newer Civitai version of the selected LoRA, installed beside it (its name gets the version). */
+async function installNewer(n: NonNullable<LoraInfo['newer']>[number]): Promise<void> {
+  newerError.value = ''
+  try {
+    await imports.start()
+    const title = info.value?.name ?? current.value?.title ?? 'LoRA'
+    const name = installName({ title, version: n.name }, assets.all)
+    await imports.add({ source: 'civitai', ref: n.ref, ...(name !== title ? { name } : {}) }, name)
+  } catch (err) {
+    newerError.value = cleanError(err)
+  }
+}
+const newerState = (ref: string): 'installed' | 'running' | '' => isInstalled({ source: 'civitai', ref }, assets.all) ? 'installed'
+  : imports.of({ source: 'civitai', ref }) && imports.of({ source: 'civitai', ref })!.state !== 'done' && imports.of({ source: 'civitai', ref })!.state !== 'failed' ? 'running' : ''
 
 /** Tries a prompt of the makers in the comparison, with the strength they used. */
 function tryExample(example: LoraExample): void {
@@ -386,6 +405,16 @@ onActivated(refresh)
               {{ info.source === 'civitai' ? 'Civitai' : 'Hugging Face' }}<template v-if="info.creator"> · {{ t('lora.info.by', { creator: info.creator }) }}</template><template v-if="info.version"> · {{ info.version }}</template>
               · {{ t('lora.info.readOn', { date: new Date(info.fetchedAt).toLocaleDateString(dateLocale()) }) }}
             </small>
+            <div v-if="info.newer?.length" class="newer">
+              <small><strong>{{ t('lora.info.newer', { n: info.newer.length }) }}</strong></small>
+              <div v-for="n in info.newer" :key="n.ref" class="newer-row">
+                <small>{{ [n.name, n.baseModel, n.date].filter(Boolean).join(' · ') }}</small>
+                <small v-if="newerState(n.ref) === 'installed'" class="dim">{{ t('lora.finder.installed') }}</small>
+                <small v-else-if="newerState(n.ref) === 'running'" class="dim">{{ t('lora.finder.waiting') }}</small>
+                <button v-else class="btn small" @click="installNewer(n)">{{ t('lora.finder.install') }}</button>
+              </div>
+              <small v-if="newerError" class="error selectable">{{ newerError }}</small>
+            </div>
             <div v-if="info.tags.length" class="words"><span v-for="tag in info.tags" :key="tag" class="word tag">{{ tag }}</span></div>
             <div v-if="info.description.length" class="text selectable" :class="{ clamped: !wholeDescription }">
               <p v-for="(para, i) in info.description" :key="i">{{ para }}</p>
@@ -507,6 +536,20 @@ onActivated(refresh)
   margin: -10px 0 4px;
   padding: 10px 0;
   background: var(--bg);
+}
+
+.newer {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+.newer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .chips,

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
 import { describe, expect, it } from 'vitest'
-import { LORA_BASES, baseOfAsset, baseOfCivitai, baseOfModel, isInstalled } from './lora_bases'
+import { LORA_BASES, baseOfAsset, baseOfCivitai, baseOfModel, installName, isInstalled, withVersion, type LoraHit } from './lora_bases'
 import type { Asset } from './types'
 
 const model = (arch: string, family: string, extra: Partial<Asset> = {}): Asset => ({
   id: 'model:' + arch, title: arch, name: arch, folder: '/m/' + arch, type: 'model',
   meta: { arch, family, label: arch, runtime: 'diffusers', kind: 'image' }, ...extra,
 })
-const lora = (source: Asset['source'] & Record<string, unknown>): Asset => ({
-  id: 'lora:x', title: 'x', name: 'x', folder: '/l/x', type: 'lora', meta: { arch: '', family: 'sdxl', label: '', runtime: 'diffusers', kind: 'image' }, source,
+const lora = (source: Asset['source'] & Record<string, unknown>, name = 'x'): Asset => ({
+  id: 'lora:x', title: name, name, folder: '/l/' + name, type: 'lora', meta: { arch: '', family: 'sdxl', label: '', runtime: 'diffusers', kind: 'image' }, source,
 })
 
 describe('the bases LoRAs are made for', () => {
@@ -70,12 +70,31 @@ describe('the bases LoRAs are made for', () => {
       lora({ type: 'civitai', ref: 'https://civitai.com/models/58390?modelVersionId=62833', model_id: 58390 }),
       lora({ type: 'hf', ref: 'ByteDance/Hyper-SD', file: 'Hyper-SDXL-8steps-lora.safetensors' }),
     ]
-    expect(isInstalled({ source: 'civitai', ref: 'https://civitai.com/models/58390?modelVersionId=99' }, assets)).toBe(true)
+    // one version of a model: that version is installed, another one is not; a hit naming no version takes any
+    expect(isInstalled({ source: 'civitai', ref: 'https://civitai.com/models/58390?modelVersionId=62833' }, assets)).toBe(true)
+    expect(isInstalled({ source: 'civitai', ref: 'https://civitai.com/models/58390?modelVersionId=99' }, assets)).toBe(false)
+    expect(isInstalled({ source: 'civitai', ref: 'https://civitai.com/models/58390' }, assets)).toBe(true)
+    // an older import with the version only in its manifest's version_id
+    const byId = [lora({ type: 'civitai', ref: 'https://civitai.com/models/7', model_id: 7, version_id: 70 })]
+    expect(isInstalled({ source: 'civitai', ref: 'https://civitai.com/models/7?modelVersionId=70' }, byId)).toBe(true)
+    expect(isInstalled({ source: 'civitai', ref: 'https://civitai.com/models/7?modelVersionId=71' }, byId)).toBe(false)
+    // the recommended list names one version: another one installed counts
+    expect(isInstalled({ source: 'civitai', ref: 'https://civitai.com/models/7?modelVersionId=71', anyVersion: true }, byId)).toBe(true)
     expect(isInstalled({ source: 'civitai', ref: 'https://civitai.com/models/5839' }, assets)).toBe(false)
     expect(isInstalled({ source: 'hf', ref: 'ByteDance/Hyper-SD', file: 'Hyper-SDXL-8steps-lora.safetensors' }, assets)).toBe(true)
     expect(isInstalled({ source: 'hf', ref: 'ByteDance/Hyper-SD', file: 'Hyper-FLUX.1-dev-8steps-lora.safetensors' }, assets)).toBe(false)
     expect(isInstalled({ source: 'hf', ref: 'other/repo', file: 'a.safetensors' }, assets)).toBe(false)
     // a model is not a LoRA
     expect(isInstalled({ source: 'hf', ref: 'a/b' }, [model('sdxl', 'sdxl', { source: { type: 'hf', ref: 'a/b' } })])).toBe(false)
+  })
+
+  it('shows a hit as another version and names a second version beside the first', () => {
+    const hit: LoraHit = { source: 'civitai', ref: 'r1', page: 'r1', title: 'Film Grain', version: 'v1', triggerWords: ['a'], nsfw: false, installed: false, previewUrl: 'p1' }
+    const v2 = withVersion(hit, { id: 2, ref: 'r2', name: 'v2', baseModel: 'SDXL 1.0', fits: true, triggerWords: ['b'], sizeMb: 20 })
+    expect([v2.ref, v2.page, v2.version, v2.triggerWords, v2.sizeMb, v2.previewUrl]).toEqual(['r2', 'r2', 'v2', ['b'], 20, 'p1'])
+    const have = [lora({ type: 'civitai', ref: 'r1' }, 'Film_Grain')]
+    expect(installName(v2, [])).toBe('Film Grain')
+    expect(installName(v2, have)).toBe('Film Grain (v2)')
+    expect(installName({ title: 'Film Grain' }, have)).toBe('Film Grain')  // no version to tell them apart: the importer refuses
   })
 })

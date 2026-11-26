@@ -6,7 +6,7 @@
 // page as data URLs, since the page itself loads nothing from the internet.
 
 import { TERMS } from '@shared/licence_terms'
-import { LORA_BASES, isInstalled, loraBase, type FindKind, type LoraBase, type LoraHit, type LoraSearchPage, type LoraSearchRequest } from '@shared/lora_bases'
+import { LORA_BASES, isInstalled, loraBase, withVersion, type FindKind, type LoraBase, type LoraHit, type LoraSearchPage, type LoraSearchRequest, type LoraVersion } from '@shared/lora_bases'
 import type { Asset } from '@shared/types'
 import { mainLanguage, t } from './i18n'
 
@@ -114,37 +114,47 @@ export function parseCivitai(body: Raw, base: LoraBase, safe: boolean, assets: A
     if (!id || !CIVITAI_TYPES[kind].includes(type)) continue
     const nsfw = civitaiAdult(model)
     if (safe && nsfw) continue
-    // the newest version made for this base (any base: the newest), with a SafeTensor file
-    const versions = list(model.modelVersions) as Raw[]
-    const version = versions.find((v) => (!base.civitai.length || base.civitai.includes(String(v.baseModel))) && hasSafetensors(v))
+    // every version with a SafeTensor file (newest first); shown: the newest made for this base (any base: the newest)
+    const versions = (list(model.modelVersions) as Raw[]).filter(hasSafetensors).map((v) => civitaiVersion(id, v, base, safe))
+      .filter((v): v is LoraVersion => !!v)
+    const version = versions.find((v) => v.fits)
     if (!version) continue
-    const versionId = num(version.id)
-    const file = (list(version.files) as Raw[]).find((f) => f.primary === true && isSafetensors(f)) ?? (list(version.files) as Raw[]).find(isSafetensors)
-    const image = (list(version.images) as Raw[]).find((i) => (i.type ?? 'image') === 'image' && typeof i.url === 'string'
-      && (!safe || (num(i.nsfwLevel) ?? 1) <= 2))
-    const imageLevel = image ? num(image.nsfwLevel) ?? 1 : 0
-    const page = `https://civitai.com/models/${id}${versionId ? `?modelVersionId=${versionId}` : ''}`
-    const hit: LoraHit = {
-      source: 'civitai', ref: page, page,
-      title: str(model.name) ?? t('main.loras.model', { id }), version: str(version.name),
+    const hit: LoraHit = withVersion({
+      source: 'civitai', ref: version.ref, page: version.ref,
+      title: str(model.name) ?? t('main.loras.model', { id }),
       author: str((model.creator as Raw | undefined)?.username),
-      baseModel: str(version.baseModel),
       downloads: num((model.stats as Raw | undefined)?.downloadCount),
       likes: num((model.stats as Raw | undefined)?.thumbsUpCount),
-      triggerWords: [...new Set(list(version.trainedWords).flatMap((w) => String(w).split(',')).map((w) => w.trim()).filter(Boolean))].slice(0, 12),
-      sizeMb: file && num(file.sizeKB) ? Math.round(num(file.sizeKB)! / 1024) : undefined,
-      previewUrl: image ? civitaiThumb(String(image.url)) : undefined,
-      previewExplicit: image ? imageLevel > 2 : undefined,
-      nsfw,
+      triggerWords: [], nsfw,
       licence: civitaiLicence(model),
-      needsToken: version.availability !== undefined && version.availability !== 'Public',
       installed: false,
-    }
+      versions: versions.length > 1 ? versions : undefined,
+    }, version)
     hit.installed = isInstalled(hit, assets, kind)
     hits.push(hit)
   }
   const next = str((body.metadata as Raw | undefined)?.nextCursor)
   return { hits, cursor: next ? encodeCursor({ i: 0, c: next }) : undefined }
+}
+
+/** One Civitai version as a card shows it; fits: made for the base searched for (any base: always). */
+function civitaiVersion(model: number, v: Raw, base: LoraBase, safe: boolean): LoraVersion | undefined {
+  const id = num(v.id)
+  if (!id) return undefined
+  const files = list(v.files) as Raw[]
+  const file = files.find((f) => f.primary === true && isSafetensors(f)) ?? files.find(isSafetensors)
+  const image = (list(v.images) as Raw[]).find((i) => (i.type ?? 'image') === 'image' && typeof i.url === 'string'
+    && (!safe || (num(i.nsfwLevel) ?? 1) <= 2))
+  return {
+    id, ref: `https://civitai.com/models/${model}?modelVersionId=${id}`, name: str(v.name), baseModel: str(v.baseModel),
+    fits: !base.civitai.length || base.civitai.includes(String(v.baseModel)),
+    createdAt: str(v.publishedAt) ?? str(v.createdAt),
+    sizeMb: file && num(file.sizeKB) ? Math.round(num(file.sizeKB)! / 1024) : undefined,
+    triggerWords: [...new Set(list(v.trainedWords).flatMap((w) => String(w).split(',')).map((w) => w.trim()).filter(Boolean))].slice(0, 12),
+    previewUrl: image ? civitaiThumb(String(image.url)) : undefined,
+    previewExplicit: image ? (num(image.nsfwLevel) ?? 1) > 2 : undefined,
+    needsToken: v.availability !== undefined && v.availability !== 'Public',
+  }
 }
 
 const isSafetensors = (f: Raw): boolean => ((f.metadata as Raw | undefined)?.format === 'SafeTensor' || /\.safetensors$/i.test(String(f.name ?? '')))
@@ -337,7 +347,11 @@ export async function searchLoras(req: LoraSearchRequest, opts: { fetcher: Fetch
   }
   // installed may have changed since the answer was kept
   const hits = page.hits.map((h) => ({ ...h, installed: isInstalled(h, opts.assets, kind) }))
-  for (const h of hits) if (h.previewUrl) issued.set(h.previewUrl, !!h.previewExplicit)
+  for (const h of hits) {
+    if (h.previewUrl) issued.set(h.previewUrl, !!h.previewExplicit)
+    // the other Civitai versions' pictures, shown when one is picked on the card
+    for (const v of h.versions ?? []) if (v.previewUrl) issued.set(v.previewUrl, !!v.previewExplicit)
+  }
   return { hits, cursor: page.cursor }
 }
 

@@ -251,6 +251,8 @@ export interface LoraInfo {
     examples: number
   }
   examples: LoraExample[]
+  /** Civitai: versions newer than this one for the same base, with a SafeTensor file (newest first) */
+  newer?: { name?: string; ref: string; baseModel?: string; date?: string }[]
   /** what the makers allow commercially, in the words of Civitai */
   commercialUse?: string[]
   licence?: string
@@ -526,6 +528,9 @@ export interface ImportInfo {
   inPlace: boolean
   note?: string
   triggerWords?: string[]
+  /** Civitai: the model, the version checked and every version of it (newest first), to choose another */
+  civitai?: { modelId: number; versionId: number; modelName?: string; versionName?: string
+    versions: { id: number; name?: string; baseModel?: string; usable: boolean; reason?: string }[] }
 }
 
 export interface ImportJob {

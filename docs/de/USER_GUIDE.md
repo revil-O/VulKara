@@ -734,6 +734,7 @@ FLUX.2, FLUX 3, Krea 2 …). Du kannst sie nach Familie filtern und ihre Namen, 
 - **Von der Seite**: was die Ersteller der LoRA auf Civitai oder Hugging Face geschrieben haben: Beschreibung, Tags,
   Versionshinweise, Lizenz und kommerzielle Nutzung. Es wird einmal gelesen, zwischengespeichert und lässt sich mit der
   Pfeiltaste aktualisieren.
+- **Eine neuere Version**: Bei einer LoRA von Civitai sagt die Seite, wenn es neuere Versionen für dieselbe Basis gibt (sie fragt Civitai einmal pro Sitzung); **Installieren** legt eine davon neben die LoRA, mit der Version im Namen.
 - **Empfohlene Einstellungen**: Stärke, Schritte, Guidance, Sampler und Clip Skip, wie von den Erstellern angegeben oder
   aus ihren Beispielbildern ermittelt.
 - **Prompts der Ersteller**: Beispiel-Prompts. **Ausprobieren** öffnet sie im Stärkenvergleich.
@@ -967,7 +968,7 @@ das Suchfeld (Return) grenzt die Liste ein.
 
 Jede Karte zeigt eine Vorschau, die Ersteller, die Basis, Downloads, Likes, Trigger-Wörter, die Größe und eine Zeile
 zur Lizenz. **Installieren** legt die LoRA in die Downloads oben auf der Seite; danach erscheint sie unter LoRAs und auf
-der Seite LoRA. Bei einem Hugging-Face-Repository mit mehreren Dateien wählt das Menü auf der Karte die Datei. Manche
+der Seite LoRA. Bei einem Hugging-Face-Repository mit mehreren Dateien wählt das Menü auf der Karte die Datei. Bei einer Civitai-LoRA oder einem Civitai-Modell mit mehreren Versionen wählt das Menü **Version** eine aus (Name, Basis, Datum; *für eine andere Basis*, *installiert*); Bild, Triggerwörter und Größe folgen der Wahl. Eine zweite Version von etwas Installiertem kommt daneben, mit der Version im Namen. Manche
 LoRAs brauchen ein Zugriffstoken oder eine auf ihrer Seite akzeptierte Lizenz; die Karte sagt es dann. Der Pfeil öffnet
 die Seite der LoRA im Browser.
 
@@ -1032,6 +1033,8 @@ und die Trigger-Wörter einer LoRA. Ein Hugging-Face-Repository ohne vollständi
 Einzeldateien wie GGUF-Quantisierungen) antwortet mit der Liste seiner Modelldateien und ihrer Größen; ein Klick auf eine
 Datei prüft diese. **Herunterladen** (Hugging Face, Civitai) oder **Importieren** (Datei, Ordner) startet es dann; das
 Namensfeld und das Komprimierungsmenü daneben sind optional.
+
+Bei einem Civitai-Link nennt die Prüfung auch die Versionen des Modells: Das Menü prüft eine andere, Versionen, die dieser Mac nicht ausführen kann, sind ausgegraut und nennen den Grund.
 
 **Von einer Hugging-Face-Seite**: Ein Link `vulkara://import/hf?repo=besitzer/name` (ab 0.11.0, z. B. „Use this
 model“ auf Hugging Face, sobald VulKara dort gelistet ist) öffnet Hinzufügen mit eingetragenem Repository und prüft
@@ -1218,7 +1221,7 @@ Die Titelzeile jeder Seite zeigt die Version (*v0.7.9*, ein Klick öffnet die Ä
 *Update auf Version … vorhanden!*: ein Klick holt die Karte zurück.
 Läuft noch etwas (Bilder, Downloads, ein Training, eine
 Laufzeit-Installation, eine Bildbeschreibung oder ein Modell-Export), nennt die Karte es und bietet **Danach
-aktualisieren** (VulKara aktualisiert und startet neu, sobald es fertig ist; **Nicht warten** nimmt das zurück) oder
+aktualisieren** (VulKara aktualisiert und startet neu, sobald es fertig ist; **Nicht warten** nimmt das zurück; solange startet nichts Neues) oder
 **Abbrechen und jetzt aktualisieren** (fragt vorher; eine Laufzeit, die gerade installiert wird, läuft noch zu Ende).
 Aktualisiert wird nur eine App in einem Ordner, in den sie
 schreiben darf (in Programme, nicht aus dem Disk-Image gestartet). Mit Homebrew installiert? Das geht genauso;

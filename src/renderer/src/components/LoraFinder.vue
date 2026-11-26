@@ -10,7 +10,7 @@ import { cleanError } from '../stores/runtimes'
 import { useSettingsStore } from '../stores/settings'
 import { curatedHits } from '../util/curated'
 import { openLink } from '../util/links'
-import { BASE_GROUPS, isInstalled, loraBase, type FindKind, type LoraHit } from '@shared/lora_bases'
+import { BASE_GROUPS, installName, isInstalled, loraBase, withVersion, type FindKind, type LoraHit, type LoraVersion } from '@shared/lora_bases'
 import type { ImportInfo, ImportJob, ImportRequest } from '@shared/api'
 import { num, t } from '../i18n'
 
@@ -122,7 +122,9 @@ async function loadPlans(list: LoraHit[], id: number): Promise<void> {
 
 const fileOf = (h: LoraHit): string | undefined => chosen[h.ref] ?? h.file
 const requestOf = (h: LoraHit): ImportRequest => h.source === 'hf' ? { source: 'hf', ref: h.ref, file: fileOf(h) } : { source: 'civitai', ref: h.ref }
-const installed = (h: LoraHit): boolean => isInstalled({ source: h.source, ref: h.ref, file: fileOf(h) }, assets.all, props.kind)
+const installed = (h: LoraHit): boolean => isInstalled({ source: h.source, ref: h.ref, file: fileOf(h), anyVersion: h.recommended }, assets.all, props.kind)
+// a model of the recommended list that is installed in another version than the list names
+const otherVersion = (h: LoraHit): boolean => !!h.recommended && h.source === 'civitai' && !isInstalled({ source: h.source, ref: h.ref }, assets.all, props.kind)
 
 function jobOf(h: LoraHit): ImportJob | undefined {
   const job = imports.of(requestOf(h))
@@ -139,10 +141,31 @@ function tokenMissing(h: LoraHit): string {
 async function install(h: LoraHit): Promise<void> {
   installError.value = ''
   try {
-    await imports.add(requestOf(h), h.title)
+    // a second version of a LoRA that is installed already gets its version in the name, beside the first
+    // (request.name is the folder's name; the second argument only the title in the downloads)
+    const name = installName(h, assets.all, props.kind)
+    await imports.add({ ...requestOf(h), ...(name !== h.title ? { name } : {}) }, name)
   } catch (err) {
     installError.value = cleanError(err)
   }
+}
+
+/** Civitai: the card shows another version (picture, trigger words, size, what Install takes). */
+function pickVersion(h: LoraHit, ref: string): void {
+  const v = h.versions?.find((x) => x.ref === ref)
+  const i = hits.value.indexOf(h)
+  if (!v || i < 0) return
+  const shown = withVersion(h, v)
+  hits.value[i] = shown
+  void loadThumbs([shown], run)
+  if (props.kind === 'model') void loadPlans([shown], run)
+}
+
+function versionLabel(v: LoraVersion): string {
+  const parts = [v.name ?? String(v.id), v.baseModel, v.createdAt?.slice(0, 10)].filter(Boolean)
+  if (!v.fits) parts.push(t('lora.finder.otherBase'))
+  if (isInstalled({ source: 'civitai', ref: v.ref }, assets.all, props.kind)) parts.push(t('lora.finder.versionInstalled'))
+  return parts.join(' · ')
 }
 
 function count(n: number | undefined): string {
@@ -248,6 +271,12 @@ function close(): void {
               <select v-if="h.files && h.files.length > 1" v-model="chosen[h.ref]" class="file" :title="t('lora.finder.fileHint')">
                 <option v-for="f in h.files" :key="f" :value="f">{{ f }}</option>
               </select>
+              <label v-if="h.versions" class="version">
+                <span class="dim small">{{ t('lora.finder.version', { n: h.versions.length }) }}</span>
+                <select :value="h.ref" class="file" @change="pickVersion(h, ($event.target as HTMLSelectElement).value)">
+                  <option v-for="v in h.versions" :key="v.id" :value="v.ref">{{ versionLabel(v) }}</option>
+                </select>
+              </label>
               <p v-if="!installed(h) && plans[key(h)]?.fits === false" class="warn-text small">{{ t('models.recommended.tooLittleMemory') }}</p>
               <p v-if="!installed(h) && refused[key(h)]" class="warn-text small selectable clip">{{ refused[key(h)] }}</p>
               <p v-if="!installed(h) && tokenMissing(h)" class="warn-text small">{{ tokenMissing(h) }}</p>
@@ -263,7 +292,7 @@ function close(): void {
                 <p v-else-if="jobOf(h)!.state === 'waiting'" class="dim small">{{ t('lora.finder.waiting') }}</p>
               </template>
               <div class="row">
-                <span v-if="installed(h)" class="installed"><Check :size="14" /> {{ t('lora.finder.installed') }}</span>
+                <span v-if="installed(h)" class="installed"><Check :size="14" /> {{ otherVersion(h) ? t('lora.finder.otherVersionInstalled') : t('lora.finder.installed') }}</span>
                 <button v-else-if="jobOf(h) && (jobOf(h)!.state === 'running' || jobOf(h)!.state === 'waiting')" class="btn small danger" @click="imports.cancel(jobOf(h)!.id)">
                   <Square :size="11" /> {{ t('lora.finder.cancel') }}
                 </button>
@@ -476,6 +505,10 @@ header {
   height: 26px;
   font-size: 12px;
   max-width: 100%;
+}
+.version {
+  display: grid;
+  gap: 2px;
 }
 
 .bar {

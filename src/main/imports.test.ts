@@ -76,6 +76,12 @@ describe('imports', () => {
     expect(toInfo({ type: 'lora', label: 'Style (SDXL)', download_gb: 0.2, trigger_words: ['styl3'], plan: { quant: { transformer: 'q8' } } }))
       .toMatchObject({ kind: 'lora', triggerWords: ['styl3'], quant: 'q8' })
     expect(toInfo({ label: 'FLUX.1', plan: { fits: true, streamed: true, min_ram_gb: 14 } })).toMatchObject({ streamed: true, minRamGb: 14 })
+    // Civitai: the versions of the model to choose another
+    expect(toInfo({ type: 'lora', source: 'civitai', model_id: 7, version_id: 71, model_name: 'Grain', version_name: 'v2',
+      versions: [{ id: 71, name: 'v2', base_model: 'SDXL 1.0', usable: true, reason: '' }, { id: 70, name: 'v1', usable: false, reason: 'only a .pt file' }, { name: 'no id' }] }).civitai)
+      .toEqual({ modelId: 7, versionId: 71, modelName: 'Grain', versionName: 'v2', versions: [
+        { id: 71, name: 'v2', baseModel: 'SDXL 1.0', usable: true, reason: undefined }, { id: 70, name: 'v1', baseModel: undefined, usable: false, reason: 'only a .pt file' }] })
+    expect(toInfo({ type: 'lora', source: 'hf' }).civitai).toBeUndefined()
     const { queue, runs } = setup()
     const info = queue.inspect(REQ)
     expect(runs[0].dryRun).toBe(true)

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.2 – 2026-11-26
+
+- **Fixes to the update that waits for running work (from 0.11.1).** While the update waits, no new work starts (it
+  would have waited for that too, and Stop would have missed it); a model export stopped for the update no longer
+  leaves its half-written file of several GB behind; the card leaves its waiting list when the update can not start;
+  without a newer version nothing is stopped; quitting the app while it waits no longer starts the download.
+- **Civitai versions of LoRAs and models.** A LoRA or model on Civitai often has several versions (for other bases,
+  or newer training). The search card now has a **Version** menu (name, base, date, whether it is installed); picture,
+  trigger words and size follow it, and Install takes that version. A second version of one that is installed goes
+  beside it with its version in the name instead of failing with "already exists". A Civitai link without a version
+  lists them when checked, with the reason for those this Mac can not run. The LoRA page tells when Civitai has a newer
+  version for the same base (asked once per session) and installs it beside the old one.
 ## 0.11.1 – 2026-11-26
 
 - **The update waits for running work, or stops it when you say so.** Update and restart used to refuse while pictures

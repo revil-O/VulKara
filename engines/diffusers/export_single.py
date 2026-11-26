@@ -13,6 +13,7 @@ prints __progress__ lines and one __exported__ {"file": …, "gb": …} or __err
 import json
 import os
 import re
+import signal
 import sys
 
 import compat
@@ -203,7 +204,15 @@ def export(model_folder, out_path, report=None):
     return os.path.getsize(out_path) / 1e9
 
 
+def stop_on_sigterm():
+    """The app stops an export with SIGTERM (Stop, or an update that stops the running work): as SystemExit, so that
+    export() still removes its half-written .part file of several GB."""
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+
+
 def main(argv):
+    stop_on_sigterm()
+
     def report(stage, pct):
         print("__progress__ " + json.dumps({"stage": stage, "progress": pct}), flush=True)
 

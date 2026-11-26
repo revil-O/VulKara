@@ -101,3 +101,28 @@ def test_text_encoder_keys_get_text_model_in_front_when_transformers_left_it_out
         {"text_model.embeddings.position_embedding.weight", "text_projection.weight"}
     kept = {"text_model.embeddings.position_embedding.weight": t}
     assert ex.clip_keys(kept) is kept
+
+
+def test_a_stopped_export_leaves_no_part_file(tmp_path, monkeypatch):
+    import os
+    import signal
+    from safetensors.torch import save_file
+    w = tmp_path / "weights"
+    for comp in ("unet", "vae", "text_encoder"):
+        (w / comp).mkdir(parents=True)
+        save_file({"text_model.x" if comp.startswith("text") else "x": torch.ones(2)}, str(w / comp / "model.safetensors"))
+    (tmp_path / "model.json").write_text(json.dumps({"family": "sd1", "layout": "repo", "weights_dir": "weights"}))
+    out = tmp_path / "x.safetensors"
+
+    def stopped_while_writing(state, path, metadata=None):
+        open(path, "wb").write(b"half")
+        os.kill(os.getpid(), signal.SIGTERM)  # the app's kill() while the file is written
+    monkeypatch.setattr("safetensors.torch.save_file", stopped_while_writing)
+    old = signal.getsignal(signal.SIGTERM)
+    try:
+        ex.stop_on_sigterm()
+        with pytest.raises(SystemExit):
+            ex.export(str(tmp_path), str(out))
+    finally:
+        signal.signal(signal.SIGTERM, old)
+    assert not out.exists() and not (tmp_path / "x.safetensors.part").exists()

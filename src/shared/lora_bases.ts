@@ -149,6 +149,25 @@ export interface LoraHit {
   installed: boolean
   /** a model of the recommended list (shown first in the model finder) */
   recommended?: boolean
+  /** Civitai: the versions with a SafeTensor file, newest first; the hit shows the one picked (withVersion) */
+  versions?: LoraVersion[]
+}
+
+/** One Civitai version of a LoRA or model, as the search names it. */
+export interface LoraVersion {
+  id: number
+  /** the Civitai page with modelVersionId: what the import takes */
+  ref: string
+  name?: string
+  baseModel?: string
+  /** made for the base searched for (any base: always) */
+  fits: boolean
+  createdAt?: string
+  sizeMb?: number
+  triggerWords: string[]
+  previewUrl?: string
+  previewExplicit?: boolean
+  needsToken?: boolean
 }
 
 export interface LoraSearchRequest {
@@ -169,16 +188,39 @@ export interface LoraSearchPage {
 
 type Raw = Record<string, unknown>
 const civitaiId = (ref: string): string | undefined => /civitai\.com\/models\/(\d+)/.exec(ref)?.[1]
+const civitaiVersion = (ref: string): string | undefined => /[?&]modelVersionId=(\d+)/.exec(ref)?.[1]
 
-/** Whether a LoRA (or model) found online is installed: the same Civitai model, or the same file of a Hugging Face repository. */
-export function isInstalled(hit: Pick<LoraHit, 'source' | 'ref' | 'file'>, assets: Asset[], kind: FindKind = 'lora'): boolean {
+/** Whether a LoRA (or model) found online is installed: the same Civitai model (and version, when both name one), or
+ *  the same file of a Hugging Face repository. */
+export function isInstalled(hit: Pick<LoraHit, 'source' | 'ref' | 'file'> & { anyVersion?: boolean }, assets: Asset[], kind: FindKind = 'lora'): boolean {
   return assets.some((a) => {
     if (a.type !== kind || !a.source) return false
     if (hit.source === 'civitai') {
       const id = civitaiId(hit.ref)
       const own = (a.source as Raw).model_id
-      return a.source.type === 'civitai' && !!id && (String(own ?? '') === id || civitaiId(a.source.ref) === id)
+      if (a.source.type !== 'civitai' || !id || (String(own ?? '') !== id && civitaiId(a.source.ref) !== id)) return false
+      const wanted = civitaiVersion(hit.ref)
+      const have = String((a.source as Raw).version_id ?? '') || civitaiVersion(a.source.ref)
+      // anyVersion: the recommended list names one version; another one installed counts (as up to 0.11.1)
+      return !wanted || !have || wanted === have || !!hit.anyVersion
     }
     return a.source.type === 'hf' && a.source.ref === hit.ref && (!hit.file || !a.source.file || a.source.file === hit.file)
   })
+}
+
+/** The hit as one of its Civitai versions shows it: picture, trigger words, size and what the import takes. */
+export function withVersion(hit: LoraHit, v: LoraVersion): LoraHit {
+  return { ...hit, ref: v.ref, page: v.ref, version: v.name, baseModel: v.baseModel, triggerWords: v.triggerWords, sizeMb: v.sizeMb,
+    previewUrl: v.previewUrl ?? hit.previewUrl, previewExplicit: v.previewUrl ? v.previewExplicit : hit.previewExplicit, needsToken: v.needsToken }
+}
+
+// importer.safe_name: the folder a name becomes (macOS compares folder names without case)
+const folderOf = (name: string): string => name.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+|[._]+$/g, '').toLowerCase()
+
+/** The name to install a hit under: its title, or with the version added when a LoRA or model of that name is there
+ *  already (another version of it, or another one of the same name), so that versions sit side by side. */
+export function installName(hit: Pick<LoraHit, 'title' | 'version'>, assets: Asset[], kind: FindKind = 'lora'): string {
+  const taken = new Set(assets.filter((a) => a.type === kind).map((a) => folderOf(a.name)))
+  if (!taken.has(folderOf(hit.title)) || !hit.version) return hit.title
+  return `${hit.title} (${hit.version})`
 }

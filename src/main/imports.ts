@@ -134,7 +134,18 @@ export function toInfo(summary: Record<string, unknown>): ImportInfo {
     inPlace: summary.in_place === true,
     note: typeof summary.note === 'string' && summary.note ? summary.note : undefined,
     triggerWords: Array.isArray(summary.trigger_words) ? (summary.trigger_words as string[]) : undefined,
+    civitai: civitaiOf(summary),
   }
+}
+
+function civitaiOf(summary: Record<string, unknown>): ImportInfo['civitai'] {
+  const modelId = num(summary.model_id)
+  const versionId = num(summary.version_id)
+  if (summary.source !== 'civitai' || !modelId || !versionId) return undefined
+  const text = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
+  const versions = (Array.isArray(summary.versions) ? summary.versions as Record<string, unknown>[] : [])
+    .filter((v) => num(v.id)).map((v) => ({ id: num(v.id)!, name: text(v.name), baseModel: text(v.base_model), usable: v.usable === true, reason: text(v.reason) }))
+  return { modelId, versionId, modelName: text(summary.model_name), versionName: text(summary.version_name), versions }
 }
 
 interface Entry extends ImportJob {

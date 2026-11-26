@@ -710,6 +710,7 @@ Você pode filtrá-las por família e buscar nos nomes, palavras-gatilho e categ
 - **Categoria**: seu próprio agrupamento, usado pela busca.
 - **Da página dela**: o que os criadores da LoRA escreveram no Civitai ou no Hugging Face: descrição, tags, notas da
   versão, licença e uso comercial. É lido uma vez, guardado em cache e pode ser atualizado com o botão de seta.
+- **Uma versão mais nova**: para uma LoRA do Civitai, a página avisa quando há versões mais novas para a mesma base (consulta o Civitai uma vez por sessão); **Instalar** coloca uma ao lado da LoRA, com a versão no nome.
 - **Ajustes recomendados**: intensidade, passos, guidance, sampler e clip skip, conforme informados pelos criadores ou
   deduzidos das imagens de exemplo deles.
 - **Prompts dos criadores**: prompts de exemplo. **Experimentar** os abre na comparação de intensidades.
@@ -934,7 +935,7 @@ lista.
 
 Cada cartão mostra uma prévia, os criadores, a base, downloads, curtidas, palavras-gatilho, o tamanho e uma linha sobre
 a licença. **Instalar** coloca a LoRA nos downloads no topo da página; depois ela aparece em LoRAs e na página LoRA.
-Para um repositório do Hugging Face com vários arquivos, o menu no cartão escolhe o arquivo. Algumas LoRAs precisam de
+Para um repositório do Hugging Face com vários arquivos, o menu no cartão escolhe o arquivo. Para uma LoRA ou um modelo do Civitai com várias versões, o menu **Versão** escolhe uma (nome, base, data; *para outra base*, *instalada*); imagem, palavras-gatilho e tamanho acompanham a escolha. Uma segunda versão de algo instalado fica ao lado, com a versão no nome. Algumas LoRAs precisam de
 um token de acesso ou de uma licença aceita na página delas; o cartão informa isso. A seta abre a página da LoRA no
 navegador.
 
@@ -997,6 +998,8 @@ de uma LoRA. Um repositório do Hugging Face sem um modelo completo (sem formato
 quantizações GGUF) responde com a lista dos arquivos de modelo e seus tamanhos; um clique num arquivo verifica esse
 arquivo. **Baixar** (Hugging Face, Civitai) ou **Importar** (arquivo, pasta) então o inicia; o campo de nome e o menu de
 compressão ao lado são opcionais.
+
+Com um link do Civitai, a verificação também lista as versões do modelo: o menu verifica outra, e versões que este Mac não consegue executar aparecem em cinza com o motivo.
 
 **De uma página do Hugging Face**: um link `vulkara://import/hf?repo=dono/nome` (a partir da 0.11.0, por ex.
 “Use this model” no Hugging Face quando o VulKara estiver listado lá) abre Adicionar com o repositório preenchido e
@@ -1182,7 +1185,7 @@ A barra de título de cada página mostra a versão (*v0.7.9*, um clique abre No
 *Atualização para a versão … disponível!*: um clique traz o cartão de volta. Se algo
 ainda estiver em andamento (imagens, downloads, um treinamento, a instalação de um runtime, uma descrição de imagem ou a
 exportação de um modelo), o cartão mostra e oferece **Atualizar depois** (o VulKara atualiza e reinicia assim que
-terminar; **Não esperar** desfaz isso) ou **Interromper e atualizar agora** (pergunta antes; um runtime sendo instalado
+terminar; **Não esperar** desfaz isso; enquanto isso nada novo começa) ou **Interromper e atualizar agora** (pergunta antes; um runtime sendo instalado
 termina primeiro). Só atualiza um app numa pasta onde ele pode escrever (em Aplicativos, não aberto
 pela imagem de disco). Instalado com o Homebrew? Funciona igual; `brew upgrade --cask vulkara` também.
 

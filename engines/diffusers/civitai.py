@@ -268,6 +268,17 @@ def resolve(ref, token=None):
             note = "Newer versions left out: " + "; ".join(skipped[:4])
     model_type = (model or {}).get("type") or (version.get("model") or {}).get("type") or ""
     f = pick_file(version)
+    # every version of the model, newest first, for the choice in the app (a link names one or none)
+    versions = []
+    for v in (model or {}).get("modelVersions") or []:
+        usable = pick_file(v) is not None
+        if usable and model_type.lower() not in ("lora", "locon", "dora", "lycoris") and arch_of(v.get("baseModel")) == "unknown" \
+                and not re.search(r"sd ?1|sd ?2", v.get("baseModel") or "", re.I):
+            usable, reason = False, "model type not supported"
+        else:
+            reason = "" if usable else _unusable_reason(v)
+        versions.append({"id": v.get("id"), "name": v.get("name"), "base_model": v.get("baseModel"), "usable": usable,
+                         "reason": reason})
     base = version.get("baseModel") or ""
     # a version's own text encoder / VAE (models in separate files, e.g. Anima): downloaded with it
     extras = []
@@ -279,7 +290,7 @@ def resolve(ref, token=None):
                            "sha256": ((x.get("hashes") or {}).get("SHA256") or "").lower()})
     return {
         "model_id": model_id, "version_id": version.get("id"), "name": (model or {}).get("name") or version.get("name"),
-        "version_name": version.get("name"), "type": model_type, "base_model": base, "arch": arch_of(base),
+        "version_name": version.get("name"), "versions": versions, "type": model_type, "base_model": base, "arch": arch_of(base),
         "file_name": f.get("name"), "size_bytes": int(float(f.get("sizeKB") or 0) * 1024),
         "sha256": ((f.get("hashes") or {}).get("SHA256") or "").lower(), "download_url": f.get("downloadUrl"),
         "precision": (f.get("metadata") or {}).get("fp"), "note": note, "extras": extras,

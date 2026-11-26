@@ -690,6 +690,7 @@ family and search their names, trigger words and categories.
 - **Category**: your own grouping, used by the search.
 - **From its page**: what the LoRA's makers wrote on Civitai or Hugging Face: description, tags, version notes,
   licence and commercial use. It is read once, cached, and can be refreshed with the arrow button.
+- **A newer version**: for a LoRA from Civitai, the page says when newer versions for the same base are there (it asks Civitai once per session); **Install** puts one beside the LoRA, with the version in its name.
 - **Recommended settings**: strength, steps, guidance, sampler and clip skip, as given by the makers or worked out
   from their example pictures.
 - **Prompts of its makers**: example prompts. **Try it** opens them in the strength comparison.
@@ -906,7 +907,7 @@ next to the source switch picks another base, and the search field (Return) narr
 
 Each card shows a preview, the makers, the base, downloads, likes, trigger words, the size and a line on the licence.
 **Install** puts the LoRA into the downloads at the top of the page; it then appears under LoRAs and on the LoRA page.
-For a Hugging Face repository with several files, the menu on the card picks the file. Some LoRAs need an access token
+For a Hugging Face repository with several files, the menu on the card picks the file. For a Civitai LoRA or model with several versions, the **Version** menu picks one (name, base, date; *for another base*, *installed*); picture, trigger words and size follow it. A second version of one that is installed goes beside it, with the version in its name. Some LoRAs need an access token
 or a licence accepted on their page; the card says so. The arrow opens the LoRA's page in the browser.
 
 While nudity is not allowed (Settings → Content), LoRAs and pictures for adults are left out: those Civitai marks as
@@ -966,6 +967,8 @@ words of a LoRA. A Hugging Face repository without a complete model (no diffuser
 GGUF quantizations) answers with the list of its model files and their sizes; a click on a file checks that one.
 **Download** (Hugging Face, Civitai) or **Import** (file, folder) then starts it; the name field and the compression
 menu next to it are optional.
+
+For a Civitai link the check also lists the model's versions: the menu checks another one, and versions this Mac can not run are greyed out with the reason.
 
 **From a Hugging Face page**: a `vulkara://import/hf?repo=owner/name` link (from 0.11.0, e.g. "Use this model"
 on Hugging Face once VulKara is listed there) opens Add with the repository filled in and checks it; it is downloaded
@@ -1140,7 +1143,7 @@ the release notes, **Later** hides the card until the next version. The title ro
 (*v0.7.9*, a click opens the Changelog) or, with a newer one, *Update to version … available!*: a click brings the
 card back. If something still runs (pictures, downloads, a training, a
 runtime install, a picture description or a model export), the card lists it and offers **Update afterwards** (VulKara
-updates and restarts as soon as it is done; **Don't wait** takes that back) or **Stop and update now** (asks first; a
+updates and restarts as soon as it is done; **Don't wait** takes that back; meanwhile no new work starts) or **Stop and update now** (asks first; a
 runtime being installed still finishes). It updates only an app in a folder it may write to (in Applications, not started from the disk image). Installed
 with Homebrew? It works the same; `brew upgrade --cask vulkara` does too.
 

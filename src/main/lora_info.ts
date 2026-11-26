@@ -157,6 +157,20 @@ export function infoSource(manifest: Raw): InfoSource {
   return civitai ? { civitai } : {}
 }
 
+/** The versions of a Civitai model newer than the one installed, for the same base and with a SafeTensor file
+ *  (Civitai lists them newest first). */
+export function newerVersions(model: Raw, version: Raw, modelId: number | undefined): NonNullable<LoraInfo['newer']> {
+  const all = Array.isArray(model.modelVersions) ? (model.modelVersions as Raw[]) : []
+  const at = all.findIndex((v) => num(v.id) !== undefined && num(v.id) === num(version.id))
+  if (at <= 0 || !modelId) return []
+  const safetensors = (v: Raw): boolean => (Array.isArray(v.files) ? (v.files as Raw[]) : [])
+    .some((f) => (f.metadata as Raw | undefined)?.format === 'SafeTensor' || /\.safetensors$/i.test(String(f.name ?? '')))
+  return all.slice(0, at).filter((v) => num(v.id) && safetensors(v) && (!version.baseModel || v.baseModel === version.baseModel))
+    .map((v) => ({ name: typeof v.name === 'string' ? v.name : undefined, ref: `https://civitai.com/models/${modelId}?modelVersionId=${num(v.id)}`,
+      baseModel: typeof v.baseModel === 'string' ? v.baseModel : undefined,
+      date: String(v.publishedAt ?? v.createdAt ?? '').slice(0, 10) || undefined }))
+}
+
 export function cachedInfo(folder: string): LoraInfo | undefined {
   try {
     return existsSync(join(folder, CACHE)) ? (JSON.parse(readFileSync(join(folder, CACHE), 'utf8')) as LoraInfo) : undefined
@@ -181,6 +195,8 @@ export async function fetchInfo(folder: string, fetcher: Fetcher, tokens: { civi
     const model = modelId ? (JSON.parse(await fetcher(`https://civitai.com/api/v1/models/${modelId}`, headers)) as Raw) : {}
     if (!from.civitai.versionId) version = ((model.modelVersions as Raw[] | undefined) ?? [])[0] ?? {}
     info = fromCivitai({ ...model, id: modelId }, version, safe)
+    const newer = newerVersions(model, version, modelId)
+    if (newer.length) info.newer = newer
   } else if (from.huggingface) {
     const headers: Record<string, string> = tokens.huggingface ? { Authorization: `Bearer ${tokens.huggingface}` } : {}
     info = fromModelCard(from.huggingface, await fetcher(`https://huggingface.co/${from.huggingface}/raw/main/README.md`, headers))

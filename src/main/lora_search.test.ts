@@ -110,6 +110,9 @@ describe('Civitai', () => {
     })
     expect(decodeCursor(page.cursor)).toEqual({ i: 0, c: '2026|5' })
     expect(parseCivitai({ items: [], metadata: {} }, sdxl, true, []).cursor).toBeUndefined()
+    // both versions with a SafeTensor file can be chosen; the Pony one is for another base
+    expect(page.hits[0].versions?.map((v) => [v.id, v.name, v.fits, v.sizeMb])).toEqual([[11, 'v2 for Pony', false, 1], [10, 'v1', true, 223]])
+    expect(page.hits[0].versions?.[0].ref).toBe('https://civitai.com/models/1?modelVersionId=11')
   })
 
   it('leaves out adult models and pictures when nudity is not allowed', () => {
@@ -385,6 +388,17 @@ describe('preview pictures', () => {
     // kept: the first picture is not fetched twice
     await previewPicture(safeUrl, { fetcher, safe: true })
     expect(asked.filter((u) => u === safeUrl)).toHaveLength(1)
+  })
+
+  it('also fetches the pictures of the other Civitai versions of a hit', async () => {
+    const pony = 'https://image.civitai.com/k/p/original=true/pony.jpeg'
+    const item = civitaiModel(1)
+    item.modelVersions[0].images = [{ url: pony, type: 'image', nsfwLevel: 1 }] as never
+    const fetcher: FetchLike = async (url) => url.includes('/api/') ? response({ items: [item] }, { url }) : response(png, { url, headers: { 'content-type': 'image/png' } })
+    const page = await searchLoras({ base: 'sdxl', source: 'civitai' }, { fetcher, safe: true, assets: [] })
+    const other = page.hits[0].versions!.find((v) => v.name === 'v2 for Pony')!.previewUrl!
+    expect(other).toContain('pony.jpeg')
+    expect(await previewPicture(other, { fetcher, safe: true })).toMatch(/^data:image\/png;base64,/)
   })
 
   it('refuses what is not a picture or too large', async () => {

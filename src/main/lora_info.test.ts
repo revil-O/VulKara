@@ -4,7 +4,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { cachedInfo, fetchInfo, fromCivitai, fromModelCard, htmlToParagraphs, infoSource, markdownToParagraphs, strengthInPrompt } from './lora_info'
+import { cachedInfo, fetchInfo, fromCivitai, fromModelCard, htmlToParagraphs, infoSource, markdownToParagraphs, newerVersions, strengthInPrompt } from './lora_info'
 
 const MODEL = {
   id: 637096, name: 'Tattoo Maker XL', creator: { username: 'maker' }, tags: ['style', 'tattoo'], allowCommercialUse: ['Image', 'Rent'],
@@ -74,5 +74,22 @@ describe('lora info', () => {
     writeFileSync(join(unknown, 'lora.json'), JSON.stringify({ source: { type: 'file' } }))
     expect(await fetchInfo(unknown, async () => '{}', {}, false)).toBeUndefined()
     expect(cachedInfo(unknown)).toBeUndefined()
+  })
+})
+
+describe('newer versions on Civitai', () => {
+  const file = (name: string) => ({ name, metadata: { format: name.endsWith('.safetensors') ? 'SafeTensor' : 'PickleTensor' } })
+  const model = { modelVersions: [
+    { id: 4, name: 'v4', baseModel: 'SDXL 1.0', publishedAt: '2026-11-20T10:00:00Z', files: [file('a.safetensors')] },
+    { id: 3, name: 'v3 Pony', baseModel: 'Pony', files: [file('b.safetensors')] },
+    { id: 2, name: 'v2 pickle', baseModel: 'SDXL 1.0', files: [file('c.pt')] },
+    { id: 1, name: 'v1', baseModel: 'SDXL 1.0', files: [file('d.safetensors')] },
+  ] }
+  it('lists the newer ones for the same base with a SafeTensor file, and none for the newest', () => {
+    expect(newerVersions(model, { id: 1, baseModel: 'SDXL 1.0' }, 9)).toEqual([
+      { name: 'v4', ref: 'https://civitai.com/models/9?modelVersionId=4', baseModel: 'SDXL 1.0', date: '2026-11-20' },
+    ])
+    expect(newerVersions(model, { id: 4, baseModel: 'SDXL 1.0' }, 9)).toEqual([])
+    expect(newerVersions(model, { id: 99 }, 9)).toEqual([])
   })
 })

@@ -47,3 +47,6 @@ def test_newest_runnable_version_is_taken(monkeypatch):
     c = civitai.resolve("https://civitai.com/models/7/m")
     assert (c["version_id"], c["arch"], c["file_name"]) == (1, "sdxl", "z")
     assert "v3" in c["note"] and "v2" in c["note"]
+    # every version for the choice in the app, the ones it can not run with their reason
+    assert [(v["id"], v["usable"]) for v in c["versions"]] == [(3, False), (2, False), (1, True)]
+    assert c["versions"][0]["reason"] == "model type not supported" and c["versions"][1]["reason"]
