@@ -248,6 +248,7 @@ mantém os ajustes, para que os modelos possam ser comparados com os mesmos valo
 
 - Deixe **É uma foto: prepará-la antes** ativado quando a imagem de controle for uma foto normal. Desative quando a
   imagem de controle já for um esqueleto, um mapa de profundidade ou uma imagem de bordas.
+- **Modelo de profundidade** (com Profundidade e uma foto): *Small* (rápido, padrão) ou *Base* (bordas mais finas: cabelo, plantas, postes finos; 0,2 s, baixado uma vez, 390 MB, licença não comercial).
 - **Peso** (0–2) define o quanto o resultado segue rigorosamente a imagem de controle.
 - O modelo de controle é baixado na primeira vez que é usado.
 
@@ -480,8 +481,9 @@ Cria um vídeo curto. Dois tipos de modelos fazem isso (Modelos → Recomendados
   começa só com o prompt.
 - **Prompt**: o que acontece, como movimento, câmera, clima e, no LTX-2.3, o som: *a red fox trots through fresh snow
   at sunrise, soft crunching footsteps and distant birdsong*.
-- **Duração**: 1–5 segundos.
-- **Resolução**: 480p ou 720p (o LTX-2.3 arredonda os lados para passos de 64 px).
+- **Duração**: 1–5 segundos, com o LTX-2.3 até 20 segundos (num Mac mini M4 com 16 GB, 10 s levaram cerca de 15 minutos e 20 s cerca de 35; a memória continua a mesma).
+- **Quadros por segundo** (LTX-2.3): 24 ou 30 fps.
+- **Resolução**: 480p ou 720p, com o LTX-2.3 num Mac a partir de 24 GB também 1080p (o LTX-2.3 arredonda os lados para passos de 64 px; com 16 GB, 1080p usou toda a memória e cerca de uma hora para 5 s).
 - **Com som** (LTX-2.3): desligado, cria o vídeo sem faixa de som.
 
 ## 9. Ampliar
@@ -1177,8 +1179,11 @@ verifica (o checksum SHA-256 que o GitHub informa para o arquivo, a versão dent
 versões do VulKara e o Gatekeeper) e a coloca no lugar do app quando o VulKara é encerrado; depois a nova versão
 inicia. **Notas da versão** abre as notas da versão, **Mais tarde** esconde o cartão até a próxima versão.
 A barra de título de cada página mostra a versão (*v0.7.9*, um clique abre Novidades) ou, com uma mais nova,
-*Atualização para a versão … disponível!*: um clique traz o cartão de volta. Só atualiza
-enquanto nada está sendo gerado ou instalado, e só um app numa pasta onde ele pode escrever (em Aplicativos, não aberto
+*Atualização para a versão … disponível!*: um clique traz o cartão de volta. Se algo
+ainda estiver em andamento (imagens, downloads, um treinamento, a instalação de um runtime, uma descrição de imagem ou a
+exportação de um modelo), o cartão mostra e oferece **Atualizar depois** (o VulKara atualiza e reinicia assim que
+terminar; **Não esperar** desfaz isso) ou **Interromper e atualizar agora** (pergunta antes; um runtime sendo instalado
+termina primeiro). Só atualiza um app numa pasta onde ele pode escrever (em Aplicativos, não aberto
 pela imagem de disco). Instalado com o Homebrew? Funciona igual; `brew upgrade --cask vulkara` também.
 
 ### Pastas

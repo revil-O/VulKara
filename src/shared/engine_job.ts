@@ -37,6 +37,7 @@ export function toEngineJob(job: Job): Record<string, unknown> {
     ['mask_image', job.maskImage],
     ['reference_images', job.referenceImages?.length ? job.referenceImages : undefined],
     ['video_seconds', job.videoSeconds],
+    ['video_fps', job.videoFps === 30 ? 30 : undefined],
     ['audio', job.videoMute ? false : undefined],
     ['upscale', job.upscale],
     ['upsample', job.upsample],
@@ -72,6 +73,7 @@ export function toEngineJob(job: Job): Record<string, unknown> {
     out.controlnet_image = job.controlnet.image
     out.controlnet_weight = job.controlnet.weight
     out.controlnet_preprocess = job.controlnet.preprocess
+    if (job.controlnet.depthModel === 'base') out.controlnet_depth_model = 'base'
   }
   return out
 }

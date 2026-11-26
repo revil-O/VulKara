@@ -23,6 +23,15 @@ describe('the engine job', () => {
     expect(toEngineJob(job).video_seconds).toBe(2)
   })
 
+  it('passes 30 fps and the finer depth model on, and nothing for the defaults', () => {
+    const job: Job = { id: '5', page: 'video', prompt: 'a fox', modelId: 'm', modelDir: '/m', width: 768, height: 512, seed: 7, videoSeconds: 20 }
+    expect(toEngineJob({ ...job, videoFps: 30 }).video_fps).toBe(30)
+    expect('video_fps' in toEngineJob({ ...job, videoFps: 24 })).toBe(false)
+    const control: Job = { ...job, page: 'text', controlnet: { type: 'Depth', image: '/c.png', weight: 1, preprocess: true } }
+    expect('controlnet_depth_model' in toEngineJob(control)).toBe(false)
+    expect(toEngineJob({ ...control, controlnet: { ...control.controlnet!, depthModel: 'base' } }).controlnet_depth_model).toBe('base')
+  })
+
   it('passes keep the picture on only when it is on', () => {
     const job: Job = { id: '3', page: 'image', prompt: 'snow', modelId: 'm', modelDir: '/m', width: 1024, height: 1024, seed: 7, inputImage: '/in.png' }
     expect(toEngineJob({ ...job, keepPicture: true }).keep_picture).toBe(true)

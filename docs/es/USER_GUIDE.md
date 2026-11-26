@@ -250,6 +250,7 @@ los ajustes, para poder comparar modelos con los mismos:
 
 - Deja activado **Es una foto: prepararla primero** cuando la imagen de control sea una foto normal. Desactívalo
   cuando la imagen de control ya sea un esqueleto, un mapa de profundidad o una imagen de bordes.
+- **Modelo de profundidad** (con Profundidad y una foto): *Small* (rápido, por defecto) o *Base* (bordes más finos: pelo, plantas, postes finos; 0,2 s, se descarga una vez, 390 MB, licencia no comercial).
 - **Peso** (0–2) ajusta con qué rigor sigue el resultado a la imagen de control.
 - El modelo de control se descarga la primera vez que se usa.
 
@@ -486,8 +487,9 @@ Crea un vídeo corto. Lo hacen dos tipos de modelos (Modelos → Recomendados):
   empieza solo con el prompt.
 - **Prompt**: lo que ocurre, como movimiento, cámara, ambiente y, con LTX-2.3, el sonido: *a red fox trots through
   fresh snow at sunrise, soft crunching footsteps and distant birdsong*.
-- **Duración**: 1–5 segundos.
-- **Resolución**: 480p o 720p (LTX-2.3 redondea los lados a pasos de 64 px).
+- **Duración**: 1–5 segundos, con LTX-2.3 hasta 20 segundos (en un Mac mini M4 con 16 GB, 10 s tardaron unos 15 minutos y 20 s unos 35; la memoria no cambia).
+- **Fotogramas por segundo** (LTX-2.3): 24 o 30 fps.
+- **Resolución**: 480p o 720p, con LTX-2.3 en un Mac desde 24 GB también 1080p (LTX-2.3 redondea los lados a pasos de 64 px; con 16 GB, 1080p usó toda la memoria y una hora para 5 s).
 - **Con sonido** (LTX-2.3): desactivado, crea el vídeo sin pista de sonido.
 
 ## 9. Ampliar
@@ -1191,8 +1193,11 @@ comprueba (la suma SHA-256 que GitHub indica para el archivo, la versión que co
 versiones de VulKara y Gatekeeper) y la pone en lugar de la app cuando VulKara se cierra; luego se inicia la nueva
 versión. **Novedades** abre las notas de la versión, **Más tarde** oculta la tarjeta hasta la siguiente versión.
 La barra de título de cada página muestra la versión (*v0.7.9*, un clic abre Cambios) o, si hay una más nueva,
-*¡Actualización a la versión … disponible!*: un clic vuelve a mostrar la tarjeta. Solo
-actualiza mientras no se genera ni se instala nada, y solo una app en una carpeta en la que puede escribir (en
+*¡Actualización a la versión … disponible!*: un clic vuelve a mostrar la tarjeta. Si aún
+hay algo en marcha (imágenes, descargas, un entrenamiento, la instalación de un runtime, una descripción de imagen o una
+exportación de modelo), la tarjeta lo indica y ofrece **Actualizar después** (VulKara se actualiza y se reinicia en
+cuanto termine; **No esperar** lo anula) o **Detener y actualizar ahora** (pregunta antes; un runtime que se está
+instalando termina primero). Solo actualiza una app en una carpeta en la que puede escribir (en
 Aplicaciones, no iniciada desde la imagen de disco). ¿Instalada con Homebrew? Funciona igual; `brew upgrade --cask
 vulkara` también.
 

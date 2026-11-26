@@ -243,6 +243,8 @@
    "style": "Stil",
    "length": "Länge",
    "lengthHint": "Längere Videos dauern deutlich länger und brauchen mehr Arbeitsspeicher.",
+   "lengthLongHint": "Lange Videos dauern: Auf einem Mac mini M4 mit 16 GB brauchten 10 s etwa 15 Minuten, 20 s etwa 35; der Speicher bleibt gleich.",
+   "frameRate": "Bildrate",
    "resolution": "Auflösung",
    "resolutionHint": "Das Video übernimmt die Proportionen des Startbildes.",
    "sound": "Mit Ton",
@@ -269,6 +271,10 @@
    "none": "Keine",
    "controlHint": "{hint} Das Steuerungsmodell wird beim ersten Mal heruntergeladen.",
    "controlPhoto": "Es ist ein Foto: zuerst aufbereiten",
+   "depthModel": "Tiefenmodell",
+   "depthSmall": "Small (schnell)",
+   "depthBase": "Base (feinere Kanten)",
+   "depthModelHint": "Base zeichnet feinere Kanten als Small (Haare, Pflanzen, dünne Masten), bei 0,2 s und 1,5 GB pro Bild; einmal geladen (390 MB). Die Lizenz erlaubt nur nicht kommerzielle Nutzung.",
    "weight": "Gewichtung",
    "controlNoPose": "Das gewählte Modell nimmt keine Pose als Steuerbild. Wähle ein SD 1.5-, SDXL- oder FLUX.1-Modell und stelle dann „Steuerung“ auf „Pose“.",
    "sampler": "Sampler",
@@ -1797,7 +1803,30 @@
    "notPackaged": "das ist keine installierte App (ein Entwicklungs-Build)",
    "notInstalled": "VulKara läuft aus dem Disk-Image; zieh es zuerst in Programme",
    "readOnly": "VulKara kann sich in seinem Ordner nicht ersetzen; lade die neue Version von der Release-Seite",
-   "header": "Update auf Version {version} vorhanden!"
+   "header": "Update auf Version {version} vorhanden!",
+   "stillRunning": "Läuft noch: {list}.",
+   "waitingFor": "Aktualisiert und startet neu, sobald das fertig ist: {list}.",
+   "after": "Danach aktualisieren",
+   "stopNow": "Abbrechen und jetzt aktualisieren",
+   "stopAsk": "Abgebrochen werden: {list}. Noch nicht erzeugte Bilder, unfertige Downloads und ein laufendes Training gehen verloren.",
+   "runtimeWaits": "Eine Laufzeit, die gerade installiert wird, läuft noch zu Ende.",
+   "stopConfirm": "Abbrechen und aktualisieren",
+   "back": "Zurück",
+   "noWait": "Nicht warten",
+   "work": {
+    "jobs": {
+     "one": "{n} Bild oder Video",
+     "other": "{n} Bilder oder Videos"
+    },
+    "imports": {
+     "one": "{n} Download",
+     "other": "{n} Downloads"
+    },
+    "training": "ein Training",
+    "runtime": "eine Laufzeit-Installation",
+    "caption": "eine Bildbeschreibung",
+    "export": "ein Modell-Export"
+   }
   },
   "licenses": {
    "title": "Lizenzen",
@@ -2015,7 +2044,6 @@
    "notReadyBuiltAny": "Ein Paket ist für diesen Mac (Apple Silicon, Python 3.11) nicht fertig gebaut verfügbar, und VulKara kompiliert keine Pakete: Versuch es später mit „Aktualisieren“ oder melde es. ({message})"
   },
   "appUpdate": {
-   "busy": "Aktualisiere, wenn kein Bild erzeugt und nichts installiert wird.",
    "restarting": "VulKara startet für sein Update neu, sobald die Warteschlange leer ist; füge Bilder nach dem Neustart hinzu."
   },
   "updates": {

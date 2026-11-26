@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 // Copyright (C) 2026 Oliver Schmidt
 import { describe, expect, it } from 'vitest'
-import { TURBO, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, buildRemoveJob, emptyForm, removeHelper, removeMethods, keepsPicture, takesFaceDetail, formPage, formProblem, lorasFor, modelsFor, takesTurbo, takesUpsampler, upsamplerHelper, takesSound, takesTextToVideo, requiredHelper, fixedSampling, type RemoveMethod } from './job_form'
+import { TURBO, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, buildRemoveJob, emptyForm, removeHelper, removeMethods, keepsPicture, maxVideoSeconds, takesFps, takesFaceDetail, formPage, formProblem, lorasFor, modelsFor, takesTurbo, takesUpsampler, upsamplerHelper, takesSound, takesTextToVideo, requiredHelper, fixedSampling, type RemoveMethod } from './job_form'
 import type { Asset, ModelMeta } from '@shared/types'
 import { EDITION } from '@shared/edition'
 
@@ -265,6 +265,20 @@ describe('generate form', () => {
     expect(back.videoSound).toBe(false)
   })
 
+  it('lets LTX-2.3 make clips up to 20 s at 24 or 30 fps and 1080p, other video models stay at 5 s, 24 fps, 720p', () => {
+    const ltx = model('ltx', { arch: 'ltx23', family: 'ltx', runtime: 'mlx', kind: 'video', negativePrompt: false, defaults: { num_steps: 11, guidance_scale: 1, width: 768, height: 512 } })
+    const wan = model('wan', { kind: 'video', family: 'wan' })
+    expect([maxVideoSeconds(ltx.meta), maxVideoSeconds(wan.meta), takesFps(ltx.meta), takesFps(wan.meta)]).toEqual([20, 5, true, false])
+    const form = { ...emptyForm('video'), prompt: 'a fox', inputImage: '/in.png', videoSeconds: 20, videoFps: 30 as const, videoResolution: '1080p' as const }
+    const long = buildJob('video', form, ltx, [], { inputSize: [1920, 1080] })
+    expect([long.videoSeconds, long.videoFps, long.width, long.height]).toEqual([20, 30, 1920, 1088])
+    const other = buildJob('video', form, wan, [], { inputSize: [1920, 1080] })
+    expect([other.videoSeconds, other.videoFps, other.width, other.height]).toEqual([5, undefined, 1248, 704])
+    const back = emptyForm('video')
+    applyJob(back, { ...long, id: '9' }, [ltx], [])
+    expect([back.videoSeconds, back.videoFps]).toEqual([20, 30])
+  })
+
   it('builds an illusion job with the pattern as control picture', () => {
     const sd15 = model('sd15', { arch: 'sd15', family: 'sd1', defaults: { num_steps: 25, guidance_scale: 7, width: 512, height: 512 } })
     expect(modelsFor('illusion', [SDXL, FLUX, sd15]).map((m) => m.title)).toEqual(['xl', 'sd15'])
@@ -285,6 +299,14 @@ describe('generate form', () => {
     applyModel(tile, FLUX, [])
     expect(tile.controlType).toBe('')
     expect(buildJob('inpaint', { ...form, inputImage: '/a.png' }, SDXL, [], { maskImage: '/m.png' }).controlnet).toBeUndefined()
+    // the finer depth model only for a depth control made from a photo
+    const depth = { ...form, controlType: 'Depth', controlPreprocess: true, controlDepthBase: true }
+    expect(buildJob('text', depth, SDXL, []).controlnet?.depthModel).toBe('base')
+    expect(buildJob('text', { ...depth, controlPreprocess: false }, SDXL, []).controlnet?.depthModel).toBeUndefined()
+    expect(buildJob('text', { ...depth, controlType: 'Canny' }, SDXL, []).controlnet?.depthModel).toBeUndefined()
+    const back = emptyForm('text')
+    applyJob(back, { ...buildJob('text', depth, SDXL, []), id: '3' }, [SDXL], [])
+    expect(back.controlDepthBase).toBe(true)
   })
 
   it('lets the family decide when an older manifest does not say whether a model can inpaint', () => {

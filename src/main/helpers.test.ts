@@ -72,6 +72,9 @@ describe('helper models', () => {
     // the engine runs CodeFormer for any true value: 1 or 'yes' sent by hand are refused too
     expect(usesNonCommercialHelper({ restore: { faces: 1 } as never })).toBe(true)
     expect(usesNonCommercialHelper({ removeObject: { method: 'rorem' } })).toBe(false)
+    // Depth Anything V2 Base is CC BY-NC 4.0, Small (the default) Apache-2.0
+    expect(usesNonCommercialHelper({ controlnet: { type: 'Depth', image: '/c.png', weight: 1, preprocess: true, depthModel: 'base' } })).toBe(true)
+    expect(usesNonCommercialHelper({ controlnet: { type: 'Depth', image: '/c.png', weight: 1, preprocess: true } })).toBe(false)
     // RestoreFormer++ is Apache-2.0
     expect(usesNonCommercialHelper({ restore: { faces: true, faceModel: 'restoreformer' } as never })).toBe(false)
     expect(usesNonCommercialHelper({ restore: { faces: false } as never })).toBe(false)

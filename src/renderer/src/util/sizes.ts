@@ -33,16 +33,18 @@ export function ratioOf(width: number, height: number, nativeW: number, nativeH:
 /** The sizes offered when a model does not say which it takes. */
 export const DEFAULT_SIZES = Array.from({ length: 13 }, (_, i) => 256 + i * 64)
 
-export type VideoResolution = '480p' | '720p'
-// shorter side of a video (Wan sizes are multiples of 32)
-const SHORT_SIDE: Record<VideoResolution, number> = { '480p': 480, '720p': 704 }
-const MAX_LONG_SIDE = 1280
+export type VideoResolution = '480p' | '720p' | '1080p'
+// shorter side of a video (Wan sizes are multiples of 32, LTX-2.3's of 64: 1080 → 1088)
+const SHORT_SIDE: Record<VideoResolution, number> = { '480p': 480, '720p': 704, '1080p': 1088 }
+const MAX_LONG_SIDE: Record<VideoResolution, number> = { '480p': 1280, '720p': 1280, '1080p': 1920 }
+/** LTX-2.3 at 1080p needed 15.96 GB and swapped on a 16 GB Mac, about an hour for 5 s (MEASUREMENTS 7cy) */
+export const VIDEO_1080P_MIN_RAM_GB = 24
 
 /** The size of a video with the proportions of its start picture (16:9 while that is not known). */
 export function videoSize(picture: [number, number] | undefined, resolution: VideoResolution): [number, number] {
   const short = SHORT_SIDE[resolution]
   const ratio = picture && picture[0] && picture[1] ? picture[0] / picture[1] : 16 / 9
   const landscape = ratio >= 1
-  const long = Math.min(MAX_LONG_SIDE, Math.round((short * (landscape ? ratio : 1 / ratio)) / 32) * 32)
+  const long = Math.min(MAX_LONG_SIDE[resolution], Math.round((short * (landscape ? ratio : 1 / ratio)) / 32) * 32)
   return landscape ? [long, short] : [short, long]
 }

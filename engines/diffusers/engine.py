@@ -1621,7 +1621,8 @@ class DiffusersEngine:
                 import preprocess
                 self._state("Preparing %s control image" % cn_type)
                 control_image = preprocess.control_image(cn_type, control_image, report=lambda stage, pct: (
-                    protocol.status("%s %d%%" % (stage, pct) if pct >= 0 else stage)))
+                    protocol.status("%s %d%%" % (stage, pct) if pct >= 0 else stage)),
+                    depth_model="depth_base" if d.get("controlnet_depth_model") == "base" else "depth")
             control_image = control_image.resize((width, height))
             pipe_extra["controlnet"] = model.ensure_controlnet(cn_spec, width, height)
             call.update(controlnet.call_kwargs(cn_spec, cn_type, d.get("controlnet_weight") or 1.0,

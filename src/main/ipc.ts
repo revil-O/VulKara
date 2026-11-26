@@ -48,7 +48,7 @@ import { engineLine, mainLanguage, t } from './i18n'
 import { MAX_REFERENCES } from '@shared/engine_job'
 import { engineEnv, getSettings, helpersDir, historyDir, imagesDir, isValidSetting, modelsDir, settableByPage, lorasDir, onSettingChanged, setSetting } from './settings'
 import type { LoraSearchRequest } from '@shared/lora_bases'
-import type { ImportJob, ImportRequest, QueueSnapshot, TrainingRequest, ViewerAction, ViewerItem } from '@shared/api'
+import type { AppUpdateState, ImportJob, ImportRequest, QueueSnapshot, TrainingRequest, UpdateWork, ViewerAction, ViewerItem } from '@shared/api'
 import { FOLDER_KEYS, type FolderKey, type Settings } from '@shared/settings'
 import type { Job } from '@shared/types'
 
@@ -320,6 +320,38 @@ export async function repairRuntimes(): Promise<void> {
 }
 // a model being written as one file (assets:exportSingle): it holds the memory, so no job starts meanwhile
 let exporting: ChildProcess | undefined
+// a picture being described (caption:image), stopped by caption:stop
+let captioning: { proc?: ChildProcess; stopped: boolean } | undefined
+
+/** What runs: an app update waits for it, or stops it first (updateStop). */
+function updateWork(): UpdateWork[] {
+  const open = (state: string): boolean => state === 'waiting' || state === 'running'
+  const counts: [UpdateWork['kind'], number][] = [
+    ['jobs', queue.snapshot().filter((j) => open(j.state)).length],
+    ['imports', imports.list().filter((j) => open(j.state)).length],
+    ['training', trainer.running ? 1 : 0],
+    ['runtime', installing.size],
+    ['caption', captioning ? 1 : 0],
+    ['export', exporting ? 1 : 0],
+  ]
+  return counts.filter(([, count]) => count > 0).map(([kind, count]) => ({ kind, count }))
+}
+
+/** Stops what runs for an update, all but a runtime install: stopped halfway it would leave half a Python behind. */
+function updateStop(): void {
+  for (const j of queue.snapshot()) if (j.state === 'waiting' || j.state === 'running') queue.cancel(j.job.id)
+  imports.cancelAll()
+  if (trainer.running) trainer.stop()
+  if (captioning) {
+    captioning.stopped = true
+    captioning.proc?.kill()
+  }
+  exporting?.kill()
+}
+
+// the update waits for the running work (updateWork): checked every 2 s
+let updateWaiting: ReturnType<typeof setInterval> | undefined
+const updateState = (): AppUpdateState => ({ ...appUpdate().status(), ...(updateWaiting ? { waiting: true, work: updateWork() } : {}) })
 
 // newer versions of the runtimes' key packages: public PyPI and GitHub lists, no token is sent
 let updateChecker: UpdateChecker | undefined
@@ -339,7 +371,7 @@ const appUpdate = (): AppUpdater => (appUpdater ??= new AppUpdater({
   packaged: app.isPackaged,
   pid: process.pid,
   args: process.argv.slice(1),
-  changed: (s) => send('app:updateChanged', s),
+  changed: () => send('app:updateChanged', updateState()),
   log,
 }))
 
@@ -455,13 +487,37 @@ export function registerIpc(): void {
   const promptCache = (): string => join(dataDir(), 'prompt_cache')
   handle('app:promptCache', () => dirSize(promptCache()))
   handle('app:clearPromptCache', () => rmSync(promptCache(), { recursive: true, force: true }))
-  handle('app:update', () => appUpdate().status())
-  handle('app:checkUpdate', () => appUpdate().check())
-  handle('app:installUpdate', () => {
-    if (busy() || installing.size) throw new Error(t('main.appUpdate.busy'))
+  handle('app:update', () => updateState())
+  handle('app:checkUpdate', async () => { await appUpdate().check(); return updateState() })
+  const stopWaiting = (): void => {
+    clearInterval(updateWaiting)
+    updateWaiting = undefined
+  }
+  const startUpdate = (): void => {
+    stopWaiting()
     // a job queued while the update downloaded finishes first; the new version starts after the quit
-    const quitWhenIdle = (): void => { if (busy() || installing.size) setTimeout(quitWhenIdle, 2000); else app.quit() }
+    const quitWhenIdle = (): void => { if (updateWork().length) setTimeout(quitWhenIdle, 2000); else app.quit() }
     void appUpdate().install(quitWhenIdle)
+  }
+  // nothing runs: at once; else the running work back, and with 'after' or 'stop' the update waits for it to end
+  handle('app:installUpdate', (mode?: unknown) => {
+    if (mode === 'stop') updateStop()
+    const work = updateWork()
+    if (!work.length) {
+      startUpdate()
+      return []
+    }
+    if (mode !== 'after' && mode !== 'stop') return work
+    updateWaiting ??= setInterval(() => {
+      if (updateWork().length) send('app:updateChanged', updateState())
+      else startUpdate()
+    }, 2000)
+    send('app:updateChanged', updateState())
+    return work
+  })
+  handle('app:cancelUpdateWait', () => {
+    stopWaiting()
+    send('app:updateChanged', updateState())
   })
   handle('runtimes:checkUpdates', async (force: boolean) => {
     const checker = runtimeUpdates()
@@ -473,7 +529,6 @@ export function registerIpc(): void {
   })
   scheduleUpdateChecks()
 
-  let captioning: { proc?: ChildProcess; stopped: boolean } | undefined
   const addJob = (job: Omit<Job, 'id'>, count?: number): string[] => {
     if (trainer.running) throw new Error(t('main.queue.training'))
     if (installing.size) throw new Error(t('main.queue.installing'))

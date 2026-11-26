@@ -18,9 +18,10 @@ import { useQueueStore } from '../stores/queue'
 import { useImportsStore } from '../stores/imports'
 import { cleanError } from '../stores/runtimes'
 import { guidanceHint, stepsHint } from '../util/model_fit'
-import { MAX_LORAS, MODES, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, buildRemoveJob, modelDefaults, emptyForm, formProblem, lorasFor, modelsFor, keepsPicture, takesFaceDetail, takesReferences, takesTurbo, takesUpsampler, takesSound, fixedSampling, turboLora, upsamplerHelper, requiredHelper, removes, removeHelper, removeMethods, TURBO, type GenerateForm, type Mode } from '../util/job_form'
+import { MAX_LORAS, MODES, aiLabelOf, applyDefaults, applyJob, applyModel, buildJob, buildRemoveJob, modelDefaults, emptyForm, formProblem, lorasFor, modelsFor, keepsPicture, takesFaceDetail, takesReferences, takesTurbo, takesUpsampler, takesSound, takesFps, maxVideoSeconds, fixedSampling, turboLora, upsamplerHelper, requiredHelper, removes, removeHelper, removeMethods, TURBO, type GenerateForm, type Mode } from '../util/job_form'
 import { MAX_REFERENCES } from '@shared/engine_job'
-import { DEFAULT_SIZES, RATIOS, ratioOf, sizeForRatio } from '../util/sizes'
+import { DEFAULT_SIZES, RATIOS, VIDEO_1080P_MIN_RAM_GB, ratioOf, sizeForRatio } from '../util/sizes'
+import { useSystemStore } from '../stores/system'
 import { CONSENT_QUESTION } from '@shared/content_policy'
 import { askConsent } from '../util/consent'
 import { controlTypesFor } from '@shared/controlnet'
@@ -80,6 +81,14 @@ const samplerShown = computed({
 })
 const controlTypes = computed(() => (does.control ? controlTypesFor(model.value?.meta) : []))
 const controlType = computed(() => controlTypes.value.find((ct) => ct.id === form.controlType))
+// 1080p video: LTX-2.3 only, and only from 24 GB (on 16 GB it needed 15.96 GB, swapped and took an hour for 5 s)
+const system = useSystemStore()
+system.loadHardware().catch(() => {})  // the remote web UI may not ask; 1080p then stays hidden
+const offers1080p = computed(() => takesFps(model.value?.meta) && (system.hardware?.ramGb ?? 0) >= VIDEO_1080P_MIN_RAM_GB)
+watch([offers1080p, () => model.value?.meta], () => {
+  if (form.videoResolution === '1080p' && !offers1080p.value) form.videoResolution = '720p'
+  form.videoSeconds = Math.min(form.videoSeconds, maxVideoSeconds(model.value?.meta))
+})
 const sizes = computed(() => model.value?.meta.resolutions?.length ? model.value.meta.resolutions : DEFAULT_SIZES)
 const native = computed<[number, number]>(() => {
   const d = model.value?.meta.defaults ?? {}
@@ -498,14 +507,24 @@ const labelPreview = computed(() => {
           <template v-if="mode === 'video'">
             <label class="field">
               <span>{{ t('generate.panel.length') }} <b>{{ form.videoSeconds }} s</b></span>
-              <input v-model.number="form.videoSeconds" type="range" min="1" max="5" />
-              <small class="dim">{{ t('generate.panel.lengthHint') }}</small>
+              <input v-model.number="form.videoSeconds" type="range" min="1" :max="maxVideoSeconds(model?.meta)" />
+              <small class="dim">{{ t(form.videoSeconds > 5 ? 'generate.panel.lengthLongHint' : 'generate.panel.lengthHint') }}</small>
+            </label>
+            <label v-if="takesFps(model?.meta)" class="field">
+              <span>{{ t('generate.panel.frameRate') }}</span>
+              <select v-model.number="form.videoFps">
+                <!-- i18n-ok: the unit fps is the same in every language -->
+                <option :value="24">24 fps</option>
+                <!-- i18n-ok: the unit fps is the same in every language -->
+                <option :value="30">30 fps</option>
+              </select>
             </label>
             <label class="field">
               <span>{{ t('generate.panel.resolution') }}</span>
               <select v-model="form.videoResolution">
                 <option value="480p">480p</option>
                 <option value="720p">720p</option>
+                <option v-if="offers1080p" value="1080p">1080p</option>
               </select>
               <small class="dim">{{ t('generate.panel.resolutionHint') }}</small>
             </label>
@@ -619,6 +638,13 @@ const labelPreview = computed(() => {
               <small class="dim">{{ t('generate.panel.controlHint', { hint: t(controlType.hint) }) }}</small>
               <ImageInput v-model="form.controlImage" class="control" />
               <label class="check"><input v-model="form.controlPreprocess" type="checkbox" /> {{ t('generate.panel.controlPhoto') }}</label>
+              <label v-if="controlType.id === 'Depth' && form.controlPreprocess" class="field sub">
+                <span>{{ t('generate.panel.depthModel') }} <HintBadge :text="t('generate.panel.depthModelHint')" /></span>
+                <select v-model="form.controlDepthBase">
+                  <option :value="false">{{ t('generate.panel.depthSmall') }}</option>
+                  <option :value="true">{{ t('generate.panel.depthBase') }}</option>
+                </select>
+              </label>
               <span>{{ t('generate.panel.weight') }} <b>{{ dec(form.controlWeight) }}</b></span>
               <input v-model.number="form.controlWeight" type="range" min="0" max="2" step="0.05" />
             </template>
@@ -679,6 +705,11 @@ const labelPreview = computed(() => {
 </template>
 
 <style scoped>
+/* a choice under a checkbox of the control: its label as plain as the others there */
+.field.sub > span {
+  font-weight: inherit;
+}
+
 .prompt {
   padding: 12px 12px 10px 14px;
 }

@@ -174,3 +174,9 @@ def test_a_failed_encode_leaves_no_video_behind(tmp_path):
         return 49
     assert ltx23.written(path, good) == 49
     assert [p.name for p in tmp_path.iterdir()] == ["ltx23_x.mp4"]
+
+
+def test_frame_counts_for_long_clips_and_30_fps():
+    """LTX takes 8n + 1 frames: the counts of the measured clips (MEASUREMENTS 7cy)."""
+    assert [ltx23.frames_for(s) for s in (5, 10, 20)] == [121, 241, 481]
+    assert ltx23.frames_for(5, 30) == 153

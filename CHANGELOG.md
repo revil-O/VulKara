@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.11.1 – 2026-11-26
+
+- **The update waits for running work, or stops it when you say so.** Update and restart used to refuse while pictures
+  were made or something installed. Now the card lists what still runs (pictures and videos, downloads, a training, a
+  runtime install, a picture description, a model export; the last two were not counted before) and offers **Update
+  afterwards**, which restarts into the new version as soon as all of it is done, or **Stop and update now** after a
+  confirmation. A runtime being installed always finishes first: stopped halfway it would leave half a Python behind.
+- **LTX-2.3: videos up to 20 seconds, 30 fps, 1080p from 24 GB.** The length goes up to 20 s for LTX-2.3 (other video
+  models stay at 5 s): on a Mac mini M4 with 16 GB 10 s took about 15 minutes and 20 s about 35, the memory stayed at
+  9.1 GB; from 6 s the page says so. The frame rate can be 24 or 30 fps (the same memory, a quarter more frames). On a
+  Mac with 24 GB or more LTX-2.3 also offers 1080p (1920 × 1088); on 16 GB it needed 15.96 GB, swapped and took about
+  an hour for 5 s, so it is not offered there (MEASUREMENTS 7cy).
+- **A finer depth model for depth control pictures.** With a Depth control made from a photo, Depth Anything V2 Base
+  can make the depth map instead of the small model: finer edges at hair, plants and thin poles, 0.2 s and 1.5 GB per
+  picture, downloaded once (390 MB) at a pinned revision. Small stays the default; Base's licence (CC BY-NC 4.0)
+  allows non-commercial use only (MEASUREMENTS 7cx).
+
 ## 0.11.0 – 2026-11-25
 
 - **RestoreFormer++ as a second face model in Restore.** Under "Restore faces" a choice between CodeFormer (sharper,

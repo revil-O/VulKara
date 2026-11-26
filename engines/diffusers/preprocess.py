@@ -24,6 +24,9 @@ MODELS = {
     "dwpose": {"repo": "yzd-v/DWPose", "files": ["yolox_l.onnx", "dw-ll_ucoco_384.onnx"], "size_gb": 0.35},
     "depth": {"repo": "depth-anything/Depth-Anything-V2-Small-hf",
               "files": ["config.json", "model.safetensors", "preprocessor_config.json"], "size_gb": 0.1},
+    # finer edges (hair, plants, thin poles) at 0.2 s and 1.5 GB on an M4 (MEASUREMENTS 7cx); CC BY-NC 4.0
+    "depth_base": {"repo": "depth-anything/Depth-Anything-V2-Base-hf",
+                   "files": ["config.json", "model.safetensors", "preprocessor_config.json"], "size_gb": 0.39},
 }
 
 
@@ -245,19 +248,19 @@ def draw_pose(pose, width=None, height=None):
 
 # ---------------------------------------------------------------- other control types
 
-_depth_pipe = None
+_depth_pipes = {}
 
 
-def depth(image, report=None):
-    global _depth_pipe
+def depth(image, report=None, model="depth"):
+    """A depth map (near light, far dark) by Depth Anything V2: model "depth" (Small) or "depth_base"."""
     from PIL import Image
-    if _depth_pipe is None:
+    if model not in _depth_pipes:
         import torch
         from transformers import pipeline
-        d = ensure_model("depth", report)
+        d = ensure_model(model, report)
         device = "mps" if torch.backends.mps.is_available() else "cpu"
-        _depth_pipe = pipeline("depth-estimation", model=str(d), device=device)
-    out = _depth_pipe(image.convert("RGB"))["depth"]
+        _depth_pipes[model] = pipeline("depth-estimation", model=str(d), device=device)
+    out = _depth_pipes[model](image.convert("RGB"))["depth"]
     return Image.merge("RGB", [out.convert("L")] * 3).resize(image.size)
 
 
@@ -273,12 +276,12 @@ def _edges(image, low, high, blur=0, thicken=0):
     return Image.fromarray(np.stack([e] * 3, -1))
 
 
-def control_image(kind, image, report=None):
-    """Control image of the given ControlNet type from a photo (PIL)."""
+def control_image(kind, image, report=None, depth_model="depth"):
+    """Control image of the given ControlNet type from a photo (PIL); depth_model: "depth" (Small) or "depth_base"."""
     if kind == "BodyPose":
         return draw_pose(detect_pose(image, report))
     if kind == "Depth":
-        return depth(image, report)
+        return depth(image, report, depth_model)
     if kind == "Canny":
         return _edges(image, 100, 200)
     if kind == "LineArt":

@@ -1070,6 +1070,17 @@
   {
    "group": "Helper models",
    "id": null,
+   "title": "Depth Anything V2 Base (depth control pictures)",
+   "source": "https://huggingface.co/depth-anything/Depth-Anything-V2-Base-hf",
+   "license": "CC BY-NC 4.0",
+   "license_url": "https://creativecommons.org/licenses/by-nc/4.0/",
+   "model": "no",
+   "outputs": "no",
+   "note": "For non-commercial use only. VulKara downloads the weights from Hugging Face on first use."
+  },
+  {
+   "group": "Helper models",
+   "id": null,
    "title": "RORem (object removal, Inpainting)",
    "source": "https://huggingface.co/LetsThink/RORem",
    "license": "Apache License 2.0 (base: SDXL Inpainting 0.1, CreativeML Open RAIL++-M)",

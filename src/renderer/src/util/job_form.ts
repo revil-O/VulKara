@@ -41,6 +41,7 @@ export interface GenerateForm {
   sizeWanted?: { width: number; height: number; changedTo: [number, number] }
   /** video: length in seconds and the shorter side */
   videoSeconds: number
+  videoFps: 24 | 30
   videoResolution: VideoResolution
   /** video with sound (models that make it: takesSound) */
   videoSound: boolean
@@ -50,6 +51,8 @@ export interface GenerateForm {
   controlType: string
   controlImage: string
   controlPreprocess: boolean
+  /** the depth control picture by Depth Anything V2 Base instead of Small */
+  controlDepthBase: boolean
   controlWeight: number
   /** the EU's icon for AI content in the lower right corner of the pictures */
   /** FLUX 3 Image Klein, text to image: the prompt upsampler writes the full caption from the prompt */
@@ -112,8 +115,8 @@ export function emptyForm(mode: Mode): GenerateForm {
   return {
     prompt: '', negativePrompt: '', style: '', modelId: '', width: 512, height: 512, steps: 25, guidance: 7, seed: null, count: 1,
     sampler: 'Default', sigmaSchedule: 'Default', loras: [], strength: mode === 'inpaint' ? 1 : 0.6, inputImage: '', references: [], customSize: false,
-    videoSeconds: 2, videoResolution: '480p', videoSound: true, patternStrength: 1.1,
-    controlType: '', controlImage: '', controlPreprocess: true, controlWeight: 1, upsample: true, keepPicture: false, faceDetail: false, faceDetailStrength: 0.4, fast: false,
+    videoSeconds: 2, videoFps: 24, videoResolution: '480p', videoSound: true, patternStrength: 1.1,
+    controlType: '', controlImage: '', controlPreprocess: true, controlDepthBase: false, controlWeight: 1, upsample: true, keepPicture: false, faceDetail: false, faceDetailStrength: 0.4, fast: false,
     inpaintAction: 'repaint', removeMethod: 'auto', aiLabel: false, aiLabelSize: 'medium', aiLabelIcon: 'auto', aiLabelTone: 'auto', aiLabelSubtle: false,
   }
 }
@@ -256,6 +259,10 @@ export const takesUpsampler = (meta: Asset['meta'] | undefined): boolean => meta
 export const takesTextToVideo = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'ltx23'
 /** Models whose steps and guidance are fixed (LTX-2.3's distilled 8 + 3 steps without guidance): no sliders. */
 export const fixedSampling = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'ltx23'
+/** The longest video a model makes: LTX-2.3 20 s (its peak stays at 9.1 GB, the time grows, MEASUREMENTS 7cy), others 5 s. */
+export const maxVideoSeconds = (meta: Asset['meta'] | undefined): number => (meta?.arch === 'ltx23' ? 20 : 5)
+/** Models whose frame rate can be chosen (LTX-2.3: 24 or 30 fps). */
+export const takesFps = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'ltx23'
 /** Models that make a video with sound (LTX-2.3). */
 export const takesSound = (meta: Asset['meta'] | undefined): boolean => meta?.arch === 'ltx23'
 /** The helper model a model needs before it can run (LTX-2.3's text encoder), '' for none. */
@@ -293,9 +300,12 @@ export function buildJob(mode: Mode, form: GenerateForm, model: Asset, loras: As
 
   if (mode === 'video') {
     job.inputImage = form.inputImage
-    job.videoSeconds = form.videoSeconds
+    job.videoSeconds = Math.min(form.videoSeconds, maxVideoSeconds(model.meta))
+    if (form.videoFps === 30 && takesFps(model.meta)) job.videoFps = 30
     if (!form.videoSound && takesSound(model.meta)) job.videoMute = true
-    ;[job.width, job.height] = videoSize(form.inputImage ? opts.inputSize : undefined, form.videoResolution)
+    // 1080p is offered for LTX-2.3 only (and only on Macs from 24 GB, the page decides that)
+    const resolution = form.videoResolution === '1080p' && !takesFps(model.meta) ? '720p' : form.videoResolution
+    ;[job.width, job.height] = videoSize(form.inputImage ? opts.inputSize : undefined, resolution)
   } else if (mode === 'illusion') {
     if (model.meta.family === 'sd1') {
       const f = Math.min(1, SD1_ILLUSION_MAX / Math.max(form.width, form.height))
@@ -320,6 +330,7 @@ export function buildJob(mode: Mode, form: GenerateForm, model: Asset, loras: As
   }
   if (does.control && form.controlType && form.controlImage && controlTypesFor(model.meta).some((ct) => ct.id === form.controlType)) {
     job.controlnet = { type: form.controlType, image: form.controlImage, weight: form.controlWeight, preprocess: form.controlPreprocess }
+    if (form.controlType === 'Depth' && form.controlPreprocess && form.controlDepthBase) job.controlnet.depthModel = 'base'
     // text to image keeps the chosen size; with an input picture the engine sizes after that
   }
   return job
@@ -368,6 +379,7 @@ export function applyJob(form: GenerateForm, job: Job, models: Asset[], loras: A
   // a method this build does not offer (ObjectClear in a build with commercially usable models only) falls back to Auto
   if (job.removeObject) form.removeMethod = removeMethods().some((m) => m.id === job.removeObject!.method) ? job.removeObject.method : 'auto'
   if (job.videoSeconds) form.videoSeconds = job.videoSeconds
+  form.videoFps = job.videoFps === 30 ? 30 : 24
   form.videoSound = !job.videoMute
   if (job.controlnet?.type === 'Illusion') {
     form.patternStrength = job.controlnet.weight
@@ -375,6 +387,7 @@ export function applyJob(form: GenerateForm, job: Job, models: Asset[], loras: A
     form.controlType = job.controlnet.type
     form.controlImage = job.controlnet.image
     form.controlPreprocess = job.controlnet.preprocess
+    form.controlDepthBase = job.controlnet.depthModel === 'base'
     form.controlWeight = job.controlnet.weight
   } else {
     form.controlType = ''

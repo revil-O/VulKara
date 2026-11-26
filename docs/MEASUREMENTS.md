@@ -3254,6 +3254,77 @@ case 2. CodeFormer is sharper and has more contrast but smooths older skin (case
 softer, keeps more of the age lines (cases 0 and 5) and looks flatter on case 3. CodeFormer is closer to the truth in
 five of six cases by the numbers, RestoreFormer++ only on the small faces of the couple.
 
+## 7cw. Upscalers: 4x-UltraSharp and 4xNomos2_hq_dat2 against Real-ESRGAN and 4xBHI_dat2_real (0.11.1, 2026-11-25, Mac mini M4 16 GB)
+
+The script and the five web-like photos of 7ce (RORem test set, 512 px, JPEG quality 60, to 2048 px), all through
+`photo_tools` (spandrel 0.4.2, MPS, fp32, the same tiling with overlap 32, the largest tile within 10.8 GB). New:
+4x-UltraSharp (Kim2091, HF rev. 920fe218, `4x-UltraSharp.safetensors`, ESRGAN, CC BY-NC-SA 4.0) and 4xNomos2_hq_dat2
+(Philip Hofmann, release 4xNomos2_hq_dat2, `.pth` with only `params`, DAT2, CC BY 4.0). Queue lock held; swap 1.6 →
+3.0 GB over A and B together.
+
+| Model | 512² tile | Metal | per photo |
+| --- | --- | --- | --- |
+| Real-ESRGAN x4plus | 3.70 s | 4.45 GB | 3.7 s (tile 512) |
+| 4x-UltraSharp | 3.55 s | 4.46 GB | 3.5 s (tile 512) |
+| 4xBHI_dat2_real | 15.22 s | 11.45 GB | 32.0–34.8 s (tile 384) |
+| 4xNomos2_hq_dat2 | 14.56 s | 11.45 GB | 32.0–32.2 s (tile 384) |
+
+Seen at full size (600² crops of the 2048 px results): 4xNomos2's pictures are broken — offset stripes and blocks
+across every photo, faces and edges falling apart — although spandrel reads it with the same DAT settings as
+4xBHI_dat2 (embed 180, split [8, 32], depth 6 × 6), which looks right with the same tiling; the cause is not found.
+4x-UltraSharp is as fast as Real-ESRGAN and sharper on cars, façades and glass, but on these JPEG photos it turns
+faces into waxy, painted masks and adds a hard texture to walls; Real-ESRGAN stays smooth, 4xBHI_dat2 the most
+natural (as in 7ce).
+
+Cause of the stripes (2026-11-26): not the loader. All 2116 tensors of the file sit in spandrel's model with the same
+values, and the author's own ONNX export (`4xNomos2_hq_dat2_fp32.onnx`, SHA-256 f5b0b05f…, onnxruntime on the CPU)
+paints the same stripes on an untiled 128² crop; they lie on JPEG's 8 px grid. The author made it "for usage on
+non-degraded input". Again on the same five photos made 512 px but saved as PNG (no JPEG): 4xNomos2 is clean and close
+to 4xBHI_dat2, a little smoother with less grain, faces, number plate and emblem natural; Real-ESRGAN 8.2 s (tile 384),
+both DAT2 models 33.3–33.6 s per photo. So it suits only clean originals (camera files, PNG), and breaks on the
+JPEG pictures most people enlarge.
+
+## 7cx. Depth Anything V2 Small, Base and Large (0.11.1, 2026-11-25, Mac mini M4 16 GB)
+
+The transformers pipeline `depth-estimation` as `preprocess.depth` runs it (MPS), Small = VulKara's helper
+(Apache-2.0), Base (HF rev. b1958afc, 390 MB) and Large (rev. 7581137e, 1.34 GB), both CC BY-NC 4.0; three photos of
+the RORem test set (two men at a table, high-rises, a limousine under a tree) and two portraits of 7cv (an elderly
+woman, a couple in a garden). Time per picture after a warm-up; Metal = peak of `driver_allocated_memory`.
+
+| Model | load | per picture | Metal peak |
+| --- | --- | --- | --- |
+| Small | 0.5 s | 0.06–0.23 s | 1.29 GB |
+| Base | 0.8 s | 0.16–0.22 s | 1.50 GB |
+| Large | 2.1 s | 0.50–0.67 s | 3.33 GB |
+
+Seen at full size: all three place people, cars and buildings correctly. Base and Large draw finer edges — single
+strands of hair, the plants behind the couple, the street lamp and its brackets — where Small rounds them off;
+Large is a little crisper than Base. All three are fast enough to make a control picture without waiting.
+
+## 7cy. LTX-2.3: longer clips, larger sizes, 30 fps (0.11.1, 2026-11-25/26, Mac mini M4 16 GB)
+
+Route A of the app (ltx-2-mlx, distilled two-stage, the q4 weights, Gemma 3 12B 4 bit, with sound) called through the
+engine's own `ltx23.run`, one process per case; 30 fps only by setting the module's `FPS` in the script (the app has 24
+fixed). The fox prompt of 7cp, seed 42; time from start (loading and text encoding included) to the saved mp4; peak =
+MLX's `get_peak_memory`; a watchdog would have ended a run at 6 GB more swap. Queue lock held (handed to okAI between
+the first and the other runs; a 20 s run was lost there and repeated).
+
+| Case | Size | Frames | Time | Peak | Swap | File |
+| --- | --- | --- | --- | --- | --- | --- |
+| 10 s, 24 fps | 768 × 512 | 241 | 933 s | 9.10 GB | flat | 5.0 MB |
+| 20 s, 24 fps | 768 × 512 | 481 | 2079 s | 9.11 GB | flat | 9.9 MB |
+| 5 s, 720p, 24 fps | 1280 × 704 | 121 | 1091 s | 10.95 GB | flat | 5.8 MB |
+| 5 s, 1080p, 24 fps | 1920 × 1088 | 121 | 3362 s | 15.96 GB | +1.5 GB | 13.1 MB |
+| 5 s, 30 fps | 768 × 512 | 153 | 571 s | 9.10 GB | flat | 3.2 MB |
+| 5 s, 24 fps: ltx-2-mlx's own command line (7cp, not the engine) | 768 × 512 | 121 | 494 s | 14.49 GB | flat | – |
+
+The length does not raise the peak (ltx-2-mlx streams the blocks, `low_memory`), it raises the time a little more
+than in proportion (20 s: 2.2 × the 10 s run). 720p fits easily; 1080p reaches the 16 GB Mac's limit, swaps 1.5 GB
+and takes 56 minutes for 5 s. Sizes are snapped to LTX's 64 px grid (720 → 704, 1080 → 1088). Seen (first, middle and
+last frames, the 1080p middle frame at full size): the fox stays the same animal over 20 s, four legs, head and tail
+right in every frame checked, the 1080p frame sharp in fur, bark and snow; every clip has its AAC sound track at
+48 kHz, none silent (listening was not possible here).
+
 ## 8. Earlier references (from the user guide and the changelog)
 
 - Training on the M2 (2025–26): SDXL about 2.5 s per step at 768 px, FLUX.2 [klein] 4B about 15 s, 9B about 30 s,

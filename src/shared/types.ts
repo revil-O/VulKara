@@ -164,8 +164,11 @@ export interface Job {
   referenceImages?: string[]
   maskImage?: string
   loras?: { path: string; scale: number }[]
-  controlnet?: { type: string; image: string; weight: number; preprocess: boolean }
+  /** depthModel 'base': the finer Depth Anything V2 Base makes the depth control picture (default Small) */
+  controlnet?: { type: string; image: string; weight: number; preprocess: boolean; depthModel?: 'base' }
   videoSeconds?: number
+  /** frames per second of an LTX-2.3 video (24 or 30; default 24) */
+  videoFps?: 24 | 30
   /** a video without sound (models that make one with sound) */
   videoMute?: boolean
   /** enlarge the input picture to this many times its size (1.1 to 4) instead of painting */

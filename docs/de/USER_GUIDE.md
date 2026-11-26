@@ -256,6 +256,7 @@ anderen Modells die Einstellungen bei, damit sich Modelle mit denselben Werten v
 
 - Lass **Es ist ein Foto: zuerst aufbereiten** eingeschaltet, wenn das Steuerbild ein normales Foto ist. Schalte es
   aus, wenn das Steuerbild schon ein Skelett, eine Tiefenkarte oder ein Kantenbild ist.
+- **Tiefenmodell** (bei Tiefe und einem Foto): *Small* (schnell, Standard) oder *Base* (feinere Kanten: Haare, Pflanzen, dünne Masten; 0,2 s, einmal geladen, 390 MB, nicht kommerzielle Lizenz).
 - **Gewichtung** (0–2) legt fest, wie streng das Ergebnis dem Steuerbild folgt.
 - Das Steuerungsmodell wird beim ersten Einsatz heruntergeladen.
 
@@ -495,8 +496,9 @@ Macht ein kurzes Video. Das können zwei Arten von Modellen (Modelle → Empfohl
   auch nur aus dem Prompt.
 - **Prompt**: was passiert, etwa Bewegung, Kamera, Stimmung und bei LTX-2.3 der Ton: *a red fox trots through fresh
   snow at sunrise, soft crunching footsteps and distant birdsong*.
-- **Länge**: 1–5 Sekunden.
-- **Auflösung**: 480p oder 720p (LTX-2.3 rundet die Seiten auf Schritte von 64 px).
+- **Länge**: 1–5 Sekunden, mit LTX-2.3 bis 20 Sekunden (auf einem Mac mini M4 mit 16 GB brauchten 10 s etwa 15 Minuten, 20 s etwa 35; der Speicher bleibt gleich).
+- **Bildrate** (LTX-2.3): 24 oder 30 fps.
+- **Auflösung**: 480p oder 720p, mit LTX-2.3 auf einem Mac ab 24 GB auch 1080p (LTX-2.3 rundet die Seiten auf Schritte von 64 px; auf 16 GB brauchte 1080p den ganzen Speicher und etwa eine Stunde für 5 s).
 - **Mit Ton** (LTX-2.3): aus macht das Video ohne Tonspur.
 
 ## 9. Vergrößern
@@ -1214,7 +1216,11 @@ VulKara-Releases und Gatekeeper) und setzt es an die Stelle der App, sobald VulK
 Version. **Was ist neu** öffnet die Release-Notizen, **Später** blendet die Karte bis zur nächsten Version aus.
 Die Titelzeile jeder Seite zeigt die Version (*v0.7.9*, ein Klick öffnet die Änderungen) oder bei einer neueren
 *Update auf Version … vorhanden!*: ein Klick holt die Karte zurück.
-Aktualisiert wird nur, während nichts erzeugt oder installiert wird, und nur eine App in einem Ordner, in den sie
+Läuft noch etwas (Bilder, Downloads, ein Training, eine
+Laufzeit-Installation, eine Bildbeschreibung oder ein Modell-Export), nennt die Karte es und bietet **Danach
+aktualisieren** (VulKara aktualisiert und startet neu, sobald es fertig ist; **Nicht warten** nimmt das zurück) oder
+**Abbrechen und jetzt aktualisieren** (fragt vorher; eine Laufzeit, die gerade installiert wird, läuft noch zu Ende).
+Aktualisiert wird nur eine App in einem Ordner, in den sie
 schreiben darf (in Programme, nicht aus dem Disk-Image gestartet). Mit Homebrew installiert? Das geht genauso;
 `brew upgrade --cask vulkara` auch.
 

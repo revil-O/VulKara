@@ -95,6 +95,10 @@
    "name": "Depth Anything V2 Small (Tiefe)",
    "description": "Macht aus einem Foto eine Tiefenkarte: Nahes ist hell, Fernes dunkel. Für Tiefen-Steuerbilder."
   },
+  "depth_base": {
+   "name": "Depth Anything V2 Base (Tiefe, feiner)",
+   "description": "Feinere Tiefenkarten als das kleine Modell (Haare, Pflanzen, dünne Masten), für Tiefen-Steuerbilder. Nicht kommerzielle Lizenz."
+  },
   "controlnet-union-sdxl-1.0-promax": {
    "name": "ControlNet Union für SDXL (ProMax)",
    "description": "Ein Modell für Pose, Tiefe, Kanten, Skizze und Kacheln mit SDXL-Modellen."
@@ -289,6 +293,7 @@
   "Free use below USD 10 million annual revenue; companies above need a paid commercial licence from Lightricks. The use restrictions of Attachment A apply to the model and its outputs; Lightricks claims no rights in the outputs.": "Freie Nutzung unter 10 Mio. US-Dollar Jahresumsatz; Unternehmen darüber brauchen eine kostenpflichtige kommerzielle Lizenz von Lightricks. Die Nutzungsbeschränkungen aus Anhang A gelten für das Modell und seine Ausgaben; Lightricks beansprucht keine Rechte an den Ausgaben.",
   "Free use below USD 10 million annual revenue; companies above need a paid commercial licence from Lightricks. The use restrictions of Attachment A apply to the model and its outputs; Lightricks claims no rights in the outputs. Quantized to 4 bit for MLX by dgrauet (ltx-2.3-mlx-q4).": "Freie Nutzung unter 10 Mio. US-Dollar Jahresumsatz; Unternehmen darüber brauchen eine kostenpflichtige kommerzielle Lizenz von Lightricks. Die Nutzungsbeschränkungen aus Anhang A gelten für das Modell und seine Ausgaben; Lightricks beansprucht keine Rechte an den Ausgaben. Von dgrauet für MLX auf 4 Bit quantisiert (ltx-2.3-mlx-q4).",
   "The Gemma Prohibited Use Policy applies; Google may restrict usage. Passing the model on needs the agreement and a Notice file; Google claims no rights in outputs.": "Die Gemma Prohibited Use Policy gilt; Google kann die Nutzung einschränken. Wer das Modell weitergibt, muss die Vereinbarung und eine Notice-Datei mitgeben; Google beansprucht keine Rechte an den Ausgaben.",
-  "Apache-2.0, no limits on the outputs. VulKara downloads the weights from the project on first use and reads them as numbers only (no executable code).": "Apache-2.0, ohne Einschränkungen für die Ausgaben. VulKara lädt die Gewichte bei der ersten Nutzung vom Projekt herunter und liest sie nur als Zahlen (kein ausführbarer Code)."
+  "Apache-2.0, no limits on the outputs. VulKara downloads the weights from the project on first use and reads them as numbers only (no executable code).": "Apache-2.0, ohne Einschränkungen für die Ausgaben. VulKara lädt die Gewichte bei der ersten Nutzung vom Projekt herunter und liest sie nur als Zahlen (kein ausführbarer Code).",
+  "For non-commercial use only. VulKara downloads the weights from Hugging Face on first use.": "Nur für nicht kommerzielle Nutzung. VulKara lädt die Gewichte bei der ersten Nutzung von Hugging Face herunter."
  }
 }

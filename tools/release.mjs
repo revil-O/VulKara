@@ -95,4 +95,6 @@ if (notarizing) {
   step('notarize the DMG', 'xcrun', ['notarytool', 'submit', dmg, '--keychain-profile', PROFILE, '--wait'])
   step('staple', 'xcrun', ['stapler', 'staple', dmg])
 }
+// the unpacked app goes: Spotlight would offer it, and started from here it would use the real profile
+rmSync(dirname(APP), { recursive: true, force: true })
 console.log(`\nDone: ${dmg} (${notarizing ? 'signed, notarized' : `signed, not notarized: there is no notarytool profile "${PROFILE}"`})`)

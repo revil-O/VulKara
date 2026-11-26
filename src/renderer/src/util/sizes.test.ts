@@ -25,5 +25,8 @@ describe('sizes', () => {
     expect(videoSize([1080, 1920], '720p')).toEqual([704, 1248])
     expect(videoSize([4000, 1000], '720p')).toEqual([1280, 704])
     expect(videoSize(undefined, '480p')).toEqual([864, 480])
+    // 1080p (LTX-2.3 from 24 GB): LTX's 64 px grid, the long side up to 1920
+    expect(videoSize([1920, 1080], '1080p')).toEqual([1920, 1088])
+    expect(videoSize([1080, 1920], '1080p')).toEqual([1088, 1920])
   })
 })

@@ -37,6 +37,14 @@
   },
   "revision": "5426e4f0f36572d16453bbda7a8389317b1bef99"
  },
+ "depth-anything/Depth-Anything-V2-Base-hf": {
+  "files": {
+   "config.json": null,
+   "model.safetensors": "9996d15c334d264cfcc29f4318d7d3789a006ecc444782c2fb82f7eaa1acb8bf",
+   "preprocessor_config.json": null
+  },
+  "revision": "b1958afc87fb45a9e3746cb387596094de553ed8"
+ },
  "lllyasviel/control_v11f1p_sd15_depth": {
   "files": {
    "config.json": null,

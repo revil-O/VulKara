@@ -51,3 +51,14 @@ def test_edge_images():
     for kind in ("Canny", "LineArt", "Scribble"):
         out = np.asarray(preprocess.control_image(kind, img))
         assert out.shape == (64, 64, 3) and out.max() == 255
+
+
+def test_the_depth_control_picture_takes_the_chosen_model(monkeypatch):
+    seen = []
+    monkeypatch.setattr(preprocess, "depth", lambda image, report=None, model="depth": seen.append(model) or image)
+    from PIL import Image
+    img = Image.new("RGB", (8, 8))
+    preprocess.control_image("Depth", img)
+    preprocess.control_image("Depth", img, depth_model="depth_base")
+    assert seen == ["depth", "depth_base"]
+    assert preprocess.MODELS["depth_base"]["repo"] == "depth-anything/Depth-Anything-V2-Base-hf"

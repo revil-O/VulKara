@@ -243,6 +243,7 @@ settings, so that models can be compared with the same ones:
 
 - Leave **It is a photo: prepare it first** on when the control picture is a normal photo. Switch it off when the
   control picture is already a skeleton, depth map or edge picture.
+- **Depth model** (with Depth and a photo): *Small* (fast, the default) or *Base* (finer edges: hair, plants, thin poles; 0.2 s, downloaded once, 390 MB, non-commercial licence).
 - **Weight** (0–2) sets how strictly the result follows the control picture.
 - The control model is downloaded the first time it is used.
 
@@ -468,8 +469,9 @@ Makes a short video. Two kinds of models do it (Models → Recommended):
   prompt alone.
 - **Prompt**: what happens, such as movement, camera, mood and, for LTX-2.3, the sound: *a red fox trots through
   fresh snow at sunrise, soft crunching footsteps and distant birdsong*.
-- **Length**: 1–5 seconds.
-- **Resolution**: 480p or 720p (LTX-2.3 rounds the sides to steps of 64 px).
+- **Length**: 1–5 seconds, with LTX-2.3 up to 20 seconds (on a Mac mini M4 with 16 GB 10 s took about 15 minutes, 20 s about 35; the memory stays the same).
+- **Frame rate** (LTX-2.3): 24 or 30 fps.
+- **Resolution**: 480p or 720p, with LTX-2.3 on a Mac from 24 GB also 1080p (LTX-2.3 rounds the sides to steps of 64 px; on 16 GB 1080p needed all the memory and about an hour for 5 s).
 - **With sound** (LTX-2.3): off makes the video without a sound track.
 
 ## 9. Upscale
@@ -1136,8 +1138,10 @@ release. When there is a newer one, a card in the corner says so: **Update and r
 and Gatekeeper) and puts it in place of the app once VulKara has quit; then the new version starts. **What's new** opens
 the release notes, **Later** hides the card until the next version. The title row of every page shows the version
 (*v0.7.9*, a click opens the Changelog) or, with a newer one, *Update to version … available!*: a click brings the
-card back. It updates only while nothing is being made or
-installed, and only an app in a folder it may write to (in Applications, not started from the disk image). Installed
+card back. If something still runs (pictures, downloads, a training, a
+runtime install, a picture description or a model export), the card lists it and offers **Update afterwards** (VulKara
+updates and restarts as soon as it is done; **Don't wait** takes that back) or **Stop and update now** (asks first; a
+runtime being installed still finishes). It updates only an app in a folder it may write to (in Applications, not started from the disk image). Installed
 with Homebrew? It works the same; `brew upgrade --cask vulkara` does too.
 
 ### Folders

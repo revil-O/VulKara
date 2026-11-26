@@ -67,6 +67,15 @@ export interface AppUpdateState {
   stage: 'idle' | 'downloading' | 'checking' | 'restarting' | 'error'
   percent: number
   error?: string
+  /** the update waits until nothing runs any more (work: what still runs) */
+  waiting?: boolean
+  work?: UpdateWork[]
+}
+
+/** What runs in VulKara when an update should start: it waits for it, or stops it (a runtime install excepted). */
+export interface UpdateWork {
+  kind: 'jobs' | 'imports' | 'training' | 'runtime' | 'caption' | 'export'
+  count: number
 }
 
 /** Time the steps of a job waited for parts of the model to be read again, and how much was read. */
@@ -735,8 +744,11 @@ export interface VulkaraApi {
     update(): Promise<AppUpdateState>
     /** asks GitHub for the newest release */
     checkUpdate(): Promise<AppUpdateState>
-    /** downloads and checks the newest release, then restarts into it */
-    installUpdate(): Promise<void>
+    /** downloads and checks the newest release, then restarts into it; while something runs it returns that and
+     *  starts only with mode: 'after' (once it is done) or 'stop' (stops it first) */
+    installUpdate(mode?: 'after' | 'stop'): Promise<UpdateWork[]>
+    /** the update no longer waits for the running work */
+    cancelUpdateWait(): Promise<void>
     onUpdate(fn: (s: AppUpdateState) => void): () => void
     /** a page the main window should show (the app menu and the menu bar: Settings …) */
     onNavigate(fn: (route: string) => void): () => void

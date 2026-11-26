@@ -186,7 +186,8 @@ def run(job, model_dir, gemma_dir, images_dir, stop=None, state=None, progress=N
     from ltx_core_mlx.model.video_vae.video_vae import _compute_decode_tiling
 
     seconds = float(job.get("video_seconds") or 2)
-    num_frames = frames_for(seconds)
+    fps = 30 if int(job.get("video_fps") or FPS) == 30 else FPS  # 24 or 30 (MEASUREMENTS 7cy: the same peak)
+    num_frames = frames_for(seconds, fps)
     width, height = snap(int(job.get("width") or 768), int(job.get("height") or 512))
     with_sound = job.get("audio", True) is not False
     total, done = 8 + 3, [0]
@@ -215,7 +216,7 @@ def run(job, model_dir, gemma_dir, images_dir, stop=None, state=None, progress=N
             samplers.tqdm, _Steps.on_step = _Steps, staticmethod(on_step)
             state("Making the video (LTX-2.3, %d × %d, %d frames)" % (width, height, num_frames))
             video, audio = pipe.generate_two_stage(job.get("prompt") or "", height=height, width=width,
-                                                   num_frames=num_frames, frame_rate=FPS, seed=int(job.get("seed") or 0),
+                                                   num_frames=num_frames, frame_rate=fps, seed=int(job.get("seed") or 0),
                                                    image=start)
             # the transformer is not needed for decoding (ltx-2-mlx frees it there too)
             pipe.dit = None
@@ -231,13 +232,13 @@ def run(job, model_dir, gemma_dir, images_dir, stop=None, state=None, progress=N
                 mx.eval(waveform)
                 pipe.audio_decoder_block.free()
             decoder = pipe.video_decoder_block.load()
-            tiling = _compute_decode_tiling(video.shape, frame_rate=FPS)
+            tiling = _compute_decode_tiling(video.shape, frame_rate=fps)
             name = "ltx23_%s.mp4" % uuid.uuid4().hex[:12]
             path = os.path.join(images_dir, name)
             os.makedirs(images_dir, exist_ok=True)
             notice = "AI generated with VulKara (model: LTX-2.3)"
             chunks = (c.astype(mx.float32) for c in decoder.tiled_decode(video, tiling))
-            frames = written(path, lambda part: write_mp4(part, chunks, waveform, FPS, notice))
+            frames = written(path, lambda part: write_mp4(part, chunks, waveform, fps, notice))
             log("[ltx23] %d × %d, %d frames%s in %.0fs" % (width, height, frames, " with sound" if with_sound else "",
                                                           time.time() - t0))
             return path

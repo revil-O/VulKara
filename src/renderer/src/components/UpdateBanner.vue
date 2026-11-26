@@ -8,12 +8,16 @@ import { Download, ExternalLink, RotateCw, X } from '@lucide/vue'
 import { t } from '../i18n'
 import { cleanError } from '../stores/runtimes'
 import { useAppUpdateStore } from '../stores/appUpdate'
+import type { UpdateWork } from '@shared/api'
 
 const DISMISSED = 'vk.updateLater'
 const updates = useAppUpdateStore()
 const { state } = storeToRefs(updates)
 const later = ref(readLater())
 const failed = ref('')
+// what ran when Update was clicked; asking: the stop is to be confirmed
+const running = ref<UpdateWork[]>([])
+const asking = ref(false)
 const installButton = ref<HTMLButtonElement>()
 
 function readLater(): string {
@@ -45,14 +49,27 @@ const rawError = computed(() => failed.value || (state.value?.stage === 'error' 
 const stuck = computed(() => rawError.value in REASONS)
 const error = computed(() => (stuck.value ? t(REASONS[rawError.value as keyof typeof REASONS]) : rawError.value))
 
-async function install(): Promise<void> {
+async function install(mode?: 'after' | 'stop'): Promise<void> {
   failed.value = ''
+  asking.value = false
   try {
-    await window.vk.app.installUpdate()
+    running.value = await window.vk.app.installUpdate(mode)
   } catch (err) {
     failed.value = cleanError(err)
   }
 }
+function noWait(): void {
+  running.value = []
+  void window.vk.app.cancelUpdateWait()
+}
+/** "2 pictures or videos, 1 download" */
+function workList(work: UpdateWork[]): string {
+  return work.map((w) => t(`app.update.work.${w.kind}`, { n: w.count })).join(', ')
+}
+// a runtime install is not stopped: the confirmation says so
+// a started download shows its own progress
+watch(() => state.value?.stage, (stage) => { if (stage !== 'idle') running.value = [] })
+const onlyWaits = computed(() => (state.value?.work ?? running.value).some((w) => w.kind === 'runtime'))
 function notes(): void {
   if (state.value?.notesUrl) void window.vk.app.openExternal(state.value.notesUrl)
 }
@@ -75,6 +92,34 @@ function dismiss(): void {
     </template>
     <p v-else-if="state.stage === 'checking'">{{ t('app.update.checking', { version: state.available ?? '' }) }}</p>
     <p v-else-if="state.stage === 'restarting'">{{ t('app.update.restarting', { version: state.available ?? '' }) }}</p>
+    <template v-else-if="asking">
+      <p>{{ t('app.update.stopAsk', { list: workList(state.work ?? running) }) }}<span v-if="onlyWaits" class="dim">{{ t('app.update.runtimeWaits') }}</span></p>
+      <div class="actions">
+        <button class="btn primary small" @click="install('stop')">{{ t('app.update.stopConfirm') }}</button>
+        <button class="btn small" @click="asking = false">{{ t('app.update.back') }}</button>
+      </div>
+    </template>
+    <template v-else-if="state.waiting">
+      <p>
+        <strong>{{ t('app.update.available', { version: state.available ?? '' }) }}</strong>
+        <span>{{ t('app.update.waitingFor', { list: workList(state.work ?? []) }) }}</span>
+      </p>
+      <div class="actions">
+        <button class="btn small" @click="asking = true">{{ t('app.update.stopNow') }}</button>
+        <button class="btn small ghost" @click="noWait">{{ t('app.update.noWait') }}</button>
+      </div>
+    </template>
+    <template v-else-if="running.length">
+      <p>
+        <strong>{{ t('app.update.available', { version: state.available ?? '' }) }}</strong>
+        <span>{{ t('app.update.stillRunning', { list: workList(running) }) }}</span>
+      </p>
+      <div class="actions">
+        <button ref="installButton" class="btn primary small" @click="install('after')">{{ t('app.update.after') }}</button>
+        <button class="btn small" @click="asking = true">{{ t('app.update.stopNow') }}</button>
+        <button class="btn small ghost" @click="running = []">{{ t('app.update.back') }}</button>
+      </div>
+    </template>
     <template v-else>
       <p>
         <strong>{{ t('app.update.available', { version: state.available ?? '' }) }}</strong>
@@ -82,7 +127,7 @@ function dismiss(): void {
       </p>
       <p v-if="error" class="error selectable">{{ t('app.update.failed', { reason: error }) }}</p>
       <div class="actions">
-        <button v-if="!stuck" ref="installButton" class="btn primary small" @click="install">
+        <button v-if="!stuck" ref="installButton" class="btn primary small" @click="install()">
           <component :is="error ? RotateCw : Download" :size="13" /> {{ error ? t('app.update.retry') : t('app.update.install') }}
         </button>
         <button class="btn small" @click="notes"><ExternalLink :size="13" /> {{ t('app.update.notes') }}</button>
