@@ -5,6 +5,8 @@
     python main.py                 serve jobs over stdin/stdout (spawned by bridge.js)
     python main.py import_model …  import a model (spawned by native_functions.js)
     python main.py detect_pose <image>   pose (body, hands, face) of a photo for the pose editor
+    python main.py find_photos <scan>    the photos on a flatbed scan as turned rectangles (Scans page)
+    python main.py cut_photos <job.json> the photos cut out of a scan and saved as PNG (Scans page)
     python main.py find_faces <image>    the faces of a photo for Restore (5 landmarks and the restored square)
     python main.py caption_image <image> a prompt that describes the picture (Image to image, Qwen3-VL 2B)
     python main.py export_single <model folder> <out.safetensors>   SD 1.x / SDXL in folder layout as one checkpoint
@@ -102,6 +104,12 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "export_single":
         import export_single
         sys.exit(export_single.main(sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "find_photos":
+        import scans
+        sys.exit(scans.find_main(sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "cut_photos":
+        import scans
+        sys.exit(scans.cut_main(sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "find_faces":
         import restore
         sys.exit(restore.faces_main(sys.argv[2:]))

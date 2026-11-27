@@ -50,12 +50,12 @@ The app and its user guide in **English** · [Deutsch](docs/de/USER_GUIDE.md) ·
 > picks the right one. Signed, notarized and self-updating like the Apple silicon version. [What it can do](#requirements)
 
 > [!NOTE]
-> **<img src="docs/icons/layers.svg" width="16" height="16" alt=""> New in 0.11.2: Civitai versions.** Pick the version of a LoRA or model you want on its
-> card, keep two versions side by side, and the LoRA page tells you when a newer one is out.
+> **<img src="docs/icons/scan-line.svg" width="16" height="16" alt=""> New in 0.11.3: Scans.** Drop your flatbed scans in: the photos on them are found,
+> straightened and cut out of the lid and a white paper border, one PNG each with the scan's 16 bits – and on to Restore
+> as a batch. [Restore and Scans](#restore-old-photos)
 >
-> **<img src="docs/icons/clapperboard.svg" width="16" height="16" alt=""> New in 0.11.1: longer videos.** LTX-2.3 makes clips with sound up to 20 seconds, at 24 or
-> 30 fps, and 1080p on Macs with 24 GB or more; a finer depth model for depth control pictures; updates wait for running
-> work. [Video](#video-upscale-pose-and-illusion) · [Changelog](CHANGELOG.md)
+> **<img src="docs/icons/layers.svg" width="16" height="16" alt=""> New in 0.11.2: Civitai versions.** Pick the version of a LoRA or model you want on its
+> card, keep two versions side by side, and the LoRA page tells you when a newer one is out. [Changelog](CHANGELOG.md)
 >
 > **<img src="docs/icons/sparkles.svg" width="16" height="16" alt=""> Since 0.7.0: FLUX 3 Image Klein.** Black Forest Labs' newest model on the MLX runtime, for text to
 > image and edits with a reference picture, with LoRAs and an optional **prompt upsampler** that turns a short prompt
@@ -257,6 +257,11 @@ change left of the line, the original right), the result at the photo's size or 
 kinds of old photos, and your own templates.
 
 ![Restore](docs/screenshots/restore.jpg)
+
+**Scans** cuts the photos out of flatbed scans: the scanner lid and a white paper border go, each photo is straightened,
+several photos on one scan become one PNG each (*Album 3 – Photo 1.png*), with the scan's 16 bits, DPI and colour
+profile, in about a second without AI. Frames can be corrected by hand, and the cut-out photos go on to Restore as a
+batch whose results land in the same folder.
 
 ### Video, upscale, pose and illusion
 

@@ -132,6 +132,10 @@ async function refresh(): Promise<void> {
   await Promise.all([assets.refresh(), settings.load()])
   const given = handoff.take('restore')
   if (given?.inputImage) input.value = given.inputImage
+  if (given?.batch?.length) {
+    batch.value = given.batch
+    exportBatch.value = !!given.exportBatch
+  }
 }
 onActivated(refresh)
 watch(() => route.query.t, () => { if (route.path === '/restore') void refresh() })
@@ -290,7 +294,11 @@ function jobFor(o: RestoreOptions, kind: string, path: string, sz: [number, numb
 const batch = ref<string[]>([])
 const remote = isRemote()
 const batchBlocked = computed(() => checkSteps() || undefined)
-const makeJob = (path: string, sz: [number, number]): Omit<Job, 'id'> => jobFor({ ...opts.value, preview: undefined }, '', path, sz)
+// the results of a batch also into the scans' export folder (on for a batch from the Scans page)
+const exportBatch = ref(false)
+const stem = (path: string): string => (path.split('/').pop() ?? path).replace(/\.[^.]+$/, '')
+const makeJob = (path: string, sz: [number, number]): Omit<Job, 'id'> =>
+  ({ ...jobFor({ ...opts.value, preview: undefined }, '', path, sz), ...(exportBatch.value ? { exportName: stem(path) } : {}) })
 
 function open(q: QueuedJob, file: string): void {
   const pictures = jobs.value.flatMap((x) => queue.shown(x).map((f) => ({ job: JSON.parse(JSON.stringify(x.job)) as Job, file: f })))
@@ -302,7 +310,11 @@ function open(q: QueuedJob, file: string): void {
   <PageFrame :title="t('restore.title')" :subtitle="t('restore.subtitle')">
     <div class="page-grid">
       <BatchPanel v-if="batch.length" v-model="batch" :make="makeJob" :blocked="batchBlocked" />
-      <ImageInput v-else v-model="input" :many="!remote" @size="(w, h) => (size = [w, h])" @many="batch = $event">
+      <label v-if="batch.length && !remote" class="check export">
+        <input v-model="exportBatch" type="checkbox" /> {{ t('restore.exportBatch') }}
+        <HintBadge :text="t('restore.exportBatchHint')" />
+      </label>
+      <ImageInput v-if="!batch.length" v-model="input" :many="!remote" @size="(w, h) => (size = [w, h])" @many="batch = $event; exportBatch = false">
         <template #default="{ src, loaded }">
           <MaskCanvas ref="mask" :src="src" @loaded="(e) => (loaded(e), measure(e))" @change="painted = $event">
             <template #overlay>
@@ -468,6 +480,9 @@ function open(q: QueuedJob, file: string): void {
 </template>
 
 <style scoped>
+.export {
+  margin: 8px 0 0;
+}
 .hint {
   margin-top: -6px;
 }

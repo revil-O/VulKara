@@ -3325,6 +3325,30 @@ last frames, the 1080p middle frame at full size): the fox stays the same animal
 right in every frame checked, the 1080p frame sharp in fur, bark and snow; every clip has its AAC sound track at
 48 kHz, none silent (listening was not possible here).
 
+## 7cz. Scans: finding and cutting out the photos of a flatbed scan (0.11.3, 2026-11-27, Mac mini M4 16 GB)
+
+`engines/diffusers/scans.py` without a model (OpenCV): the photos are found on a copy with a long side of 1500 px by
+the colour of the scanner lid around them, a white paper border is cut off, then each photo is straightened and cut out
+of the full scan and written as PNG with the scan's bit depth, DPI and colour profile. Test scans made from the docs
+pictures (A4, lid with a light gradient and noise, soft edge shadows); a fresh Python process each, three runs each, all
+three alike; finding includes reading the scan. Queue: VulKara held the lock alone (owner before: the measurement), no
+swap.
+
+| Scan | photos | find | cut out + PNG | peak |
+| --- | --- | --- | --- | --- |
+| A4 300 dpi, 8 bit (2480 × 3508) | 3 | 0.14 s | 0.18 s | 0.22 GB |
+| A4 600 dpi, 16 bit (4960 × 7016) | 2 | 0.94 s | 1.32 s | 0.77 GB |
+
+In the app (test build, the engine started per call) finding took 0.13–0.98 s per scan. Found right: three photos with
+3°, 2° and 1° tilt (one lying sideways, turned upright by the user), a JPEG with a white print border, two 16-bit
+photos at 0.5° and 4°; two photos 7 px apart stay two. Not found right by colour alone: a light photo on a white lid
+needs its frame drawn by hand (said on the page). Small enough for any Mac: a 600 dpi 16-bit scan needs less than 1 GB.
+
+Intel build (release 0.11.3 x64, MacBook Pro 2017, i7, 8 GB, 2026-11-27): the same three photos of the A4 300 dpi
+scan found with the same frames; in the app 26 s for the first call after installing the runtime, then 9–13 s per scan,
+the engine process started per call. Only the total was measured; the share of the Python/OpenCV start was not split
+off (open).
+
 ## 8. Earlier references (from the user guide and the changelog)
 
 - Training on the M2 (2025–26): SDXL about 2.5 s per step at 768 px, FLUX.2 [klein] 4B about 15 s, 9B about 30 s,

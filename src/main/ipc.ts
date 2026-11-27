@@ -33,7 +33,8 @@ import { cachedLicence, fetchLicence, setOrigin } from './licence_info'
 import { cachedInfo, fetchInfo } from './lora_info'
 import { loraDetails, setCategory, setTriggerWords } from './loras'
 import { previewPicture, searchLoras, type FetchLike } from './lora_search'
-import { captionImage, detectPose, findFaces } from './pose'
+import { captionImage, detect, detectPose, findFaces } from './pose'
+import { checkPhotos, exportCopy } from './scans'
 import { Trainer, folderImages } from './training'
 import { JobQueue } from './queue'
 import { runTool } from './tool_process'
@@ -46,9 +47,9 @@ import { isMonitor, monitorContents } from './monitor_window'
 import { confirmSplash, isSplash, splashState } from './splash'
 import { engineLine, mainLanguage, t } from './i18n'
 import { MAX_REFERENCES } from '@shared/engine_job'
-import { engineEnv, getSettings, helpersDir, historyDir, imagesDir, isValidSetting, modelsDir, settableByPage, lorasDir, onSettingChanged, setSetting } from './settings'
+import { engineEnv, getSettings, helpersDir, historyDir, imagesDir, isValidSetting, modelsDir, scanExportDir, settableByPage, lorasDir, onSettingChanged, setSetting } from './settings'
 import type { LoraSearchRequest } from '@shared/lora_bases'
-import type { AppUpdateState, ImportJob, ImportRequest, QueueSnapshot, TrainingRequest, UpdateWork, ViewerAction, ViewerItem } from '@shared/api'
+import type { AppUpdateState, FoundPhotos, ImportJob, ImportRequest, QueueSnapshot, TrainingRequest, UpdateWork, ViewerAction, ViewerItem } from '@shared/api'
 import { FOLDER_KEYS, type FolderKey, type Settings } from '@shared/settings'
 import type { Job } from '@shared/types'
 
@@ -106,6 +107,13 @@ const queue: JobQueue<RuntimeId> = new JobQueue<RuntimeId>({
     // a preview of Restore (a part of the photo) is shown on its page only
     if (job.restore?.preview) return
     history.add(job, results, Date.now(), timing)
+    if (job.restore && typeof job.exportName === 'string' && job.exportName && results[0]) {
+      try {
+        exportCopy(results[0], job.exportName.slice(0, 200), scanExportDir(), t('main.scans.restored'))
+      } catch (err) {
+        log(`[scans] the restored photo could not be copied into the export folder: ${(err as Error).message}`)
+      }
+    }
     if (results.length && !getSettings().firstPictureMade) setSetting('firstPictureMade', true)
     if (getSettings().notifySound && !queue.snapshot().some((j) => j.state === 'waiting')) doneSound()
   },
@@ -320,6 +328,8 @@ export async function repairRuntimes(): Promise<void> {
 }
 // a model being written as one file (assets:exportSingle): it holds the memory, so no job starts meanwhile
 let exporting: ChildProcess | undefined
+// the photos being cut out of a scan (scans:cut): waited for by an update, stopped by its Stop
+let cutting: ChildProcess | undefined
 // a picture being described (caption:image), stopped by caption:stop
 let captioning: { proc?: ChildProcess; stopped: boolean } | undefined
 
@@ -333,6 +343,7 @@ function updateWork(): UpdateWork[] {
     ['runtime', installing.size],
     ['caption', captioning ? 1 : 0],
     ['export', exporting ? 1 : 0],
+    ['scans', cutting ? 1 : 0],
   ]
   return counts.filter(([, count]) => count > 0).map(([kind, count]) => ({ kind, count }))
 }
@@ -347,6 +358,7 @@ function updateStop(): void {
     captioning.proc?.kill()
   }
   exporting?.kill()
+  cutting?.kill()
 }
 
 // the update waits for the running work (updateWork): checked every 2 s
@@ -583,6 +595,11 @@ export function registerIpc(): void {
     if (appUpdater?.status().stage === 'restarting') throw new Error(t('main.appUpdate.restarting'))
     return addJob(job, count)
   })
+  // a browser never writes into the scans' export folder (only a Restore batch from the Scans page does)
+  {
+    const local = remoteHandlers.get('queue:add')!
+    remoteHandlers.set('queue:add', (job, ...rest) => local({ ...(job as Job), exportName: undefined }, ...rest))
+  }
   handle('benchmark:start', (job: Omit<Job, 'id'>, count: number, model: string, freshPrompt?: boolean) => {
     const run = { ...job, page: 'benchmark' }
     // the engines keep the encodings of the last prompt: a number unique to this picture makes each one encode its prompt
@@ -1064,6 +1081,40 @@ export function registerIpc(): void {
     if (typeof path !== 'string' || !isAbsolute(path) || !/\.(png|jpe?g|webp|bmp|tiff?|heic)$/i.test(path) || !existsSync(path)) throw new Error(t('main.files.choosePicture'))
     fileAccess.check(path)
     return findFaces(engineCommand('diffusers', ['find_faces', path]), engineEnv())
+  })
+
+  // Scans page: the photos on a scan found, then cut out into the export folder (engines/diffusers/scans.py)
+  const scanFile = (path: unknown): string => {
+    if (typeof path !== 'string' || !isAbsolute(path) || !/\.(png|jpe?g)$/i.test(path) || !existsSync(path)) throw new Error(t('main.files.choosePicture'))
+    fileAccess.check(path)
+    return path
+  }
+  handle('scans:find', (path: string) =>
+    detect<FoundPhotos>(engineCommand('diffusers', ['find_photos', scanFile(path)]), engineEnv(), '__photos__', () => t('main.scans.needsDiffusers'), () => {}))
+  handle('scans:cut', async (path: string, photos: unknown, word: unknown) => {
+    const scan = scanFile(path)
+    holdForUpdate()
+    const checked = checkPhotos(photos)
+    // the word is part of a file name: no folder separators or characters Finder refuses
+    const name = typeof word === 'string' ? word.replace(/[\\/:*?"<>|\0]/g, '').trim().slice(0, 40) : ''
+    const out = scanExportDir()
+    mkdirSync(out, { recursive: true })
+    const job = join(app.getPath('temp'), `vulkara-scan-${process.pid}-${Date.now()}.json`)
+    writeFileSync(job, JSON.stringify({ scan, photos: checked, out, word: name || 'Photo' }))
+    try {
+      const done = await detect<{ files: string[] }>(engineCommand('diffusers', ['cut_photos', job]), engineEnv(), '__cut__', () => t('main.scans.needsDiffusers'), () => {},
+        (proc) => { cutting = proc })
+      // only these files are given to the app (Restore takes them), not the whole export folder
+      fileAccess.grantFiles(done.files)
+      return done.files
+    } finally {
+      cutting = undefined
+      rmSync(job, { force: true })
+    }
+  })
+  handle('scans:openFolder', async () => {
+    mkdirSync(scanExportDir(), { recursive: true })
+    await shell.openPath(scanExportDir())
   })
 
   handle('splash:state', () => splashState())

@@ -20,7 +20,7 @@ guarda la app sus datos.
 7. [Lienzo IA](#7-lienzo-ia)
 8. [Vídeo](#8-vídeo)
 9. [Ampliar](#9-ampliar), [Mejorar: herramientas de fotos](#mejorar-herramientas-de-fotos)
-10. [Restaurar](#10-restaurar)
+10. [Restaurar](#10-restaurar), [Escaneos: fotos de un escáner plano](#escaneos-fotos-de-un-escáner-plano)
 11. [Editor de poses](#11-editor-de-poses)
 12. [Ilusión](#12-ilusión)
 13. [LoRAs](#13-loras)
@@ -99,7 +99,7 @@ fuentes en las que confíes.
 
 | Parte | Qué hace |
 | --- | --- |
-| **Barra de navegación** (izquierda) | Agrupa las páginas, cada grupo con un tono propio: *Inicio*; *Crear* (imágenes nuevas): Texto, Imagen, Lienzo, Vídeo, Ilusión; *Editar* (una imagen que ya tienes): Inpainting, Mejorar, Ampliar, Restaurar; *Herramientas*: Pose, LoRA, Entrenar; *Biblioteca*: Modelos, Historial, Favoritos, Consejos. En una ventana demasiado baja para todos, la barra se ensancha y muestra los grupos en dos columnas. Los iconos de abajo abren Ajustes, Registros, Cambios, Licencias y Acerca de. |
+| **Barra de navegación** (izquierda) | Agrupa las páginas, cada grupo con un tono propio: *Inicio*; *Crear* (imágenes nuevas): Texto, Imagen, Lienzo, Vídeo, Ilusión; *Editar* (una imagen que ya tienes): Inpainting, Mejorar, Ampliar, Restaurar, Escaneos; *Herramientas*: Pose, LoRA, Entrenar; *Biblioteca*: Modelos, Historial, Favoritos, Consejos. En una ventana demasiado baja para todos, la barra se ensancha y muestra los grupos en dos columnas. Los iconos de abajo abren Ajustes, Registros, Cambios, Licencias y Acerca de. |
 | **Área de trabajo** (centro) | La entrada de la página (prompt, imagen, lienzo) y, debajo, los resultados de esta página. Un resultado cuyo archivo se eliminó o se movió aparece como *Falta el archivo*; <img src="../icons/x.svg" width="14" height="14" alt="×"> lo quita de la lista. |
 | **Panel de ajustes** (derecha) | Modelo, estilo, tamaño y todo lo demás que da forma al resultado. |
 | **ⓘ** y **!** | Pequeñas insignias naranjas cuyo texto se abre al pasar el puntero por encima: **ⓘ** (un anillo) es información sin más, **!** (relleno) indica que la app hace algo distinto de lo estándar, p. ej. valores que difieren de la sugerencia del modelo o un modelo que se ejecuta con streaming desde el SSD. |
@@ -663,6 +663,31 @@ incluidas y se eliminan con su **×**.
 
 La **nota** es un campo de texto de tres líneas (se puede agrandar desde su esquina inferior derecha) para lo que muestra
 la foto, p. ej. *una foto de boda de los años 50*; ayuda a la IA.
+
+### Escaneos: fotos de un escáner plano
+
+![Escaneos](../screenshots/es/scans.jpg)
+
+**Escaneos** (en el menú, debajo de Restaurar) recorta las fotos de escaneos de escáner plano: el blanco de la tapa del
+escáner alrededor desaparece, cada foto se endereza y varias fotos en un escaneo pasan a ser un archivo cada una.
+Arrastra escaneos PNG o JPEG a la página, o elige archivos o una carpeta entera con **Cargar escaneos …**; las fotos se
+encuentran al instante, sin IA (alrededor de un segundo para un escaneo A4 a 600 dpi).
+
+Cada foto recibe un marco numerado. Arrastra el marco para moverlo, sus esquinas y bordes para cambiar el tamaño, y el
+tirador redondo de arriba para enderezarlo a mano. **↻** gira 90° en el sentido de las agujas del reloj una foto que
+estaba de lado o del revés; la flecha del centro indica qué lado queda arriba. **×** quita un marco y con **Nuevo
+marco** dibujas uno sobre una foto que no se encontró (puede pasar con una foto clara sobre una tapa blanca). El borde
+blanco de papel de las copias antiguas se recorta junto con la tapa. Una foto partida en dos marcos (una franja clara la cruza): quita ambos y dibuja uno; dos fotos
+a menos de un milímetro: dibuja un marco para cada una.
+
+**Exportar todo** guarda cada foto como PNG con el nombre de su escaneo, p. ej. *Álbum 3 – Foto 1.png*, en la carpeta de
+exportación (Ajustes → Carpetas → *Escaneos recortados*, por defecto `~/VulKara/scans`). Los números siguen el lugar de
+las fotos en el escaneo, fila por fila desde arriba. Un escaneo de 16 bits da fotos de 16 bits; se conservan los DPI y
+el perfil de color. Nunca se sobrescribe un archivo: el nuevo recibe (2), (3) …
+
+**Restaurarlas en Restore** envía todas las fotos exportadas a Restaurar como lote, con **También a la carpeta de
+exportación** activado: cada foto restaurada se copia allí como *… – restaurada.png*, junto a la foto recortada, que
+queda igual. Las fotos restauradas tienen 8 bits por color.
 
 ## 11. Editor de poses
 
@@ -1308,7 +1333,7 @@ Un navegador muestra solo las páginas para generar y observar: Texto, Imagen, V
 Modelos, Historial (ver, marcar como favorito, eliminar), Favoritos, Consejos, Cambios. En **Modelos** elige, busca
 (*Buscar modelos*, *Buscar LoRAs*) e instala modelos y LoRAs de *Recomendados*, Hugging Face y Civitai; añadir archivos
 del Mac, renombrar, exportar y quitar se queda en el Mac, igual que los modelos auxiliares. Las demás páginas que
-pertenecen al Mac se quedan ahí (Ajustes, Entrenamiento, Mejorar, Ampliar, Restaurar, Lienzo, Hardware, Registros,
+pertenecen al Mac se quedan ahí (Ajustes, Entrenamiento, Mejorar, Ampliar, Restaurar, Escaneos, Lienzo, Hardware, Registros,
 Licencias, Acerca de): un navegador no puede cambiar ajustes, instalar runtimes ni acceder a ningún archivo del Mac
 aparte de las imágenes que se le muestran. Cada dispositivo conserva su propio idioma, elegido en el navegador; el
 idioma del Mac no se toca. En el navegador, **Compartir** abre el menú de compartir del móvil (WhatsApp, Signal,

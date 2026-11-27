@@ -130,6 +130,11 @@ export function makeApi(call: Call, on: On, extra: BridgeExtra): VulkaraApi {
     restore: {
       faces: (path) => call('restore:faces', path),
     },
+    scans: {
+      find: (path) => call('scans:find', path),
+      cut: (path, photos, word) => call('scans:cut', path, photos, word),
+      openFolder: () => call('scans:openFolder'),
+    },
     pose: {
       detect: (path) => call('pose:detect', path),
       onProgress: (fn) => on('pose:progress', fn),

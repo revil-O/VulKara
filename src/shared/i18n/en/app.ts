@@ -237,6 +237,7 @@ export default {
       runtime: 'a runtime install',
       caption: 'a picture description',
       export: 'a model export',
+      scans: 'photos being cut out of a scan',
     },
   },
   licenses: {

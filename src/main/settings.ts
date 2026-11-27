@@ -38,6 +38,7 @@ const VALID: { [K in keyof Settings]: (v: unknown) => boolean } = {
   ssdStreaming: (v) => ['auto', 'always', 'off'].includes(v as string),
   comfyStreaming: (v) => typeof v === 'boolean',
   streamCacheDir: folder,
+  scanExportDir: folder,
   stepCache: (v) => ['off', 'light', 'strong'].includes(v as string),
   idleUnloadMinutes: (v) => [0, 5, 10, 30, 60].includes(v as number),
   runtime: (v) => ['auto', 'diffusers', 'mlx'].includes(v as string),
@@ -102,6 +103,7 @@ export const imagesDir = (): string => getSettings().imagesDir || DEFAULT_IMAGES
 export const historyDir = (): string => getSettings().historyDir || join(dataDir(), 'history')
 export const lorasDir = (): string => getSettings().lorasDir || join(homedir(), 'VulKara', 'loras')
 export const helpersDir = (): string => getSettings().helpersDir || join(homedir(), 'VulKara')
+export const scanExportDir = (): string => getSettings().scanExportDir || join(homedir(), 'VulKara', 'scans')
 export const runtimesDir = (): string => getSettings().runtimesDir || join(dataDir(), 'runtimes')
 
 /** What a page may set itself: everything but a folder, which it can only return to the default, and the remote

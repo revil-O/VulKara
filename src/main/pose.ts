@@ -22,7 +22,7 @@ export function captionImage(command: Command | undefined, env: Record<string, s
   return detect<Caption>(command, env, '__caption__', () => t('main.caption.needsDiffusers'), onProgress, started)
 }
 
-async function detect<T>(command: Command | undefined, env: Record<string, string>, tag: string, missing: () => string, onProgress: (stage: string, percent: number) => void, started?: (proc: ChildProcess) => void): Promise<T> {
+export async function detect<T>(command: Command | undefined, env: Record<string, string>, tag: string, missing: () => string, onProgress: (stage: string, percent: number) => void, started?: (proc: ChildProcess) => void): Promise<T> {
   if (!command) throw new Error(missing())
   let result: T | undefined
   let error = ''

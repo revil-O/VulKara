@@ -7,7 +7,7 @@ import { EDITION } from '@shared/edition'
 import type { PlainKey } from './i18n'
 import {
   Aperture, Boxes, Clapperboard, Cpu, Eraser, FileClock, Lightbulb, Frame, GraduationCap, Heart, History, House, Images, Info, Layers, Maximize2,
-  PersonStanding, Scale, ScrollText, Settings, Sparkles, Type, WandSparkles,
+  PersonStanding, Scale, ScanLine, ScrollText, Settings, Sparkles, Type, WandSparkles,
 } from '@lucide/vue'
 
 export interface PageEntry {
@@ -36,6 +36,7 @@ export const PAGES: PageEntry[] = [
   { path: '/enhance', title: 'nav.enhance', icon: Aperture, group: 'edit', page: () => import('./pages/EnhancePage.vue') },
   { path: '/upscale', title: 'nav.upscale', icon: Maximize2, group: 'edit', page: () => import('./pages/UpscalePage.vue') },
   { path: '/restore', title: 'nav.restore', icon: WandSparkles, group: 'edit', page: () => import('./pages/RestorePage.vue') },
+  { path: '/scans', title: 'nav.scans', icon: ScanLine, group: 'edit', page: () => import('./pages/ScansPage.vue') },
   { path: '/pose', title: 'nav.pose', icon: PersonStanding, group: 'tools', remote: true, page: () => import('./pages/PosePage.vue') },
   { path: '/lora', title: 'nav.lora', icon: Layers, group: 'tools', remote: true, page: () => import('./pages/LoraPage.vue') },
   { path: '/training', title: 'nav.training', icon: GraduationCap, group: 'tools', page: () => import('./pages/TrainingPage.vue') },

@@ -8,9 +8,15 @@ import { describe, expect, it, vi } from 'vitest'
 const dir = mkdtempSync(join(tmpdir(), 'vk-settings-'))
 vi.mock('electron', () => ({ app: { getPath: () => dir, isPackaged: false, getAppPath: () => dir } }))
 
-const { engineEnv, getSettings, isValidSetting, setSetting, settableByPage } = await import('./settings')
+const { engineEnv, getSettings, isValidSetting, scanExportDir, setSetting, settableByPage } = await import('./settings')
 
 describe('settings', () => {
+  it('puts cut-out scans into ~/VulKara/scans unless a folder is chosen', () => {
+    expect(scanExportDir()).toMatch(/VulKara\/scans$/)
+    expect(isValidSetting('scanExportDir', '/Volumes/Photos/Scans')).toBe(true)
+    expect(isValidSetting('scanExportDir', 'scans')).toBe(false)
+  })
+
   it('takes only the settings there are, with values they can have', () => {
     expect(isValidSetting('theme', 'dark')).toBe(true)
     expect(isValidSetting('modelsDir', '/Volumes/Models')).toBe(true)

@@ -12,6 +12,7 @@ export default {
   enhance: 'Enhance',
   upscale: 'Upscale',
   restore: 'Restore',
+  scans: 'Scans',
   pose: 'Pose',
   lora: 'LoRA',
   training: 'Training',

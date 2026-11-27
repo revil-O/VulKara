@@ -66,7 +66,8 @@
   "about": "Über",
   "runtimeUpdate": "{page}: Ein Runtime-Update ist verfügbar",
   "discord": "Discord: die VulKara-Community",
-  "coming": "Diese Seite ist in dieser Version noch nicht enthalten."
+  "coming": "Diese Seite ist in dieser Version noch nicht enthalten.",
+  "scans": "Scans"
  },
  "jobs": {
   "pages": {
@@ -648,7 +649,9 @@
   "removeRule": "Diese Regel entfernen",
   "rulePlaceholder": "Eigene Regel, z. B. „Hausnummer beibehalten“",
   "addRule": "Regel hinzufügen",
-  "rulesHint": "Eigene Regeln gelten für alle Restaurierungen."
+  "rulesHint": "Eigene Regeln gelten für alle Restaurierungen.",
+  "exportBatch": "Auch in den Export-Ordner",
+  "exportBatchHint": "Jedes restaurierte Foto wird als „<Name> – restauriert.png“ in den Export-Ordner aus Einstellungen → Ordner kopiert, neben das ausgeschnittene Foto, das unverändert bleibt. Restaurierte Fotos haben 8 Bit je Farbe; das ausgeschnittene Foto behält die Bittiefe des Scans (16 Bit bleiben 16)."
  },
  "pose": {
   "title": "Pose-Editor",
@@ -1404,7 +1407,9 @@
    "runtimesHint": "Runtimes lassen sich nicht verschieben: Nach einem Ordnerwechsel werden sie dort neu installiert.",
    "streamCache": "Cache für SSD-Streaming",
    "streamCacheDefault": "Im Ordner des jeweiligen Modells",
-   "streamCacheHint": "Die Blöcke der Modelle, die Stück für Stück von der SSD geladen werden (etwa die doppelte Modellgröße in GB). Auf einer schnellen internen SSD ist das Streaming schneller als auf einer externen Festplatte."
+   "streamCacheHint": "Die Blöcke der Modelle, die Stück für Stück von der SSD geladen werden (etwa die doppelte Modellgröße in GB). Auf einer schnellen internen SSD ist das Streaming schneller als auf einer externen Festplatte.",
+   "scans": "Ausgeschnittene Scans",
+   "scansHint": "Hier legt die Seite Scans die ausgeschnittenen Fotos ab, und Restore seine Kopien, wenn ein Stapel auch dorthin soll."
   },
   "engine": {
    "title": "Engine",
@@ -1836,7 +1841,8 @@
     "training": "ein Training",
     "runtime": "eine Laufzeit-Installation",
     "caption": "eine Bildbeschreibung",
-    "export": "ein Modell-Export"
+    "export": "ein Modell-Export",
+    "scans": "Fotos, die aus einem Scan ausgeschnitten werden"
    }
   },
   "licenses": {
@@ -2204,6 +2210,11 @@
   "logs": {
    "noLogFile": "In dieser Sitzung gibt es keine Protokolldatei.",
    "noSession": "Diese Protokollsitzung gibt es nicht."
+  },
+  "scans": {
+   "needsDiffusers": "Fotos auf einem Scan werden mit der Diffusers-Runtime gefunden: Installiere sie unter Einstellungen → Runtimes",
+   "restored": "restauriert",
+   "badFrames": "Ein Rahmen dieses Scans ist kein Rechteck, das VulKara ausschneiden kann; zieh ihn neu"
   }
  },
  "engine": {
@@ -2292,5 +2303,46 @@
   "ltxMaking": "Video wird erstellt (LTX-2.3, {width} × {height}, {frames} Bilder)",
   "ltxDecoding": "Video wird dekodiert",
   "ltxDecodingSound": "Video und Ton werden dekodiert"
+ },
+ "scans": {
+  "title": "Scans",
+  "subtitle": "Fotos aus Flachbett-Scans ausschneiden: Rand weg, gerade gestellt, je eine Datei",
+  "empty": "Scans hierher ziehen (PNG oder JPEG) oder Dateien bzw. einen ganzen Ordner wählen. Mehrere Fotos auf einem Scan werden getrennt.",
+  "load": "Scans laden …",
+  "more": "Scans hinzufügen",
+  "removeScan": "Scan aus der Liste nehmen",
+  "finding": "Suche die Fotos …",
+  "failed": "Scan nicht lesbar",
+  "none": "Kein Foto gefunden: Rahmen ziehen",
+  "count": {
+   "one": "{n} Foto",
+   "other": "{n} Fotos"
+  },
+  "exported": "exportiert",
+  "newFrame": "Neuer Rahmen",
+  "drawHint": "Über den Scan ziehen, um einen Rahmen um ein Foto zu zeichnen",
+  "editHint": "Rahmen ziehen zum Verschieben, Ecken und Kanten zum Ändern der Größe, den runden Griff darüber zum Geradestellen",
+  "photo": "Foto {n}",
+  "quarter": "Um 90° im Uhrzeigersinn drehen (der Pfeil zeigt nach oben)",
+  "remove": "Rahmen entfernen",
+  "turnHandle": "Geradestellen",
+  "ready": {
+   "one": "{n} Foto zum Exportieren",
+   "other": "{n} Fotos zum Exportieren"
+  },
+  "exportAll": "Alle exportieren ({n})",
+  "exporting": "Exportiere …",
+  "done": {
+   "one": "{n} Foto im Export-Ordner gespeichert",
+   "other": "{n} Fotos im Export-Ordner gespeichert"
+  },
+  "openFolder": "Ordner öffnen",
+  "toRestore": "In Restore wiederherstellen",
+  "folder": "Export-Ordner",
+  "folderHint": "Jedes Foto wird als PNG mit dem Namen seines Scans gespeichert, zum Beispiel „Album 3 – Foto 1.png“. Ein 16-Bit-Scan ergibt 16-Bit-Fotos; DPI und Farbprofil bleiben erhalten. Eine vorhandene Datei wird nie überschrieben: Die neue bekommt (2), (3) …",
+  "changeFolder": "Ändern unter Einstellungen → Ordner",
+  "about": "Die Fotos werden an der Farbe des Scannerdeckels um sie herum erkannt, ohne KI. Ein weißer Papierrand alter Abzüge wird mit abgeschnitten. Bei hellen Fotos auf weißem Deckel muss der Rahmen eventuell von Hand gezogen oder korrigiert werden. Ein Foto, das in zwei Rahmen geteilt wurde (ein heller Streifen quer hindurch): beide entfernen, einen neuen ziehen; zwei Fotos mit weniger als etwa einem Millimeter Abstand: je einen Rahmen ziehen.",
+  "restoreNote": "„In Restore wiederherstellen“ schickt alle exportierten Fotos als Stapel an Restore; die Ergebnisse kommen ebenfalls in den Export-Ordner, mit 8 Bit je Farbe. Die ausgeschnittenen Fotos bleiben unverändert.",
+  "word": "Foto"
  }
 }

@@ -66,7 +66,8 @@
   "about": "Acerca",
   "runtimeUpdate": "{page}: há uma atualização de runtime disponível",
   "discord": "Discord: a comunidade do VulKara",
-  "coming": "Esta página ainda não faz parte desta versão."
+  "coming": "Esta página ainda não faz parte desta versão.",
+  "scans": "Digitalizar"
  },
  "jobs": {
   "pages": {
@@ -648,7 +649,9 @@
   "removeRule": "Remover esta regra",
   "rulePlaceholder": "Regra própria, p. ex. “Manter o número da porta”",
   "addRule": "Adicionar a regra",
-  "rulesHint": "As regras próprias aplicam-se a todas as restaurações."
+  "rulesHint": "As regras próprias aplicam-se a todas as restaurações.",
+  "exportBatch": "Também na pasta de exportação",
+  "exportBatchHint": "Cada fotografia restaurada é copiada para a pasta de exportação de Definições → Pastas como «<nome> – restaurada.png», ao lado da fotografia recortada, que fica como está. As fotografias restauradas têm 8 bits por cor; a fotografia recortada mantém a profundidade da digitalização (16 bits continuam 16)."
  },
  "pose": {
   "title": "Editor de pose",
@@ -1404,7 +1407,9 @@
    "runtimesHint": "Os runtimes não podem ser movidos: depois de mudar a pasta, são instalados de novo lá.",
    "streamCache": "Cache do streaming do SSD",
    "streamCacheDefault": "Na pasta de cada modelo",
-   "streamCacheHint": "Os blocos dos modelos carregados parte a parte a partir do SSD (cerca do dobro do tamanho do modelo em GB). Num SSD interno rápido, o streaming é mais rápido do que num disco externo."
+   "streamCacheHint": "Os blocos dos modelos carregados parte a parte a partir do SSD (cerca do dobro do tamanho do modelo em GB). Num SSD interno rápido, o streaming é mais rápido do que num disco externo.",
+   "scans": "Digitalizações recortadas",
+   "scansHint": "Aqui a página Digitalizações guarda as fotografias que recorta, e o Restore as suas cópias quando um lote também deve ir para lá."
   },
   "engine": {
    "title": "Motor",
@@ -1836,7 +1841,8 @@
     "training": "um treino",
     "runtime": "uma instalação de runtime",
     "caption": "uma descrição de imagem",
-    "export": "uma exportação de modelo"
+    "export": "uma exportação de modelo",
+    "scans": "fotografias a ser recortadas de uma digitalização"
    }
   },
   "licenses": {
@@ -2204,6 +2210,11 @@
   "logs": {
    "noLogFile": "Não há ficheiro de registo nesta sessão.",
    "noSession": "Essa sessão de registo não existe."
+  },
+  "scans": {
+   "needsDiffusers": "As fotografias de uma digitalização são encontradas com o runtime Diffusers: instale-o em Definições → Runtimes",
+   "restored": "restaurada",
+   "badFrames": "Uma moldura desta digitalização não é um retângulo que o VulKara possa recortar; desenhe-a de novo"
   }
  },
  "engine": {
@@ -2292,5 +2303,46 @@
   "ltxMaking": "A criar o vídeo (LTX-2.3, {width} × {height}, {frames} fotogramas)",
   "ltxDecoding": "A descodificar o vídeo",
   "ltxDecodingSound": "A descodificar o vídeo e o som"
+ },
+ "scans": {
+  "title": "Digitalizações",
+  "subtitle": "Fotografias recortadas de digitalizações de scanner de mesa: sem margem, endireitadas, um ficheiro cada",
+  "empty": "Arraste digitalizações para aqui (PNG ou JPEG) ou escolha ficheiros ou uma pasta inteira. Várias fotografias numa digitalização são separadas.",
+  "load": "Carregar digitalizações …",
+  "more": "Adicionar digitalizações",
+  "removeScan": "Retirar a digitalização da lista",
+  "finding": "A procurar as fotografias …",
+  "failed": "Não foi possível ler a digitalização",
+  "none": "Nenhuma fotografia encontrada: desenhe uma moldura",
+  "count": {
+   "one": "{n} fotografia",
+   "other": "{n} fotografias"
+  },
+  "exported": "exportada",
+  "newFrame": "Nova moldura",
+  "drawHint": "Arraste sobre a digitalização para desenhar uma moldura à volta de uma fotografia",
+  "editHint": "Arraste uma moldura para a mover, os cantos e margens para mudar o tamanho, a pega redonda por cima para a endireitar",
+  "photo": "Fotografia {n}",
+  "quarter": "Rodar 90° no sentido dos ponteiros do relógio (a seta indica o topo)",
+  "remove": "Remover a moldura",
+  "turnHandle": "Endireitar",
+  "ready": {
+   "one": "{n} fotografia para exportar",
+   "other": "{n} fotografias para exportar"
+  },
+  "exportAll": "Exportar tudo ({n})",
+  "exporting": "A exportar …",
+  "done": {
+   "one": "{n} fotografia guardada na pasta de exportação",
+   "other": "{n} fotografias guardadas na pasta de exportação"
+  },
+  "openFolder": "Abrir a pasta",
+  "toRestore": "Restaurar no Restore",
+  "folder": "Pasta de exportação",
+  "folderHint": "Cada fotografia é guardada como PNG com o nome da sua digitalização, por exemplo «Álbum 3 – Fotografia 1.png». Uma digitalização de 16 bits dá fotografias de 16 bits; DPI e perfil de cor são mantidos. Um ficheiro existente nunca é substituído: o novo recebe (2), (3) …",
+  "changeFolder": "Alterar em Definições → Pastas",
+  "about": "As fotografias são reconhecidas pela cor da tampa do scanner à sua volta, sem IA. A margem branca de papel das cópias antigas é recortada. Com fotografias claras numa tampa branca, pode ser preciso desenhar ou corrigir a moldura à mão. Uma fotografia dividida em duas molduras (uma faixa clara atravessa-a): remova as duas e desenhe uma; duas fotografias a menos de um milímetro: desenhe uma moldura para cada.",
+  "restoreNote": "«Restaurar no Restore» envia todas as fotografias exportadas para o Restore como lote; os resultados também vão para a pasta de exportação, com 8 bits por cor. As fotografias recortadas ficam como estão.",
+  "word": "Fotografia"
  }
 }

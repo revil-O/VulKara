@@ -74,7 +74,7 @@ export interface AppUpdateState {
 
 /** What runs in VulKara when an update should start: it waits for it, or stops it (a runtime install excepted). */
 export interface UpdateWork {
-  kind: 'jobs' | 'imports' | 'training' | 'runtime' | 'caption' | 'export'
+  kind: 'jobs' | 'imports' | 'training' | 'runtime' | 'caption' | 'export' | 'scans'
   count: number
 }
 
@@ -149,6 +149,23 @@ export interface Caption {
 
 /** The faces of a photo Restore would restore: 5 landmarks (eyes, nose tip, mouth corners) and the restored square
  *  [x, y, w, h], in the photo's pixels. */
+/** A photo on a scan (Scans page): a turned rectangle in the scan's pixels; angle in degrees (|angle| <= 45, positive
+ *  turns clockwise on screen), turn the quarter turns clockwise applied after straightening. */
+export interface ScanPhoto {
+  cx: number
+  cy: number
+  w: number
+  h: number
+  angle: number
+  turn: 0 | 90 | 180 | 270
+}
+
+/** The photos found on a scan, in reading order, and the scan's size. */
+export interface FoundPhotos {
+  size: [number, number]
+  photos: ScanPhoto[]
+}
+
 export interface FoundFaces {
   size: [number, number]
   faces: { points: [number, number][]; box: [number, number, number, number] }[]
@@ -702,6 +719,14 @@ export interface VulkaraApi {
   restore: {
     /** the faces of a photo (Diffusers engine, the detector downloaded on first use) */
     faces(path: string): Promise<FoundFaces>
+  }
+  scans: {
+    /** the photos on a scan (PNG or JPEG) */
+    find(path: string): Promise<FoundPhotos>
+    /** the photos cut out into the export folder as "<scan> – <word> <n>.png"; the files written */
+    cut(path: string, photos: ScanPhoto[], word: string): Promise<string[]>
+    /** the export folder in the Finder */
+    openFolder(): Promise<void>
   }
   pose: {
     detect(path: string): Promise<DetectedPose>

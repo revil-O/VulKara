@@ -20,7 +20,7 @@ Einstellung bewirkt und wo die App ihre Daten ablegt.
 7. [KI-Leinwand](#7-ki-leinwand)
 8. [Video](#8-video)
 9. [Vergrößern](#9-vergrößern), [Verbessern: Fotowerkzeuge](#verbessern-fotowerkzeuge)
-10. [Restaurieren](#10-restaurieren)
+10. [Restaurieren](#10-restaurieren), [Scans: Fotos aus einem Flachbett-Scan](#scans-fotos-aus-einem-flachbett-scan)
 11. [Pose-Editor](#11-pose-editor)
 12. [Illusion](#12-illusion)
 13. [LoRAs](#13-loras)
@@ -100,7 +100,7 @@ Modelle aus Quellen, denen du vertraust.
 
 | Bereich | Was er tut |
 | --- | --- |
-| **Navigationsleiste** (links) | Gruppiert die Seiten, jede Gruppe in einem eigenen Farbton: *Start*; *Erstellen* (neue Bilder): Text, Bild, Leinwand, Video, Illusion; *Bearbeiten* (ein vorhandenes Bild): Inpainting, Verbessern, Vergrößern, Restaurieren; *Werkzeuge*: Pose, LoRA, Training; *Bibliothek*: Modelle, Verlauf, Favoriten, Tipps. In einem Fenster, das dafür zu niedrig ist, wird die Leiste breiter und zeigt die Gruppen in zwei Spalten. Die Symbole unten öffnen Einstellungen, Protokolle, Änderungen, Lizenzen und Über. |
+| **Navigationsleiste** (links) | Gruppiert die Seiten, jede Gruppe in einem eigenen Farbton: *Start*; *Erstellen* (neue Bilder): Text, Bild, Leinwand, Video, Illusion; *Bearbeiten* (ein vorhandenes Bild): Inpainting, Verbessern, Vergrößern, Restaurieren, Scans; *Werkzeuge*: Pose, LoRA, Training; *Bibliothek*: Modelle, Verlauf, Favoriten, Tipps. In einem Fenster, das dafür zu niedrig ist, wird die Leiste breiter und zeigt die Gruppen in zwei Spalten. Die Symbole unten öffnen Einstellungen, Protokolle, Änderungen, Lizenzen und Über. |
 | **Arbeitsbereich** (Mitte) | Die Eingabe der Seite (Prompt, Bild, Leinwand) und darunter die Ergebnisse dieser Seite. Ein Ergebnis, dessen Datei gelöscht oder verschoben wurde, erscheint als *Datei fehlt*; <img src="../icons/x.svg" width="14" height="14" alt="×"> entfernt es aus der Liste. |
 | **Einstellungsbereich** (rechts) | Modell, Stil, Größe und alles andere, was das Ergebnis prägt. |
 | **ⓘ** und **!** | Kleine orange Plaketten, deren Text sich öffnet, wenn der Zeiger darauf steht: **ⓘ** (ein Ring) ist reine Information, **!** (gefüllt) zeigt an, dass die App etwas anders als üblich macht, z. B. Werte, die vom Vorschlag des Modells abweichen, oder ein Modell, das per Streaming von der SSD läuft. |
@@ -676,6 +676,32 @@ gelöscht.
 
 Der **Hinweis** ist ein dreizeiliges Textfeld (an seiner rechten unteren Ecke lässt es sich höher ziehen) für das, was
 das Foto zeigt, z. B. *ein Hochzeitsfoto aus den 1950ern*; er hilft der KI.
+
+### Scans: Fotos aus einem Flachbett-Scan
+
+![Scans](../screenshots/de/scans.jpg)
+
+**Scans** (im Menü unter Restaurieren) schneidet die Fotos aus Flachbett-Scans aus: Das Weiß des Scannerdeckels drumherum
+fällt weg, jedes Foto wird gerade gestellt, und mehrere Fotos auf einem Scan werden zu je einer Datei. Zieh PNG- oder
+JPEG-Scans auf die Seite oder wähle mit **Scans laden …** Dateien oder einen ganzen Ordner; die Fotos werden sofort
+gefunden, ohne KI (etwa eine Sekunde für einen A4-Scan mit 600 dpi).
+
+Jedes Foto bekommt einen nummerierten Rahmen. Zieh den Rahmen, um ihn zu verschieben, seine Ecken und Kanten, um die
+Größe zu ändern, und den runden Griff darüber, um ihn von Hand gerade zu stellen. **↻** dreht ein Foto, das quer oder
+kopfüber lag, um 90° im Uhrzeigersinn; der Pfeil in der Mitte zeigt, welche Seite oben wird. **×** entfernt einen
+Rahmen, mit **Neuer Rahmen** ziehst du einen über ein Foto, das nicht gefunden wurde (das kann bei einem hellen Foto
+auf weißem Deckel passieren). Ein weißer Papierrand alter Abzüge wird mit dem Deckel abgeschnitten. Ein Foto, das in zwei Rahmen geteilt wurde (ein heller Streifen
+quer hindurch): beide entfernen, einen neuen ziehen; zwei Fotos mit weniger als etwa einem Millimeter Abstand: je einen
+Rahmen ziehen.
+
+**Alle exportieren** speichert jedes Foto als PNG mit dem Namen seines Scans, z. B. *Album 3 – Foto 1.png*, im
+Export-Ordner (Einstellungen → Ordner → *Ausgeschnittene Scans*, Standard `~/VulKara/scans`). Die Nummern folgen der
+Lage der Fotos auf dem Scan, zeilenweise von oben. Ein 16-Bit-Scan ergibt 16-Bit-Fotos; DPI und Farbprofil bleiben
+erhalten. Eine vorhandene Datei wird nie überschrieben: Die neue bekommt (2), (3) …
+
+**In Restore wiederherstellen** schickt alle exportierten Fotos als Stapel an Restaurieren, mit eingeschaltetem **Auch
+in den Export-Ordner**: Jedes restaurierte Foto wird dort als *… – restauriert.png* abgelegt, neben dem ausgeschnittenen
+Foto, das unverändert bleibt. Restaurierte Fotos haben 8 Bit je Farbe.
 
 ## 11. Pose-Editor
 
@@ -1330,7 +1356,7 @@ Modelle, Verlauf (ansehen, favorisieren, löschen), Favoriten, Tipps, Änderunge
 (*Modelle finden*, *LoRAs finden*) und installiert er Modelle und LoRAs aus *Empfohlen*, von Hugging Face und Civitai;
 Dateien des Macs hinzufügen, umbenennen, exportieren und entfernen bleibt dem Mac vorbehalten, ebenso die
 Hilfsmodelle. Die übrigen Seiten, die auf den Mac gehören, bleiben dort (Einstellungen, Training, Verbessern,
-Vergrößern, Restaurieren, Leinwand, Hardware, Protokolle, Lizenzen, Über): Ein Browser kann keine Einstellungen
+Vergrößern, Restaurieren, Scans, Leinwand, Hardware, Protokolle, Lizenzen, Über): Ein Browser kann keine Einstellungen
 ändern, keine Runtimes installieren und keine Datei auf dem Mac erreichen außer den Bildern, die er gezeigt bekommt. Jedes Gerät behält seine eigene Sprache, im
 Browser gewählt; die Sprache des Macs bleibt unberührt. Im Browser öffnet **Teilen** das Teilen-Menü des Handys
 (WhatsApp, Signal, Telegram, Threema, Mail …), und **Bild kopieren** steht ebenfalls bereit, beides nur über HTTPS;

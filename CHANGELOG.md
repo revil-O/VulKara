@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.11.3 – 2026-11-27
+
+- **Scans: photos cut out of flatbed scans.** A new page under Restore takes PNG and JPEG scans (dropped, chosen, or
+  a whole folder) and finds the photos on them without AI, about a second for an A4 scan at 600 dpi: the white of the
+  scanner lid goes, a white paper border of old prints too, each photo is straightened, and several photos on one scan
+  are separated. Each photo has a frame to move, resize and straighten by hand, ↻ turns a photo that lay sideways, ×
+  removes a frame and *New frame* draws one. *Export all* saves each photo as a PNG named after its scan
+  (*Album 3 – Photo 1.png*) into the export folder of Settings → Folders, keeping a 16-bit scan's 16 bits, its DPI and
+  colour profile, and never overwriting a file. *Restore them* sends the exported photos to Restore as a batch.
+- **Restore batches can also write into the export folder.** With *Also into the export folder* (on for a batch from
+  Scans) each restored photo is copied there as *… – restored.png* beside the cut-out one; restored photos have 8 bits
+  per colour.
+
 ## 0.11.2 – 2026-11-26
 
 - **Fixes to the update that waits for running work (from 0.11.1).** While the update waits, no new work starts (it

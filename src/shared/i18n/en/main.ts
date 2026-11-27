@@ -210,6 +210,12 @@ export default {
     needsDiffusers: 'Poses are detected with the Diffusers runtime: install it in Settings → Runtimes',
     facesNeedDiffusers: 'Faces are found with the Diffusers runtime: install it in Settings → Runtimes',
   },
+  scans: {
+    needsDiffusers: 'Photos on a scan are found with the Diffusers runtime: install it in Settings → Runtimes',
+    /** the word at the end of a restored photo's file name in the export folder */
+    restored: 'restored',
+    badFrames: 'A frame of this scan is not a rectangle VulKara can cut out; draw it again',
+  },
   caption: {
     needsDiffusers: 'A prompt is written from a picture with the Diffusers runtime: install it in Settings → Runtimes',
     busy: 'A job is running: a prompt can be written from the picture when the queue is empty.',

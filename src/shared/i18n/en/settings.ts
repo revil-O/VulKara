@@ -42,6 +42,8 @@ export default {
     streamCache: 'SSD streaming cache',
     streamCacheDefault: "In each model's folder",
     streamCacheHint: 'The blocks of models loaded piece by piece from the SSD (about twice the model size in GB). On a fast internal SSD streaming is quicker than on an external disk.',
+    scans: 'Cut-out scans',
+    scansHint: 'Where the Scans page puts the photos it cuts out of scans, and Restore its copies when a batch should go there too.',
   },
   engine: {
     title: 'Engine',

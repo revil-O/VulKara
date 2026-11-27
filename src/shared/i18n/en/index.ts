@@ -9,6 +9,7 @@ import generate from './generate'
 import canvas from './canvas'
 import edit from './edit'
 import restore from './restore'
+import scans from './scans'
 import pose from './pose'
 import lora from './lora'
 import training from './training'
@@ -22,4 +23,4 @@ import tips from './tips'
 import mainProcess from './main'
 import engine from './engine'
 
-export const en = { common, nav, jobs, generate, canvas, edit, restore, pose, lora, training, models, library, viewer, settings, hardware, app, tips, main: mainProcess, engine } as const
+export const en = { common, nav, jobs, generate, canvas, edit, restore, scans, pose, lora, training, models, library, viewer, settings, hardware, app, tips, main: mainProcess, engine } as const

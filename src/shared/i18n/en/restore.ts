@@ -39,6 +39,8 @@ export default {
   preview: 'Preview',
   previewHint: 'Restores only a part of the photo, quickly: what you zoomed in on, else the largest face (or the middle), at most 768 pixels. Not kept in the history.',
   restore: 'Restore',
+  exportBatch: 'Also into the export folder',
+  exportBatchHint: 'Each restored photo is copied into the export folder of Settings → Folders as “<name> – restored.png”, next to the cut-out photo, which stays as it is. Restored photos have 8 bits per colour; the cut-out photo keeps the bit depth of the scan (16 bits stay 16).',
   templateName: 'Name of a new template',
   saveTemplateHint: 'Keep these steps, guard rails and the note as a template',
   saveTemplate: 'Save as template',

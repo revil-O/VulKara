@@ -20,7 +20,7 @@ setting does, and where the app keeps its data.
 7. [AI Canvas](#7-ai-canvas)
 8. [Video](#8-video)
 9. [Upscale](#9-upscale), [Enhance: photo tools](#enhance-photo-tools)
-10. [Restore](#10-restore)
+10. [Restore](#10-restore), [Scans: photos from a flatbed scan](#scans-photos-from-a-flatbed-scan)
 11. [Pose editor](#11-pose-editor)
 12. [Illusion](#12-illusion)
 13. [LoRAs](#13-loras)
@@ -98,7 +98,7 @@ model and refuses a model folder that holds Python files. Use models from source
 
 | Part | What it does |
 | --- | --- |
-| **Navigation rail** (left) | Groups the pages, each group in a tint of its own: *Start*; *Create* (new pictures): Text, Image, Canvas, Video, Illusion; *Edit* (a picture you have): Inpaint, Enhance, Upscale, Restore; *Tools*: Pose, LoRA, Training; *Library*: Models, History, Favorites, Tips. In a window too low for them, the rail gets wider and shows the groups in two columns. The icons at the bottom open Settings, Logs, Changelog, Licenses and About. |
+| **Navigation rail** (left) | Groups the pages, each group in a tint of its own: *Start*; *Create* (new pictures): Text, Image, Canvas, Video, Illusion; *Edit* (a picture you have): Inpaint, Enhance, Upscale, Restore, Scans; *Tools*: Pose, LoRA, Training; *Library*: Models, History, Favorites, Tips. In a window too low for them, the rail gets wider and shows the groups in two columns. The icons at the bottom open Settings, Logs, Changelog, Licenses and About. |
 | **Work area** (middle) | The input of the page (prompt, picture, canvas) and, below it, the results of this page. A result whose file was deleted or moved shows as *File missing*; <img src="icons/x.svg" width="14" height="14" alt="×"> removes it from the list. |
 | **Settings panel** (right) | Model, style, size and everything else that shapes the result. |
 | **ⓘ** and **!** | Small orange badges whose text opens when the pointer is on them: **ⓘ** (a ring) is plain information, **!** (filled) tells that the app does something differently from the standard, e.g. values that differ from the model's suggestion or a model that runs streamed from the SSD. |
@@ -636,6 +636,31 @@ name of your own; own templates appear after the built-in ones and are deleted w
 
 The **note** is a three-line text field (it can be made taller at its lower right corner) for what the photo shows,
 e.g. *a wedding photo from the 1950s*; it helps the AI.
+
+### Scans: photos from a flatbed scan
+
+![Scans](screenshots/scans.jpg)
+
+**Scans** (under Restore in the menu) cuts the photos out of flatbed scans: the white of the scanner lid around them
+goes, each photo is straightened, and several photos on one scan become one file each. Drop PNG or JPEG scans onto the
+page, or choose files or a whole folder with **Load scans …**; the photos are found at once, without AI (about one
+second for an A4 scan at 600 dpi).
+
+Each photo gets a numbered frame. Drag the frame to move it, its corners and edges to resize it, and the round handle
+above it to straighten it by hand. **↻** turns a photo that lay sideways or upside down by a quarter clockwise; the
+arrow in the middle shows which side becomes the top. **×** removes a frame, **New frame** lets you draw one over a
+photo that was missed (a light photo on a white lid can be). A white paper border of old prints is cut off with the
+lid. A photo split into two frames (a light band across it): remove both and draw one; two photos less
+than about a millimetre apart: draw one frame for each.
+
+**Export all** saves every photo as a PNG named after its scan, e.g. *Album 3 – Photo 1.png*, into the export folder
+(Settings → Folders → *Cut-out scans*, by default `~/VulKara/scans`). The numbers follow the photos' places on the scan,
+row by row from the top. A 16-bit scan gives 16-bit photos; DPI and colour profile are kept. An existing file is
+never overwritten: the new one gets (2), (3) …
+
+**Restore them** sends all exported photos to Restore as a batch, with **Also into the export folder** switched on:
+each restored photo is copied there as *… – restored.png*, next to the cut-out photo, which stays as it is. Restored
+photos have 8 bits per colour.
 
 ## 11. Pose editor
 
@@ -1244,7 +1269,7 @@ A browser shows only the pages for generating and watching — Text, Image, Vide
 Models, History (view, favourite, delete), Favorites, Tips, Changelog. On **Models** it chooses, finds (*Find models*,
 *Find LoRAs*) and installs models and LoRAs from *Recommended*, Hugging Face and Civitai; adding files of the Mac,
 renaming, exporting and removing stay on the Mac, as do helper models. The other pages that belong on the Mac stay
-there (Settings, Training, Enhance, Upscale, Restore, Canvas, Hardware, Logs, Licenses, About): a browser cannot change
+there (Settings, Training, Enhance, Upscale, Restore, Scans, Canvas, Hardware, Logs, Licenses, About): a browser cannot change
 settings, install runtimes, or reach any file on the Mac other than the pictures it is shown. Each device
 keeps its own language, chosen in the browser; the Mac's own language is untouched. In the browser, **Share** opens
 the phone's share sheet (WhatsApp, Signal, Telegram, Threema, Mail …) and **Copy picture** is there as well, both

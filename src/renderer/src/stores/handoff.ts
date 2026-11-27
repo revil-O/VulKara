@@ -16,6 +16,9 @@ export interface Handoff {
   loraFolder?: string
   /** Inpaint page: start from this mask (white = changes), e.g. an object selected on the Enhance page */
   maskImage?: string
+  /** Restore page: these pictures as a batch, their results also into the scans' export folder */
+  batch?: string[]
+  exportBatch?: boolean
 }
 
 export const useHandoffStore = defineStore('handoff', () => {

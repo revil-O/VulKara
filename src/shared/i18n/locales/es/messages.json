@@ -66,7 +66,8 @@
   "about": "Acerca de",
   "runtimeUpdate": "{page}: hay una actualización de un runtime",
   "discord": "Discord: la comunidad de VulKara",
-  "coming": "Esta página aún no forma parte de esta versión."
+  "coming": "Esta página aún no forma parte de esta versión.",
+  "scans": "Escaneos"
  },
  "jobs": {
   "pages": {
@@ -648,7 +649,9 @@
   "removeRule": "Eliminar esta regla",
   "rulePlaceholder": "Regla propia, p. ej. “Conservar el número de la casa”",
   "addRule": "Añadir la regla",
-  "rulesHint": "Las reglas propias se conservan para todas las restauraciones."
+  "rulesHint": "Las reglas propias se conservan para todas las restauraciones.",
+  "exportBatch": "También a la carpeta de exportación",
+  "exportBatchHint": "Cada foto restaurada se copia en la carpeta de exportación de Ajustes → Carpetas como «<nombre> – restaurada.png», junto a la foto recortada, que queda igual. Las fotos restauradas tienen 8 bits por color; la foto recortada conserva la profundidad del escaneo (16 bits siguen siendo 16)."
  },
  "pose": {
   "title": "Editor de poses",
@@ -1404,7 +1407,9 @@
    "runtimesHint": "Los runtimes no se pueden mover: después de cambiar la carpeta, se vuelven a instalar allí.",
    "streamCache": "Caché del streaming desde el SSD",
    "streamCacheDefault": "En la carpeta de cada modelo",
-   "streamCacheHint": "Los bloques de los modelos que se cargan por partes desde el SSD (aprox. el doble del tamaño del modelo en GB). En un SSD interno rápido, el streaming es más rápido que en un disco externo."
+   "streamCacheHint": "Los bloques de los modelos que se cargan por partes desde el SSD (aprox. el doble del tamaño del modelo en GB). En un SSD interno rápido, el streaming es más rápido que en un disco externo.",
+   "scans": "Escaneos recortados",
+   "scansHint": "Aquí guarda la página Escaneos las fotos que recorta, y Restore sus copias cuando un lote también debe ir allí."
   },
   "engine": {
    "title": "Motor",
@@ -1836,7 +1841,8 @@
     "training": "un entrenamiento",
     "runtime": "una instalación de runtime",
     "caption": "una descripción de imagen",
-    "export": "una exportación de modelo"
+    "export": "una exportación de modelo",
+    "scans": "fotos que se recortan de un escaneo"
    }
   },
   "licenses": {
@@ -2204,6 +2210,11 @@
   "logs": {
    "noLogFile": "No hay archivo de registro en esta sesión.",
    "noSession": "No existe esa sesión de registro."
+  },
+  "scans": {
+   "needsDiffusers": "Las fotos de un escaneo se detectan con el runtime Diffusers: instálalo en Ajustes → Runtimes",
+   "restored": "restaurada",
+   "badFrames": "Un marco de este escaneo no es un rectángulo que VulKara pueda recortar; dibújalo de nuevo"
   }
  },
  "engine": {
@@ -2292,5 +2303,46 @@
   "ltxMaking": "Creando el vídeo (LTX-2.3, {width} × {height}, {frames} fotogramas)",
   "ltxDecoding": "Decodificando el vídeo",
   "ltxDecodingSound": "Decodificando el vídeo y el sonido"
+ },
+ "scans": {
+  "title": "Escaneos",
+  "subtitle": "Fotos recortadas de escaneos de escáner plano: sin borde, enderezadas, un archivo cada una",
+  "empty": "Arrastra escaneos aquí (PNG o JPEG) o elige archivos o una carpeta entera. Varias fotos en un escaneo se separan.",
+  "load": "Cargar escaneos …",
+  "more": "Añadir escaneos",
+  "removeScan": "Quitar el escaneo de la lista",
+  "finding": "Buscando las fotos …",
+  "failed": "No se pudo leer el escaneo",
+  "none": "No se encontró ninguna foto: dibuja un marco",
+  "count": {
+   "one": "{n} foto",
+   "other": "{n} fotos"
+  },
+  "exported": "exportado",
+  "newFrame": "Nuevo marco",
+  "drawHint": "Arrastra sobre el escaneo para dibujar un marco alrededor de una foto",
+  "editHint": "Arrastra un marco para moverlo, sus esquinas y bordes para cambiar el tamaño, el tirador redondo de arriba para enderezarlo",
+  "photo": "Foto {n}",
+  "quarter": "Girar 90° en el sentido de las agujas del reloj (la flecha indica arriba)",
+  "remove": "Quitar el marco",
+  "turnHandle": "Enderezar",
+  "ready": {
+   "one": "{n} foto para exportar",
+   "other": "{n} fotos para exportar"
+  },
+  "exportAll": "Exportar todo ({n})",
+  "exporting": "Exportando …",
+  "done": {
+   "one": "{n} foto guardada en la carpeta de exportación",
+   "other": "{n} fotos guardadas en la carpeta de exportación"
+  },
+  "openFolder": "Abrir la carpeta",
+  "toRestore": "Restaurarlas en Restore",
+  "folder": "Carpeta de exportación",
+  "folderHint": "Cada foto se guarda como PNG con el nombre de su escaneo, por ejemplo «Álbum 3 – Foto 1.png». Un escaneo de 16 bits da fotos de 16 bits; se conservan los DPI y el perfil de color. Nunca se sobrescribe un archivo: el nuevo recibe (2), (3) …",
+  "changeFolder": "Cambiar en Ajustes → Carpetas",
+  "about": "Las fotos se reconocen por el color de la tapa del escáner a su alrededor, sin IA. El borde blanco de papel de las copias antiguas se recorta. Con fotos claras sobre una tapa blanca puede que haya que dibujar o corregir el marco a mano. Una foto partida en dos marcos (una franja clara la cruza): quita ambos y dibuja uno; dos fotos a menos de un milímetro: dibuja un marco para cada una.",
+  "restoreNote": "«Restaurarlas en Restore» envía todas las fotos exportadas a Restore como lote; sus resultados también van a la carpeta de exportación, con 8 bits por color. Las fotos recortadas quedan igual.",
+  "word": "Foto"
  }
 }

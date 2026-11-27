@@ -39,6 +39,8 @@ export interface Settings {
   comfyStreaming: boolean
   /** where streamed models keep their blocks; '' = in each model's folder. A fast internal SSD speeds streaming up */
   streamCacheDir: string
+  /** where the Scans page puts the photos cut out of scans (and a Restore batch its copies); '' = ~/VulKara/scans */
+  scanExportDir: string
   runtime: 'auto' | 'diffusers' | 'mlx'
   /** steps that barely change are reused (engines/diffusers/step_cache.py): faster, pictures differ slightly */
   stepCache: 'off' | 'light' | 'strong'
@@ -73,7 +75,7 @@ export interface Settings {
 }
 
 /** The folder settings. A page can only reset them to the default; a folder is chosen in the main process's dialog. */
-export const FOLDER_KEYS = ['modelsDir', 'imagesDir', 'historyDir', 'lorasDir', 'helpersDir', 'runtimesDir', 'streamCacheDir'] as const
+export const FOLDER_KEYS = ['modelsDir', 'imagesDir', 'historyDir', 'lorasDir', 'helpersDir', 'runtimesDir', 'streamCacheDir', 'scanExportDir'] as const
 export type FolderKey = (typeof FOLDER_KEYS)[number]
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -88,6 +90,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ssdStreaming: 'auto',
   comfyStreaming: true,
   streamCacheDir: '',
+  scanExportDir: '',
   runtime: 'auto',
   stepCache: 'off',
   idleUnloadMinutes: 10,

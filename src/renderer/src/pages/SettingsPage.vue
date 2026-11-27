@@ -117,6 +117,7 @@ const FOLDERS: { key: FolderKey; title: PlainKey; standard: PlainKey | `~${strin
   { key: 'helpersDir', title: 'settings.folders.helpers', standard: '~/VulKara', hint: 'settings.folders.helpersHint' },
   { key: 'runtimesDir', title: 'settings.folders.runtimes', standard: 'settings.folders.inAppData', hint: 'settings.folders.runtimesHint' },
   { key: 'streamCacheDir', title: 'settings.folders.streamCache', standard: 'settings.folders.streamCacheDefault', hint: 'settings.folders.streamCacheHint' },
+  { key: 'scanExportDir', title: 'settings.folders.scans', standard: '~/VulKara/scans', hint: 'settings.folders.scansHint' },
 ]
 const standard = (s: PlainKey | `~${string}`): string => (s.startsWith('~') ? s : t(s as PlainKey))
 

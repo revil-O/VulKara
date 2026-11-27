@@ -179,6 +179,8 @@ export interface Job {
   prefill?: boolean
   /** restoring an old photo (Restore page) instead of painting a new picture */
   restore?: RestoreOptions
+  /** a restored photo is also copied into the scans' export folder as "<exportName> – restored.png" (Restore batch) */
+  exportName?: string
   /** a photo tool (Enhance page) on the input picture instead of painting */
   photoTool?: PhotoToolJob
   /** the painted object removed (Inpainting → Remove): LaMa, RORem, Auto by the size of the mask, or ObjectClear

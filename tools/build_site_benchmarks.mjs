@@ -376,6 +376,12 @@ const DEPTH = [
   ['Large', 'CC BY-NC 4.0, not offered', 2.1, 0.50, 0.67, 3.33],
 ]
 
+// Scans page, Mac mini M4 16 GB (MEASUREMENTS 7cz): [scan, size, photos, s to find, s to cut out, GB peak]
+const SCANS = [
+  ['A4 300 dpi, 8 bit', '2480 × 3508', 3, 0.14, 0.18, 0.22],
+  ['A4 600 dpi, 16 bit', '4960 × 7016', 2, 0.94, 1.32, 0.77],
+]
+
 // LTX-2.3 with sound on a Mac mini M4 16 GB (MEASUREMENTS 7cy): [case, size, frames, s, GB peak, swap]
 const LTX = [
   ['5 s, 30 fps', '768 × 512', 153, 571, 9.10, 'flat'],
@@ -821,6 +827,26 @@ function depthTable() {
     </section>`
 }
 
+function scansTable() {
+  const max = Math.max(...SCANS.map((r) => r[3] + r[4]))
+  const rows = SCANS.map(([label, size, photos, find, cut, peak]) => `
+          <tr data-tip="${esc(`${label} (${size}), ${photos} photos: found in ${fmt(find, 2)} s, cut out and saved in ${fmt(cut, 2)} s, at most ${fmt(peak, 2)} GB. MEASUREMENTS 7cz`)}" tabindex="0">
+            <td>${esc(label)}<small>${esc(size)}, ${photos} photos</small></td>
+            <td class="bars"><span class="mbar b ${at(`width:${pct(find + cut, max)}%`)}"></span></td>
+            <td class="num">${fmt(find, 2)}</td><td class="num">${fmt(cut, 2)}</td><td class="num">${fmt(peak, 2)}</td><td class="num">${fmt(find + cut, 2)}</td>
+          </tr>`).join('')
+  return `
+    <section class="chart" id="scans">
+      <h2>Scans: photos cut out of a flatbed scan</h2>
+      <p class="sub">The Scans page (0.11.3) finds the photos on a scan by the colour of the scanner lid, without a model, cuts off a white paper border, straightens each photo and saves it as PNG with the scan's bit depth and DPI. Mac mini M4 with 16 GB, a fresh process per run. Even a 600 dpi scan with 16 bits per colour takes about two seconds and less than 1 GB. On a 2017 Intel MacBook Pro the 300 dpi scan takes 9–13 s in the app, the engine started for each call. The bars are the seconds for both steps.</p>
+      <table class="micro">
+        <thead><tr><th>Scan</th><th>time</th><th class="num">s to find</th><th class="num">s to cut out</th><th class="num">GB</th><th class="num">s in all</th></tr></thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+    </section>`
+}
+
 function ltxTable() {
   const max = Math.max(...LTX.map((r) => r[3]))
   const rows = LTX.map(([label, size, frames, sec, peak, swap]) => `
@@ -869,7 +895,7 @@ export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }
     planChart('plan-after', 'Plans brought to the measurements', 'SD 1.5 planned at its own size with fused attention, ComfyUI models with the plan of a model held whole (shown in the benchmark since 0.7.5). The ComfyUI figures are the middle of two runs. Qwen-Image 2.1 streamed: the blocks kept in memory were not counted while denoising (planned 9.1 GB before). ComfyUI on 16 GB: the text encoder and the model planned apart, as ComfyUI loads them (MOSS-Image 14 GB before, NetaYume 11.6). Fibo 2.0: the activations of an edit counted (12.1 GB planned before).', PLAN_AFTER, '7p'),
     planChart('plan-m4', 'On a 16 GB Mac: Mac mini M4', 'VulKara 0.7.11 on an Apple M4 with 16 GB (the other charts: the M2, 16 GB simulated there); from MOSS-Image on, test builds after it (MEASUREMENTS 7ah, 7ba–7bl). The plan against what the engine used, 1024 px (Fibo 768 px), with the seconds per step or per picture. Fibo 2.0 on MLX started 6.3 GB short and read 18.9 GB back from the swap: slower than on the M2 (7ba). Above their plan and open: FLUX.1 [schnell] 8 bit streamed (3.9 GB), NetaYume v4 (1.8 GB), FLUX.1 Fill (0.9 GB) (7bf, 7bj).', PLAN_M4, '7af'),
     planChart('plan-list', 'The recommended list on a 16 GB Mac', 'The models kept in the recommended list of 0.10.0, five pictures each on a Mac mini M4 with 16 GB in the app (Hardware → Benchmark, the model\'s own settings, 1024 px unless named), the highest peak of pictures 2–5 against the plan, with the time per picture. The target: at most 10 % over the plan and at most 2 GB swap added. epiCRealism XL v8, MoP Mix asap, MiaoMiao RealSkin, FLUX.1 [dev] and its Q4 missed it and left the list, Chroma1 HD too; four SD 1.5 models in 32 bit are saved in 16 bit and the SDXL single files turned into folders once, at the import or the first load (MEASUREMENTS 7cq, 7cr).', RECOMMENDED, '7cq'),
-    onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), removeTable(), facesTable(), upscaleTable(), depthTable(), ltxTable(), vmTable(), intelTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
+    onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), removeTable(), facesTable(), upscaleTable(), depthTable(), ltxTable(), scansTable(), vmTable(), intelTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
   const tileHtml = tiles()
   const css = RULES.map((r, i) => `.bench-page .p${i}{${r}}`).join('\n') + '\n'
   const cssV = createHash('sha256').update(css).digest('hex').slice(0, 10)

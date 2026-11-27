@@ -19,7 +19,7 @@ as descrições de LoRAs, e para procurar atualizações. Este guia descreve cad
 7. [Tela de IA](#7-tela-de-ia)
 8. [Vídeo](#8-vídeo)
 9. [Ampliar](#9-ampliar), [Melhorar: ferramentas de foto](#melhorar-ferramentas-de-foto)
-10. [Restaurar](#10-restaurar)
+10. [Restaurar](#10-restaurar), [Digitalizações: fotos de um scanner de mesa](#digitalizações-fotos-de-um-scanner-de-mesa)
 11. [Editor de pose](#11-editor-de-pose)
 12. [Ilusão](#12-ilusão)
 13. [LoRAs](#13-loras)
@@ -97,7 +97,7 @@ fontes em que você confia.
 
 | Parte | O que faz |
 | --- | --- |
-| **Barra de navegação** (esquerda) | Agrupa as páginas, cada grupo com um tom próprio: *Início*; *Criar* (imagens novas): Texto, Imagem, Tela, Vídeo, Ilusão; *Editar* (uma imagem que você já tem): Inpainting, Melhorar, Ampliar, Restaurar; *Ferramentas*: Pose, LoRA, Treino; *Biblioteca*: Modelos, Histórico, Favoritos, Dicas. Numa janela baixa demais para eles, a barra fica mais larga e mostra os grupos em duas colunas. Os ícones na parte de baixo abrem Ajustes, Registros, Novidades, Licenças e Sobre. |
+| **Barra de navegação** (esquerda) | Agrupa as páginas, cada grupo com um tom próprio: *Início*; *Criar* (imagens novas): Texto, Imagem, Tela, Vídeo, Ilusão; *Editar* (uma imagem que você já tem): Inpainting, Melhorar, Ampliar, Restaurar, Digitalizar; *Ferramentas*: Pose, LoRA, Treino; *Biblioteca*: Modelos, Histórico, Favoritos, Dicas. Numa janela baixa demais para eles, a barra fica mais larga e mostra os grupos em duas colunas. Os ícones na parte de baixo abrem Ajustes, Registros, Novidades, Licenças e Sobre. |
 | **Área de trabalho** (centro) | A entrada da página (prompt, imagem, tela) e, abaixo dela, os resultados desta página. Um resultado cujo arquivo foi apagado ou movido aparece como *Arquivo ausente*; <img src="../icons/x.svg" width="14" height="14" alt="×"> o remove da lista. |
 | **Painel de ajustes** (direita) | Modelo, estilo, tamanho e tudo o mais que molda o resultado. |
 | **ⓘ** e **!** | Pequenos selos laranja cujo texto abre quando o ponteiro está sobre eles: **ⓘ** (um anel) é informação simples; **!** (preenchido) avisa que o app faz algo diferente do padrão, por ex. valores que diferem da sugestão do modelo ou um modelo que roda com streaming do SSD. |
@@ -654,6 +654,31 @@ embutidas e são apagadas com o **×** delas.
 
 A **nota** é um campo de texto de três linhas (pode ser aumentado pelo canto inferior direito) para o que a foto
 mostra, por ex. *uma foto de casamento dos anos 1950*; ela ajuda a IA.
+
+### Digitalizações: fotos de um scanner de mesa
+
+![Digitalizações](../screenshots/pt-BR/scans.jpg)
+
+**Digitalizações** (no menu *Digitalizar*, abaixo de Restaurar) recorta as fotos de digitalizações de scanner de mesa: o branco da
+tampa do scanner em volta some, cada foto é endireitada e várias fotos numa digitalização viram um arquivo cada.
+Arraste digitalizações PNG ou JPEG para a página ou escolha arquivos ou uma pasta inteira com **Carregar digitalizações
+…**; as fotos são encontradas na hora, sem IA (cerca de um segundo para uma digitalização A4 a 600 dpi).
+
+Cada foto recebe uma moldura numerada. Arraste a moldura para movê-la, os cantos e bordas para mudar o tamanho e a alça
+redonda acima para endireitá-la à mão. **↻** gira 90° no sentido horário uma foto que estava de lado ou de cabeça para
+baixo; a seta no meio indica qual lado fica em cima. **×** remove uma moldura e com **Nova moldura** você desenha uma
+sobre uma foto que não foi encontrada (pode acontecer com uma foto clara numa tampa branca). A borda branca de papel das
+cópias antigas é recortada junto com a tampa. Uma foto dividida em duas molduras (uma faixa clara a atravessa): remova as duas e desenhe
+uma; duas fotos a menos de um milímetro: desenhe uma moldura para cada.
+
+**Exportar tudo** salva cada foto como PNG com o nome da sua digitalização, por exemplo *Álbum 3 – Foto 1.png*, na pasta
+de exportação (Ajustes → Pastas → *Digitalizações recortadas*, por padrão `~/VulKara/scans`). Os números seguem o lugar
+das fotos na digitalização, linha por linha de cima para baixo. Uma digitalização de 16 bits dá fotos de 16 bits; DPI e
+perfil de cor são mantidos. Um arquivo existente nunca é sobrescrito: o novo recebe (2), (3) …
+
+**Restaurar no Restore** envia todas as fotos exportadas ao Restaurar como lote, com **Também na pasta de exportação**
+ligado: cada foto restaurada é copiada para lá como *… – restaurada.png*, ao lado da foto recortada, que fica como
+está. Fotos restauradas têm 8 bits por cor.
 
 ## 11. Editor de pose
 
@@ -1287,7 +1312,7 @@ Um navegador mostra apenas as páginas para gerar e acompanhar — Texto, Imagem
 Modelos, Histórico (ver, favoritar, excluir), Favoritos, Dicas, Mudanças. Em **Modelos** ele escolhe, busca (*Encontrar
 modelos*, *Encontrar LoRAs*) e instala modelos e LoRAs de *Recomendados*, do Hugging Face e do Civitai; adicionar arquivos
 do Mac, renomear, exportar e remover fica no Mac, assim como os modelos auxiliares. As demais páginas que pertencem ao
-Mac ficam lá (Ajustes, Treinamento, Melhorar, Ampliar, Restaurar, Tela, Hardware, Registros, Licenças, Sobre): um
+Mac ficam lá (Ajustes, Treinamento, Melhorar, Ampliar, Restaurar, Digitalizar, Tela, Hardware, Registros, Licenças, Sobre): um
 navegador não pode mudar ajustes, instalar runtimes, nem acessar nenhum arquivo do Mac além das imagens que lhe são
 mostradas. Cada dispositivo mantém o próprio idioma, escolhido no navegador; o idioma do Mac não é alterado. No
 navegador, **Compartilhar** abre o menu de compartilhamento do celular (WhatsApp, Signal, Telegram, Threema, Mail …)
