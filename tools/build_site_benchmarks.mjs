@@ -739,7 +739,7 @@ function intelTable() {
   return `
     <section class="chart" id="intel">
       <h2>The Intel-Mac build on the processor</h2>
-      <p class="sub">SD 1.5 with the build for Intel Macs (PyTorch 2.2.2 on the CPU, no GPU) on a MacBook Pro 2017 with an Intel Core i5-7360U and 8 GB, 512 px, 20 steps, the same picture in every run. Streaming took 2.6 times as long as holding the model and letting macOS swap: the 4 GB reserve is meant for the GPU's share of unified memory, which an Intel Mac does not have, so without a GPU the plan keeps 1 GB free. An Apple chip takes 0.72–1.55 s per step for the same model, 10 to 20 times faster. The bars are the seconds per step.</p>
+      <p class="sub">SD 1.5 with the build for Intel Macs (PyTorch 2.2.2 on the CPU, no GPU) on a MacBook Pro 2017 with an Intel Core i5-7360U and 8 GB, 512 px, 20 steps, the same picture in every run. Streaming took 2.6 times as long as holding the model and letting macOS swap: the 4 GB reserve is meant for the GPU's share of unified memory, which an Intel Mac does not have, so without a GPU the plan keeps 1 GB free. An Apple chip takes 0.72–1.55 s per step for the same model, 10 to 20 times faster. The bars are the seconds per step. OpenVINO was tried as a faster CPU path (2026-11-27): its Hugging Face pipeline needs PyTorch 2.4 or newer and does not load on Intel Macs, whose PyTorch ends at 2.2.2; PyTorch itself made 14.7 s per step in the same session.</p>
       <table class="micro">
         <thead><tr><th>Run</th><th>per step</th><th class="num">s/step</th><th class="num">s per picture</th><th class="num">GB in the swap</th></tr></thead>
         <tbody>${rows}

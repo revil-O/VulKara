@@ -3344,10 +3344,35 @@ In the app (test build, the engine started per call) finding took 0.13–0.98 s 
 photos at 0.5° and 4°; two photos 7 px apart stay two. Not found right by colour alone: a light photo on a white lid
 needs its frame drawn by hand (said on the page). Small enough for any Mac: a 600 dpi 16-bit scan needs less than 1 GB.
 
-Intel build (release 0.11.3 x64, MacBook Pro 2017, i7, 8 GB, 2026-11-27): the same three photos of the A4 300 dpi
+Intel build (release 0.11.3 x64, MacBook Pro 2017, Intel Core i5-7360U, 8 GB, 2026-11-27): the same three photos of the A4 300 dpi
 scan found with the same frames; in the app 26 s for the first call after installing the runtime, then 9–13 s per scan,
 the engine process started per call. Only the total was measured; the share of the Python/OpenCV start was not split
 off (open).
+
+## 7da. OpenVINO and Flax as other pipeline types (2026-11-27, MacBook Pro 2017, Intel Core i5-7360U, 8 GB)
+
+The question: would `OVStableDiffusionPipeline` (OpenVINO through optimum-intel) or `FlaxStableDiffusionPipeline` (JAX)
+make pictures faster, above all on Intel Macs, which run PyTorch on the CPU?
+
+- **Flax:** removed from diffusers in 0.40.0 ("All `Flax*` classes and the `flax` extras are gone", diffusers release
+  v0.40.0, PR #14169); the Apple-chip runtime has 0.41. jaxlib's last wheel for Intel Macs is 0.4.38 (2024-12-17, PyPI
+  file list). Not pursued.
+- **OpenVINO on macOS:** CPU inference only (docs.openvino.ai system requirements; the GPU plugin is for Intel graphics).
+  Intel Macs are no longer validated since OpenVINO 2025.0 (release notes 2024.6); the last macOS x86_64 wheel is
+  openvino 2025.4.1 (2025-12-17), the last optimum-intel for it 1.27.0 (2.0.0 needs openvino 2026). OSV: no advisories
+  for openvino 2025.4.1, openvino-tokenizers 2025.4.1.0, optimum-intel 1.27.0, optimum-onnx 0.1.0.
+- **Measured** in a separate test venv with the Intel runtime's set (torch 2.2.2, diffusers 0.35.2, transformers 4.57.6)
+  plus those packages; SD 1.5 (`stable-diffusion-v1-5`, fp16 files loaded as float32), 512 × 512, "a red fox sitting in a
+  snowy forest, photo", guidance 7, seed 42; seconds per step from a 2-step and an 8-step run.
+
+| Run | per step | peak | note |
+| --- | --- | --- | --- |
+| PyTorch 2.2.2, float32 (as the Intel build) | 14.7 s | 3.65 GB | load 45 s; swap 1.2 → 2.5 GB during the session |
+| OpenVINO via optimum-intel 1.27.0 | – | – | does not load: optimum-onnx 0.1.0 calls `torch.rms_norm`, which torch has only from 2.4; optimum-intel declares `torch>=2.1` |
+
+Conclusion (user's decision 2026-11-27): both dropped. OpenVINO would need models converted elsewhere with a newer torch
+and an own pipeline around the OpenVINO runtime, on packages Intel no longer maintains for Macs, and every own model or
+LoRA would need the same conversion. The test venv was deleted afterwards.
 
 ## 8. Earlier references (from the user guide and the changelog)
 
