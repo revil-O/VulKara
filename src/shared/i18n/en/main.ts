@@ -167,6 +167,11 @@ export default {
     unknown: 'Unknown photo tool.',
     removeBusy: 'A job is running: remove photo tools when the queue is empty.',
     notATool: 'Not a photo tool.',
+    upright: {
+      name: 'Upright',
+      summary: 'Converging verticals straightened',
+      description: 'Buildings photographed from below or above lean inwards. Upright finds the vertical edges of the photo and straightens them, without a model; the corners left empty are cut off. Strength sets how far: 70–90 % often looks more natural than 100 %. A photo without clear vertical lines stays as it is.',
+    },
     needsDiffusers: 'Selecting objects needs the Diffusers runtime: install it in Settings → Runtimes',
     selectionStopped: 'The selection stopped.',
     noSelection: 'No selection',

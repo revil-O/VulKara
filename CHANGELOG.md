@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.11.4 – 2026-11-28
+
+- **Upright: converging verticals straightened.** Enhance has a built-in tool for buildings photographed from below or
+  above: it finds the photo's vertical edges, straightens them with one perspective correction and cuts off the corners
+  left empty, without a model and in well under a second. *Strength* sets how far (70–90 % often looks more natural). A
+  photo without clear verticals, or taken almost straight up, stays as it is and the result says so.
+- **Several pictures: counting up or each one random.** With more than one picture, *Seeds* chooses whether the pictures
+  count up from the seed (as before) or each gets a random seed of its own; the history keeps every picture's seed.
+- **Previews for models and LoRAs that had none.** A Hugging Face model without a picture file now takes the first
+  picture of its model card (only from Hugging Face itself), and at every start VulKara fetches in the background the
+  previews still missing. Pictures from model cards go through the content filter first; in safe mode a refused picture
+  is tried again once safe mode is off. A source without any picture is not asked again.
+
 ## 0.11.3 – 2026-11-27
 
 - **Scans: photos cut out of flatbed scans.** A new page under Restore takes PNG and JPEG scans (dropped, chosen, or

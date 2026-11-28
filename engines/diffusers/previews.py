@@ -13,6 +13,7 @@ import json
 import os
 import re
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -206,6 +207,68 @@ def hf_image(repo, token=None):
     return sorted(files, key=score)[0]
 
 
+# pictures of a model card are taken only from Hugging Face itself, never from another server the card links to
+_CARD_HOSTS = ("huggingface.co", "cdn-uploads.huggingface.co")
+_CARD_PICTURE = re.compile(r'!\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)|<img\b[^>]*?\bsrc\s*=\s*["\']([^"\']+)["\']', re.I)
+
+
+def _card_url(repo, raw):
+    """A picture link of a model card as a browser would follow it, if it lies on Hugging Face; else None."""
+    base = "https://huggingface.co/%s/resolve/main/" % repo
+    u = urllib.parse.urlparse(raw)
+    if not u.scheme:
+        u = urllib.parse.urlparse(urllib.parse.urljoin(base, raw))  # relative, from the site root, or //host/…
+    if u.hostname not in _CARD_HOSTS or u.scheme not in ("https", "http"):
+        return None  # data:, mailto:, another server
+    path = u.path
+    if u.hostname == "huggingface.co":
+        path = path.replace("/blob/", "/resolve/", 1)  # the page about a file -> the file itself
+    if path.lower().endswith(".svg"):
+        return None
+    return urllib.parse.urlunparse(("https", u.netloc, path, "", u.query, ""))
+
+
+def hf_card_images(repo, token=None):
+    """The pictures of a Hugging Face model card (README) that lie on Hugging Face, in their order, for repos without a
+    picture file of their own."""
+    from huggingface_hub import hf_hub_download
+    with open(hf_hub_download(repo, "README.md", token=token), encoding="utf-8", errors="replace") as f:
+        card = f.read()
+    out = []
+    for m in _CARD_PICTURE.finditer(card):
+        url = _card_url(repo, (m.group(1) or m.group(2) or "").strip())
+        if url and url not in out:
+            out.append(url)
+    return out
+
+
+class Refused(Exception):
+    """Every picture the source offers was refused by the content filter."""
+
+
+_checker = None
+
+
+def _refused(data, safe):
+    """Why the content filter keeps a picture out (nudity in safe mode; nudity with a likely minor always), or None.
+    Raises when the filter can not run: the picture is then tried again at a later start, never shown unchecked."""
+    global _checker
+    from PIL import Image
+    import content_check
+    _checker = _checker or content_check.Checker()
+    return _checker.check_picture(Image.open(io.BytesIO(data)).convert("RGB"), safe)
+
+
+def _decodes(data):
+    from PIL import Image
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            im.verify()
+        return True
+    except Exception:
+        return False
+
+
 def source_of(manifest):
     """Where the picture of fetch_for comes from: the model's source, or Civitai for files found
     there by their hash (importer._civitai_by_hash)."""
@@ -228,6 +291,8 @@ def fetch_for(folder, token=None):
     if src.get("type") not in ("civitai", "hf") and (manifest.get("civitai") or {}).get("images"):
         # a file from disk that is on Civitai (found by its hash)
         url = civitai_image(manifest["civitai"]["images"])
+        if not url and manifest["civitai"]["images"]:
+            raise Refused("safe")
         return _save(_get(url), folder) if url else None
     if src.get("type") == "civitai":
         images = src.get("images")
@@ -237,13 +302,35 @@ def fetch_for(folder, token=None):
                                   os.environ.get("CIVITAI_TOKEN"))
             images = civitai.sample_images(v)
         url = civitai_image(images)
+        if not url and images:
+            raise Refused("safe")  # all of them above what safe mode shows
         return _save(_get(url), folder) if url else None
     if src.get("type") == "hf" and src.get("ref") and "/" in src["ref"] and not os.path.exists(src["ref"]):
-        path = hf_image(src["ref"], token or os.environ.get("HF_TOKEN"))
+        token = token or os.environ.get("HF_TOKEN")
+        path = hf_image(src["ref"], token)
         if path:
             from huggingface_hub import hf_hub_download
-            with open(hf_hub_download(src["ref"], path, token=token or os.environ.get("HF_TOKEN")), "rb") as f:
+            with open(hf_hub_download(src["ref"], path, token=token), "rb") as f:
                 return _save(f.read(), folder)
+        safe = os.environ.get("VK_SAFE_MODE") == "1"
+        refused = None
+        for url in hf_card_images(src["ref"], token):
+            try:
+                data = _get(url)
+            except urllib.error.HTTPError as e:
+                if 400 <= e.code < 500:
+                    continue  # gone or not public: the next picture of the card
+                raise
+            if not _decodes(data):
+                continue  # a page, not a picture
+            reason = _refused(data, safe)
+            if reason:
+                # a refusal that only safe mode makes is tried again once it is off
+                refused = refused if refused == "refused" else ("safe" if safe and not _refused(data, False) else "refused")
+                continue
+            return _save(data, folder)
+        if refused:
+            raise Refused(refused)
     return None
 
 
@@ -261,24 +348,61 @@ def _mark(folder, source=None):
             os.replace(p + ".tmp", p)
 
 
+def _manifest(folder):
+    for name in ("model.json", "lora.json"):
+        p = os.path.join(folder, name)
+        if os.path.isfile(p):
+            try:
+                with open(p) as f:
+                    return p, json.load(f)
+            except (OSError, ValueError):
+                return p, {}
+    return None, None
+
+
 def missing(roots):
+    """Imported models and LoRAs without a preview, except those whose source was found to have none."""
     for root in roots:
         if not os.path.isdir(root):
             continue
         for name in sorted(os.listdir(root)):
             folder = os.path.join(root, name)
-            if os.path.isdir(folder) and not name.startswith(".") and not os.path.isfile(os.path.join(folder, FILE)) \
-                    and any(os.path.isfile(os.path.join(folder, m)) for m in ("model.json", "lora.json")):
+            if not os.path.isdir(folder) or name.startswith(".") or os.path.isfile(os.path.join(folder, FILE)):
+                continue
+            path, m = _manifest(folder)
+            if not path or not isinstance(m, dict):
+                continue
+            mark = m.get("preview_missing")
+            # "safe": refused only because of safe mode, so asked again once it is off
+            if not mark or (mark == "safe" and os.environ.get("VK_SAFE_MODE") != "1"):
                 yield folder
+
+
+def _mark_missing(folder, why=True):
+    """Notes that the source has no picture (True) or only refused ones ("safe", "refused"), so the app does not ask
+    again at every start."""
+    path, m = _manifest(folder)
+    if path and isinstance(m, dict):
+        m["preview_missing"] = why
+        with open(path + ".tmp", "w") as f:
+            json.dump(m, f, indent=1)
+        os.replace(path + ".tmp", path)
 
 
 def main(argv):
     roots = argv or [str(paths.models_dir()), str(paths.loras_dir())]
     for folder in missing(roots):
         try:
-            path = fetch_for(folder)
+            try:
+                path = fetch_for(folder)
+            except Refused as r:
+                _mark_missing(folder, str(r))
+                print("__preview__ " + json.dumps({"folder": folder, "preview": None, "refused": str(r)}), flush=True)
+                continue
             if path:
                 _mark(folder)
+            else:
+                _mark_missing(folder)
             print("__preview__ " + json.dumps({"folder": folder, "preview": path}), flush=True)
         except Exception as e:
             print("__preview__ " + json.dumps({"folder": folder, "error": str(e)[:200]}), flush=True)

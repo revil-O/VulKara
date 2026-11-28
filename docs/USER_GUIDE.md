@@ -178,6 +178,7 @@ running job shows its progress on its tile, and a waiting job shows its place in
 | **Control** | None, Pose, Depth, Edges, Line art, Scribble, Tile | Guides the composition with a control picture, see below. Only shown when the model supports it. |
 | **Sampler** | depends on the family | The method that removes noise step by step. *Default* is the model's own. The second list sets the noise schedule (Karras, Exponential, Beta); it is off while the sampler is *Default*. |
 | **Seed** | number or empty | The same seed with the same settings gives the same picture. Empty means random; the dice button sets it back to random. |
+| **Seeds** (several pictures) | Counting up or Each one random | Counting up: the pictures take the seed, then seed + 1, + 2 … Each one random: every picture its own random seed. The history keeps each picture's seed, so Generate again makes exactly that picture. |
 | **Pictures** | 1–20 | How many pictures are made, each with its own seed. |
 | **LoRAs** | up to 3 | Add-ons that teach the model a style, person or object, each with its own weight (−2 to 2; the − and + next to it step it by a tenth, also on a phone). Only LoRAs of the model's family are offered. |
 | **Not in the picture** | text | The negative prompt: what should not appear. Only shown when the model supports one. |
@@ -499,6 +500,7 @@ download size, and below a line the licence, its note and the source.
 
 | Tool | What it does | Runs on | Size · licence |
 | --- | --- | --- | --- |
+| **Upright** | straightens converging verticals of buildings photographed from below or above, without a model; the empty corners are cut off. **Strength** sets how far (70–90 % often looks more natural). A photo without clear verticals, or one taken almost straight up, stays as it is | CPU | built in · VulKara |
 | **Sharpen (NAFNet)** | removes blur from shaken or slightly out-of-focus photos | CPU | 92 MB · MIT |
 | **Denoise (SCUNet)** | removes the noise of real photos (high ISO, low light) | GPU | 72 MB · Apache-2.0 |
 | **Upscale ×4 (SwinIR)** | enlarges real photos four times and recreates fine detail; a picture over 2048 px on the longer side is made smaller to 2048 first (the result's note says so), so results reach at most 8192 px | GPU | 67 MB · Apache-2.0 |
@@ -1300,6 +1302,7 @@ chosen shows the message *was not given to the app: choose it again*.
   (imported from disk) are looked up on Civitai by their SHA-256: their trigger words, a preview picture and the
   licence on the Licenses page. Only the checksum is sent, but it tells Civitai which files are on this Mac. Off,
   enter the page of such a file on the Licenses page yourself.
+- **Previews of models and LoRAs** (no setting): at each start VulKara fetches the previews still missing from where the model or LoRA came from (Civitai, or Hugging Face: a picture of the repo or of its model card); no other server is asked, and a source without a picture is not asked again. Pictures from model cards go through the content filter first.
 - **Look for app and runtime updates once a day**: on by default; see [Update check](#update-check) and [App updates](#app-updates). Off, **Check now**
   still asks when you want.
 - **Prompt cache**: prompts encoded before are kept on this Mac (at most 2 GB, the least recently used go first), so

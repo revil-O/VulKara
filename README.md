@@ -50,12 +50,13 @@ The app and its user guide in **English** · [Deutsch](docs/de/USER_GUIDE.md) ·
 > picks the right one. Signed, notarized and self-updating like the Apple silicon version. [What it can do](#requirements)
 
 > [!NOTE]
+> **<img src="docs/icons/building.svg" width="16" height="16" alt=""> New in 0.11.4: Upright.** Buildings photographed from below lean inwards: Enhance now
+> straightens their verticals without a model, in well under a second. Several pictures can also take a random seed
+> each, and models and LoRAs without a picture get one from their source. [Enhance](#video-upscale-pose-and-illusion) · [Changelog](CHANGELOG.md)
+>
 > **<img src="docs/icons/scan-line.svg" width="16" height="16" alt=""> New in 0.11.3: Scans.** Drop your flatbed scans in: the photos on them are found,
 > straightened and cut out of the lid and a white paper border, one PNG each with the scan's 16 bits – and on to Restore
 > as a batch. [Restore and Scans](#restore-old-photos)
->
-> **<img src="docs/icons/layers.svg" width="16" height="16" alt=""> New in 0.11.2: Civitai versions.** Pick the version of a LoRA or model you want on its
-> card, keep two versions side by side, and the LoRA page tells you when a newer one is out. [Changelog](CHANGELOG.md)
 >
 > **<img src="docs/icons/sparkles.svg" width="16" height="16" alt=""> Since 0.7.0: FLUX 3 Image Klein.** Black Forest Labs' newest model on the MLX runtime, for text to
 > image and edits with a reference picture, with LoRAs and an optional **prompt upsampler** that turns a short prompt
@@ -281,7 +282,7 @@ batch whose results land in the same folder.
 <td colspan="2"><img src="docs/screenshots/enhance.jpg" alt="Enhance"></td>
 </tr>
 <tr>
-<td colspan="2"><b>Enhance</b>: photo tools with small models — sharpen (NAFNet), denoise (SCUNet), upscale with
+<td colspan="2"><b>Enhance</b>: Upright straightens converging verticals without a model; photo tools with small models — sharpen (NAFNet), denoise (SCUNet), upscale with
 detail (SwinIR), remove JPEG artefacts (FBCNN), remove the background (BiRefNet) and select objects with clicks
 (SAM 2.1), whose selection can go straight to Inpaint as the mask. Denoise, Upscale and the JPEG tool run from their
 original weights on the GPU, the others as ONNX models on the CPU. All free for commercial use, downloaded once at a

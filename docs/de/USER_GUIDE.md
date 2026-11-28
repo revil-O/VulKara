@@ -187,6 +187,7 @@ Klicke auf eine Kachel, um sie in der [großen Ansicht](#18-die-große-ansicht) 
 | **Steuerung** | Keine, Pose, Tiefe, Kanten, Strichzeichnung, Skizze, Kachel | Lenkt den Bildaufbau mit einem Steuerbild, siehe unten. Nur sichtbar, wenn das Modell es unterstützt. |
 | **Sampler** | je nach Familie | Das Verfahren, das Schritt für Schritt das Rauschen entfernt. *Standard* ist der eigene des Modells. Die zweite Liste legt den Rauschverlauf fest (Karras, Exponential, Beta); sie ist aus, solange der Sampler auf *Standard* steht. |
 | **Seed** | Zahl oder leer | Derselbe Seed mit denselben Einstellungen ergibt dasselbe Bild. Leer heißt zufällig; der Würfel-Button stellt wieder auf zufällig. |
+| **Seeds** (mehrere Bilder) | Hochzählen oder Jedes zufällig | Hochzählen: Die Bilder bekommen den Seed, dann Seed + 1, + 2 … Jedes zufällig: Jedes Bild bekommt einen eigenen zufälligen Seed. Der Verlauf behält den Seed jedes Bildes, „Erneut erzeugen“ trifft also genau dieses Bild. |
 | **Bilder** | 1–20 | Wie viele Bilder erstellt werden, jedes mit eigenem Seed. |
 | **LoRAs** | bis zu 3 | Erweiterungen, die dem Modell einen Stil, eine Person oder ein Objekt beibringen, jede mit eigener Gewichtung (−2 bis 2; − und + daneben ändern sie in Zehntelschritten, auch am Handy). Angeboten werden nur LoRAs der Familie des Modells. |
 | **Nicht im Bild** | Text | Der Negativ-Prompt: was nicht erscheinen soll. Nur sichtbar, wenn das Modell einen unterstützt. |
@@ -528,6 +529,7 @@ Linie die Lizenz, ihren Hinweis und die Quelle.
 
 | Werkzeug | Was es tut | Läuft auf | Größe · Lizenz |
 | --- | --- | --- | --- |
+| **Stürzende Linien** | richtet die stürzenden Linien von Gebäuden gerade, die von unten oder oben fotografiert wurden, ohne Modell; die leeren Ecken werden abgeschnitten. **Stärke** bestimmt, wie weit (70–90 % wirken oft natürlicher). Ein Foto ohne klare Senkrechten oder fast senkrecht nach oben aufgenommen bleibt, wie es ist | CPU | eingebaut · VulKara |
 | **Schärfen (NAFNet)** | entfernt Unschärfe aus verwackelten oder leicht unscharfen Fotos | CPU | 92 MB · MIT |
 | **Entrauschen (SCUNet)** | entfernt das Rauschen echter Fotos (hohe ISO, wenig Licht) | GPU | 72 MB · Apache-2.0 |
 | **Vergrößern ×4 (SwinIR)** | vergrößert echte Fotos auf das Vierfache und stellt feine Details neu her; ein Bild mit mehr als 2048 px an der längeren Seite wird zuerst auf 2048 verkleinert (der Hinweis zum Ergebnis sagt das), sodass Ergebnisse höchstens 8192 px erreichen | GPU | 67 MB · Apache-2.0 |
@@ -1390,6 +1392,7 @@ erneut aus*.
   Trigger-Wörter, ein Vorschaubild und die Lizenz auf der Seite Lizenzen. Gesendet wird nur die Prüfsumme, aber sie
   verrät Civitai, welche Dateien auf diesem Mac liegen. Ist es aus, gibst du die Seite einer solchen Datei auf der
   Seite Lizenzen selbst an.
+- **Vorschaubilder von Modellen und LoRAs** (keine Einstellung): Bei jedem Start holt VulKara fehlende Vorschaubilder von dort, woher das Modell oder die LoRA kam (Civitai, oder Hugging Face: ein Bild des Repos oder seiner Modellkarte); kein anderer Server wird gefragt, und eine Quelle ohne Bild wird nicht erneut gefragt. Bilder aus Modellkarten laufen vorher durch den Inhaltsfilter.
 - **Einmal täglich nach App- und Runtime-Updates suchen**: standardmäßig an; siehe [Update-Prüfung](#update-prüfung) und [App-Updates](#app-updates). Ist es aus,
   fragt **Jetzt prüfen** trotzdem, wann du willst.
 - **Prompt-Cache**: Schon kodierte Prompts bleiben auf diesem Mac (höchstens 2 GB, die am längsten unbenutzten gehen

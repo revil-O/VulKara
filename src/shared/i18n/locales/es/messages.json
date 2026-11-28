@@ -290,7 +290,11 @@
    "remove": "Eliminar",
    "addLora": "Añadir una LoRA",
    "negative": "No en la imagen",
-   "negativePlaceholder": "Lo que la imagen no debe mostrar"
+   "negativePlaceholder": "Lo que la imagen no debe mostrar",
+   "seeds": "Semillas",
+   "seedsCount": "Contando hacia arriba",
+   "seedsRandom": "Cada una al azar",
+   "seedsHint": "Contando hacia arriba: las imágenes toman la semilla, luego semilla + 1, + 2 … (con la misma semilla, otra vez las mismas). Cada una al azar: cada imagen recibe su propia semilla aleatoria. El historial guarda en ambos casos la semilla de cada imagen, así que «Generar de nuevo» repite exactamente esa imagen."
   },
   "sampler": {
    "default": "Estándar",
@@ -504,7 +508,8 @@
    "importFile": "Importar un archivo de modelo",
    "checking": "Comprobando {title}…",
    "fileTypes": ".pth, .safetensors o .onnx",
-   "fileTypesHint": "Modelos de fotos propios. Los pesos de PyTorch se ejecutan en la GPU: spandrel debe conocer la arquitectura (ESRGAN, SwinIR, HAT, DAT, NAFNet, SCUNet, FBCNN, SPAN, OmniSR y otras), imagen en color de entrada, imagen en color de salida, ampliando 1, 2, 3, 4 u 8 veces; los archivos .pth se leen sin ejecutar código. Los modelos ONNX se ejecutan en la CPU y se comprueban antes: una entrada de 1 × 3 × alto × ancho, una imagen o máscara de salida, valores 0–1 o 0–255; los modelos con operadores propios se rechazan. Usa solo modelos cuya licencia lo permita."
+   "fileTypesHint": "Modelos de fotos propios. Los pesos de PyTorch se ejecutan en la GPU: spandrel debe conocer la arquitectura (ESRGAN, SwinIR, HAT, DAT, NAFNet, SCUNet, FBCNN, SPAN, OmniSR y otras), imagen en color de entrada, imagen en color de salida, ampliando 1, 2, 3, 4 u 8 veces; los archivos .pth se leen sin ejecutar código. Los modelos ONNX se ejecutan en la CPU y se comprueban antes: una entrada de 1 × 3 × alto × ancho, una imagen o máscara de salida, valores 0–1 o 0–255; los modelos con operadores propios se rechazan. Usa solo modelos cuya licencia lo permita.",
+   "uprightStrengthHint": "Cuánto se enderezan las verticales: 100 % las deja del todo verticales, menos deja algo de inclinación, que suele verse más natural (70–90 %)."
   },
   "upscale": {
    "title": "Ampliar",
@@ -2159,7 +2164,12 @@
    "notATool": "No es una herramienta de fotos.",
    "needsDiffusers": "Para seleccionar objetos se necesita el runtime Diffusers: instálalo en Ajustes → Runtimes",
    "selectionStopped": "La selección se detuvo.",
-   "noSelection": "Sin selección"
+   "noSelection": "Sin selección",
+   "upright": {
+    "name": "Líneas convergentes",
+    "summary": "Verticales convergentes enderezadas",
+    "description": "Los edificios fotografiados desde abajo o desde arriba se inclinan hacia dentro. La herramienta encuentra los bordes verticales de la foto y los endereza, sin modelo; las esquinas que quedan vacías se recortan. La intensidad fija cuánto: 70–90 % suele verse más natural que 100 %. Una foto sin líneas verticales claras queda igual."
+   }
   },
   "subject": {
    "missing": "Seleccionar sujeto no forma parte de esta compilación.",

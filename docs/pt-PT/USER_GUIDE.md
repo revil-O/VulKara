@@ -181,6 +181,7 @@ fila. Clique numa miniatura para a abrir na [vista grande](#18-a-vista-grande).
 | **Controlo** | Nenhum, Pose, Profundidade, Contornos, Line art, Rabisco, Tile | Orienta a composição com uma imagem de controlo, consulte abaixo. Só aparece quando o modelo o suporta. |
 | **Sampler** | depende da família | O método que remove o ruído passo a passo. *Predefinido* é o do próprio modelo. A segunda lista define o escalonamento do ruído (Karras, Exponential, Beta); fica desativada enquanto o sampler é *Predefinido*. |
 | **Seed** | número ou vazio | A mesma seed com as mesmas definições dá a mesma imagem. Vazio significa aleatório; o botão do dado volta a aleatório. |
+| **Seeds** (várias imagens) | Em sequência ou Cada uma aleatória | Em sequência: as imagens usam a seed, depois seed + 1, + 2 … Cada uma aleatória: cada imagem recebe a sua própria seed aleatória. O histórico guarda a seed de cada imagem, por isso «Gerar de novo» repete exatamente essa imagem. |
 | **Imagens** | 1–20 | Quantas imagens são feitas, cada uma com a sua própria seed. |
 | **LoRAs** | até 3 | Complementos que ensinam ao modelo um estilo, uma pessoa ou um objeto, cada um com o seu próprio peso (−2 a 2; os botões − e + ao lado mudam em décimas, também no telemóvel). Só são oferecidas LoRAs da família do modelo. |
 | **Fora da imagem** | texto | O prompt negativo: o que não deve aparecer. Só aparece quando o modelo o suporta. |
@@ -516,6 +517,7 @@ origem.
 
 | Ferramenta | O que faz | Executada em | Tamanho · licença |
 | --- | --- | --- | --- |
+| **Linhas convergentes** | endireita as verticais convergentes de edifícios fotografados de baixo ou de cima, sem modelo; os cantos vazios são recortados. **Intensidade** define quanto (70–90 % parece muitas vezes mais natural). Uma fotografia sem verticais claras, ou tirada quase na vertical para cima, fica como está | CPU | integrada · VulKara |
 | **Nitidez (NAFNet)** | remove a desfocagem de fotos tremidas ou ligeiramente desfocadas | CPU | 92 MB · MIT |
 | **Reduzir ruído (SCUNet)** | remove o ruído de fotos reais (ISO elevado, pouca luz) | GPU | 72 MB · Apache-2.0 |
 | **Ampliar ×4 (SwinIR)** | amplia fotos reais quatro vezes e recria detalhes finos; uma imagem com mais de 2048 px no lado maior é primeiro reduzida a 2048 (a nota do resultado indica-o), pelo que os resultados chegam no máximo a 8192 px | GPU | 67 MB · Apache-2.0 |
@@ -1361,6 +1363,7 @@ de novo*.
   conhecida (importados do disco) são procurados no Civitai pelo SHA-256: as palavras-gatilho, uma imagem de
   pré-visualização e a licença na página Licenças. Só é enviado o checksum, mas este indica ao Civitai que ficheiros
   estão neste Mac. Desativado, indique o utilizador a página desse ficheiro na página Licenças.
+- **Pré-visualizações de modelos e LoRAs** (sem definição): a cada arranque o VulKara obtém as pré-visualizações em falta no sítio de onde o modelo ou a LoRA veio (Civitai, ou Hugging Face: uma imagem do repositório ou do seu cartão de modelo); nenhum outro servidor é consultado, e uma fonte sem imagem não é consultada de novo. As imagens de cartões de modelo passam antes pelo filtro de conteúdo.
 - **Procurar atualizações da app e dos runtimes uma vez por dia**: ativado por predefinição; consulte
   [Verificação de atualizações](#verificação-de-atualizações). Desativado, **Verificar agora** continua a consultar quando quiser.
 - **Cache de prompts**: os prompts já codificados ficam guardados neste Mac (no máximo 2 GB, os usados há mais tempo

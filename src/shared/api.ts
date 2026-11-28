@@ -474,8 +474,8 @@ export interface PhotoTool {
   /** sharpen, denoise, upscale, dejpeg, cutout, select, custom */
   task: string
   kind: 'image' | 'mask' | 'segment'
-  /** torch: PyTorch weights on the GPU (spandrel); onnx: onnxruntime on the CPU */
-  runtime: 'torch' | 'onnx'
+  /** torch: PyTorch weights on the GPU (spandrel); onnx: onnxruntime on the CPU; builtin: the app's own (OpenCV, no model) */
+  runtime: 'torch' | 'onnx' | 'builtin'
   /** a few words for the list; the description goes into the info badge */
   summary?: string
   description: string

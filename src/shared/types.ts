@@ -155,6 +155,8 @@ export interface Job {
   steps?: number
   guidance?: number
   seed: number
+  /** several pictures of one job: seeds counting up from seed (default), or each picture a random seed of its own */
+  seedMode?: 'count' | 'random'
   sampler?: string
   sigmaSchedule?: string
   /** how much of the input picture changes, 0..1 */

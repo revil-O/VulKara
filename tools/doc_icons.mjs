@@ -22,6 +22,7 @@ export const DOC_ICONS = {
   'gauge': 'website: the benchmark',
   'scan-text': 'website: prompt from picture',
   'scan-line': 'Scans page (website news, README)',
+  'building': 'Enhance: Upright, converging verticals (website news, README)',
   'activity': 'website: the monitor window',
   'monitor': 'everything on the Mac',
   'tablet-smartphone': 'website: remote access from a phone or tablet',

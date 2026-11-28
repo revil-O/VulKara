@@ -111,7 +111,7 @@ const toInstall = computed(() => recommended.value.filter((tl) => !tl.installed)
 // a tool installed before the catalog carried licence notes: the note comes from the catalog
 const noteOf = (tl: PhotoTool): string | undefined => tl.licenceNote ?? recommended.value.find((r) => r.id === tl.recommended)?.licenceNote
 const importing = computed(() => imports.jobs.findLast((j) => j.request.source === 'toolfile' || (j.request.source === 'file' && j.request.ref.toLowerCase().endsWith('.onnx'))))
-const where = (tl: { runtime: 'torch' | 'onnx' }): string => (tl.runtime === 'torch' ? 'GPU' : 'CPU')
+const where = (tl: { runtime: 'torch' | 'onnx' | 'builtin' }): string => (tl.runtime === 'torch' ? 'GPU' : 'CPU')
 
 // The list shows a few words per tool; everything else is in its info badge. A tool installed before the catalog
 // had summaries (or under an older id) takes the catalog's current one (the tool with the same task).
@@ -190,7 +190,8 @@ function targetOf(sz: [number, number] | undefined): [number, number] | undefine
   return c < 1 ? [Math.max(1, Math.round(out[0] * c)), Math.max(1, Math.round(out[1] * c))] : out
 }
 const target = computed(() => targetOf(size.value))
-const result = computed(() => (target.value && tool.value ? `${target.value[0]} × ${target.value[1]}` : ''))
+// Upright cuts off the corners it leaves empty: how much is known only after it ran, so no size is promised
+const result = computed(() => (target.value && tool.value && tool.value.task !== 'upright' ? `${target.value[0]} × ${target.value[1]}` : ''))
 
 async function run(out: 'cutout' | 'mask' = output.value): Promise<void> {
   const tl = tool.value
@@ -352,7 +353,7 @@ function open(q: QueuedJob, file: string): void {
               <small class="dim"><span class="where" :class="tl.runtime === 'torch' ? 'gpu' : 'cpu'">{{ where(tl) }}</span>{{ summaryOf(tl) }}</small>
             </div>
             <HintBadge :text="infoOf(tl)" :more="licenceOf(tl)" above />
-            <button class="btn small ghost" :title="t('edit.enhance.trash')" @click.prevent="remove(tl)"><Trash2 :size="12" /></button>
+            <button v-if="tl.runtime !== 'builtin'" class="btn small ghost" :title="t('edit.enhance.trash')" @click.prevent="remove(tl)"><Trash2 :size="12" /></button>
           </label>
         </div>
 
@@ -376,7 +377,7 @@ function open(q: QueuedJob, file: string): void {
           <input v-model.number="quality" type="range" min="0" max="95" step="5" :aria-label="t('edit.enhance.jpegQualityLabel')" />
         </div>
         <div v-if="tool?.kind === 'image'" class="field">
-          <span class="title">{{ t('edit.enhance.strength', { strength }) }} <HintBadge start :text="t('edit.enhance.strengthHint')" /></span>
+          <span class="title">{{ t('edit.enhance.strength', { strength }) }} <HintBadge start :text="tool.task === 'upright' ? t('edit.enhance.uprightStrengthHint') : t('edit.enhance.strengthHint')" /></span>
           <input v-model.number="strength" type="range" min="10" max="100" step="5" />
         </div>
         <div v-if="tool?.kind === 'mask'" class="field">

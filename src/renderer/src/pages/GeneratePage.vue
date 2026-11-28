@@ -678,6 +678,13 @@ const labelPreview = computed(() => {
             <span>{{ t('generate.panel.pictures') }} <b>{{ form.count }}</b></span>
             <input v-model.number="form.count" type="range" min="1" max="20" />
           </label>
+          <label v-if="does.count && form.count > 1" class="field">
+            <span>{{ t('generate.panel.seeds') }} <HintBadge start :text="t('generate.panel.seedsHint')" /></span>
+            <select v-model="form.seedMode">
+              <option value="count">{{ t('generate.panel.seedsCount') }}</option>
+              <option value="random">{{ t('generate.panel.seedsRandom') }}</option>
+            </select>
+          </label>
 
           <div v-if="loras.length && does.loras" class="field">
             <span>{{ t('generate.panel.loras') }}</span>

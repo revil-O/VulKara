@@ -73,3 +73,54 @@ export function recheckLibrary(command: { command: string; args: string[]; env?:
     })
   })
 }
+
+/**
+ * At every start, in the background: previews for imported models and LoRAs that have none, from their source
+ * (engines/diffusers/previews.py: Civitai's sample, a picture file of the Hugging Face repo, else the first picture of
+ * its model card, checked by the content filter in safe mode). A source found to have no picture is not asked again.
+ * Resolves with how many were found; the pages reload the list when there was one. A run that hangs (a network that
+ * lets no connection through) is stopped after timeoutMs; what it found until then is kept, the rest is tried again at
+ * the next start.
+ */
+export function fetchMissingPreviews(command: { command: string; args: string[]; env?: Record<string, string> } | undefined,
+  env: Record<string, string>, changed: () => void, timeoutMs = 10 * 60_000): Promise<number> {
+  if (!command) return Promise.resolve(0)
+  return new Promise((resolve) => {
+    let out = ''
+    let timedOut = false
+    const proc = spawn(command.command, command.args, { env: { ...processEnv(), ...command.env, ...env } })
+    const timer = setTimeout(() => {
+      timedOut = true
+      log('fetching missing previews took too long and was stopped')
+      proc.kill()
+    }, timeoutMs)
+    proc.stdout.on('data', (d: Buffer) => { out += d.toString() })
+    proc.stderr.on('data', () => {})
+    proc.on('error', (err) => {
+      clearTimeout(timer)
+      log(`fetching missing previews failed: ${String(err)}`)
+      resolve(0)
+    })
+    proc.on('close', (code) => {
+      clearTimeout(timer)
+      if (code !== 0 && !timedOut) {
+        log(`fetching missing previews failed (exit ${code})`)
+        resolve(0)
+        return
+      }
+      let found = 0
+      for (const line of out.split('\n')) {
+        if (!line.startsWith('__preview__ ')) continue
+        try {
+          const r = JSON.parse(line.slice('__preview__ '.length)) as { preview?: string | null; error?: string; folder?: string }
+          if (r.preview) found++
+          else if (r.error) log(`no preview for ${r.folder}: ${r.error}`)
+        } catch {
+          // a line that is not ours
+        }
+      }
+      if (found) changed()
+      resolve(found)
+    })
+  })
+}

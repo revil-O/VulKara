@@ -440,10 +440,15 @@ def apply(job, images_dir, report=None, stop=None, note=None):
     import uuid
     from PIL import Image
     opts = job["photo_tool"]
-    folder = os.path.realpath(opts["folder"])
-    if not folder.startswith(os.path.realpath(root()) + os.sep):
-        raise ValueError("This photo tool is not installed")
-    m = load_manifest(folder)
+    import upright
+    builtin = opts["folder"] == upright.TOOL_ID  # tools of the app itself, without a model or a folder
+    if builtin:
+        folder, m = None, upright.MANIFEST
+    else:
+        folder = os.path.realpath(opts["folder"])
+        if not folder.startswith(os.path.realpath(root()) + os.sep):
+            raise ValueError("This photo tool is not installed")
+        m = load_manifest(folder)
     if not job.get("input_image"):
         raise ValueError("Choose a picture")
     with Image.open(job["input_image"]) as head:  # the size from the header, before the pixels are read
@@ -454,6 +459,15 @@ def apply(job, images_dir, report=None, stop=None, note=None):
     rgb = np.asarray(colour.open_rgb(job["input_image"]))
     given = (rgb.shape[1], rgb.shape[0])  # the picture's own size, before it may be made smaller
     stem = "".join(filter(str.isalnum, os.path.splitext(os.path.basename(job["input_image"]))[0][:30])) or "photo"
+    if builtin:
+        out, found = upright.straighten(rgb, float(opts.get("strength", 1.0)), stop)
+        if out is None:
+            return None
+        if not found and note:
+            note("The photo was left as it is: it has no clear converging verticals, or straightening them would have cut off too much.")
+        path = os.path.join(str(images_dir), "%s_upright_%s.png" % (stem, uuid.uuid4().hex[:12]))
+        Image.fromarray(out).save(path)
+        return path
     max_side = m.get("max_side")
     if max_side and max(rgb.shape[:2]) > max_side:
         if m["kind"] != "image":

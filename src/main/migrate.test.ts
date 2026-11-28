@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
-const { recheckLibrary, RECHECK_FLAG, RECHECK_TRIES } = await import('./migrate')
+const { fetchMissingPreviews, recheckLibrary, RECHECK_FLAG, RECHECK_TRIES } = await import('./migrate')
 
 describe('the one-time check of the installed LoRAs and models', () => {
   // "--" before the --apply the check adds: node takes what follows as the script's arguments
@@ -60,5 +60,33 @@ describe('the one-time check of the installed LoRAs and models', () => {
     }
     expect(existsSync(join(data, RECHECK_FLAG))).toBe(true)  // the third failed start ends it
     expect(existsSync(join(data, `${RECHECK_FLAG}.tries`))).toBe(false)
+  })
+})
+
+describe('the previews fetched for models and LoRAs without one', () => {
+  const node = (script: string) => ({ command: process.execPath, args: ['-e', script, '--'] })
+
+  it('has the pages reload the list when a picture was found, and counts them', async () => {
+    const changed = vi.fn()
+    const script = 'console.log("__preview__ " + JSON.stringify({ folder: "/m/a", preview: "/m/a/preview.jpg" })); console.log("__preview__ " + JSON.stringify({ folder: "/m/b", preview: null }))'
+    expect(await fetchMissingPreviews(node(script), {}, changed)).toBe(1)
+    expect(changed).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops a run that hangs (a network without a way out) and keeps what it found until then', async () => {
+    const changed = vi.fn()
+    const script = 'console.log("__preview__ " + JSON.stringify({ folder: "/m/a", preview: "/m/a/preview.jpg" })); setTimeout(() => {}, 20000)'
+    const started = Date.now()
+    expect(await fetchMissingPreviews(node(script), {}, changed, 400)).toBe(1)
+    expect(Date.now() - started).toBeLessThan(5000)
+    expect(changed).toHaveBeenCalledTimes(1)
+  })
+
+  it('changes nothing without a picture, a runtime or when the run fails', async () => {
+    const changed = vi.fn()
+    expect(await fetchMissingPreviews(node('console.log("__preview__ " + JSON.stringify({ folder: "/m/b", error: "offline" }))'), {}, changed)).toBe(0)
+    expect(await fetchMissingPreviews(node('process.exit(2)'), {}, changed)).toBe(0)
+    expect(await fetchMissingPreviews(undefined, {}, changed)).toBe(0)
+    expect(changed).not.toHaveBeenCalled()
   })
 })

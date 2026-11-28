@@ -26,6 +26,8 @@ export interface GenerateForm {
   /** null = a new random seed for every job */
   seed: number | null
   count: number
+  /** several pictures: seeds counting up from the seed, or each picture a random one */
+  seedMode: 'count' | 'random'
   sampler: string
   sigmaSchedule: string
   loras: { id: string; scale: number }[]
@@ -113,7 +115,7 @@ export const formPage = (page: string): Mode => (Object.hasOwn(MODES, page) ? (p
 
 export function emptyForm(mode: Mode): GenerateForm {
   return {
-    prompt: '', negativePrompt: '', style: '', modelId: '', width: 512, height: 512, steps: 25, guidance: 7, seed: null, count: 1,
+    prompt: '', negativePrompt: '', style: '', modelId: '', width: 512, height: 512, steps: 25, guidance: 7, seed: null, count: 1, seedMode: 'count',
     sampler: 'Default', sigmaSchedule: 'Default', loras: [], strength: mode === 'inpaint' ? 1 : 0.6, inputImage: '', references: [], customSize: false,
     videoSeconds: 2, videoFps: 24, videoResolution: '480p', videoSound: true, patternStrength: 1.1,
     controlType: '', controlImage: '', controlPreprocess: true, controlDepthBase: false, controlWeight: 1, upsample: true, keepPicture: false, faceDetail: false, faceDetailStrength: 0.4, fast: false,
@@ -278,6 +280,7 @@ export function buildJob(mode: Mode, form: GenerateForm, model: Asset, loras: As
     page: mode, prompt: form.prompt.trim(), modelId: model.id, modelDir: model.folder,
     width: form.width, height: form.height, steps: form.steps, guidance: form.guidance, seed: form.seed ?? -1,
   }
+  if (does.count && form.count > 1 && form.seedMode === 'random') job.seedMode = 'random'
   if (model.meta.negativePrompt && form.negativePrompt.trim()) job.negativePrompt = form.negativePrompt.trim()
   if (does.styles && form.style) job.style = form.style
   if (does.sampler && form.sampler !== 'Default' && samplersFor(model.meta)?.includes(form.sampler)) {
@@ -367,6 +370,8 @@ export function applyJob(form: GenerateForm, job: Job, models: Asset[], loras: A
   if (job.steps) form.steps = job.steps
   if (job.guidance !== undefined) form.guidance = job.guidance
   form.seed = job.seed >= 0 ? job.seed : null
+  // the job's own seed makes that picture again: counting up from it, never a random seed instead
+  form.seedMode = 'count'
   // the reused job's size stays when the model changes next
   form.sizeWanted = undefined
   form.sampler = job.sampler ?? 'Default'

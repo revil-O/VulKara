@@ -70,3 +70,167 @@ def test_lora_picture_uses_training_tags_or_name_and_triggers(tmp_path):
     assert previews.lora_prompt(tags).startswith("monochrome, tattoo_style, flower")
     named = _lora(tmp_path, "fantasy-digital-painting", trigger_words=["zaat style"])
     assert previews.lora_prompt(named).startswith("zaat style, fantasy a digital painting of")
+
+
+CARD = """---
+license: apache-2.0
+---
+# A model
+[![badge](https://img.shields.io/badge/x-y-blue)](https://example.org)
+<img src="https://evil.example.com/a.png">
+![grid](https://cdn-uploads.huggingface.co/production/uploads/abc/grid.png "the grid")
+![later](samples/b.png)
+"""
+
+
+def _card(monkeypatch, text):
+    import huggingface_hub
+
+    def download(repo, filename, token=None):
+        assert filename == "README.md"
+        p = os.path.join(os.environ.get("TMPDIR", "/tmp"), "vk_card_%d.md" % os.getpid())
+        with open(p, "w") as f:
+            f.write(text)
+        return p
+    monkeypatch.setattr(huggingface_hub, "hf_hub_download", download)
+
+
+def test_the_model_card_gives_its_pictures_on_hugging_face_in_order(monkeypatch):
+    _card(monkeypatch, CARD)
+    assert previews.hf_card_images("org/model") == [
+        "https://cdn-uploads.huggingface.co/production/uploads/abc/grid.png",
+        "https://huggingface.co/org/model/resolve/main/samples/b.png"]
+
+
+def test_card_links_are_read_like_a_browser_would(monkeypatch):
+    _card(monkeypatch, "\n".join([
+        "![a](data:image/png;base64,AAAA)",                       # inline data: not a link to fetch
+        "![b](mailto:me@example.org)",
+        "![c](https://huggingface.co/org/model/blob/main/c.png)",  # a page about the file -> the file itself
+        "![d](//cdn-uploads.huggingface.co/u/d.png)",              # protocol-relative
+        "![e](http://huggingface.co/org/model/resolve/main/e.png)",  # http to Hugging Face -> https
+        "![f](/other/repo/resolve/main/f.png)",                     # from the site root
+        "![g](.hidden/g.png)",
+        "![h](https://evil.example.com/h.png)",
+        "![i](logo.svg)",
+    ]))
+    assert previews.hf_card_images("org/model") == [
+        "https://huggingface.co/org/model/resolve/main/c.png",
+        "https://cdn-uploads.huggingface.co/u/d.png",
+        "https://huggingface.co/org/model/resolve/main/e.png",
+        "https://huggingface.co/other/repo/resolve/main/f.png",
+        "https://huggingface.co/org/model/resolve/main/.hidden/g.png",
+    ]
+
+
+def _png():
+    from PIL import Image
+    import io
+    b = io.BytesIO()
+    Image.new("RGB", (64, 48), (200, 100, 50)).save(b, "PNG")
+    return b.getvalue()
+
+
+def _hf_model(tmp_path):
+    folder = tmp_path / "m"
+    folder.mkdir()
+    (folder / "model.json").write_text(json.dumps({"source": {"type": "hf", "ref": "org/model"}}))
+    return str(folder)
+
+
+def _card_fetch(monkeypatch, urls, pages):
+    """The card offers urls; pages maps url -> bytes, or an exception to raise."""
+    monkeypatch.setattr(previews, "hf_image", lambda repo, token=None: None)
+    monkeypatch.setattr(previews, "hf_card_images", lambda repo, token=None: list(urls))
+
+    def get(url):
+        v = pages[url]
+        if isinstance(v, Exception):
+            raise v
+        return v
+    monkeypatch.setattr(previews, "_get", get)
+
+
+def _http_error(code):
+    import urllib.error
+    return urllib.error.HTTPError("https://huggingface.co/x", code, "x", {}, None)
+
+
+def test_fetch_falls_back_to_the_card_picture(tmp_path, monkeypatch):
+    folder = _hf_model(tmp_path)
+    _card_fetch(monkeypatch, ["https://cdn-uploads.huggingface.co/x.png"], {"https://cdn-uploads.huggingface.co/x.png": _png()})
+    monkeypatch.setattr(previews, "_refused", lambda data, safe: None)
+    assert previews.fetch_for(folder) == os.path.join(folder, previews.FILE)
+
+
+def test_a_card_picture_that_is_gone_or_no_picture_gives_way_to_the_next(tmp_path, monkeypatch):
+    folder = _hf_model(tmp_path)
+    a, b, c = ("https://huggingface.co/org/model/resolve/main/%s.png" % n for n in "abc")
+    _card_fetch(monkeypatch, [a, b, c], {a: _http_error(404), b: b"<html>not a picture</html>", c: _png()})
+    monkeypatch.setattr(previews, "_refused", lambda data, safe: None)
+    assert previews.fetch_for(folder) == os.path.join(folder, previews.FILE)
+
+
+def test_a_network_failure_is_tried_again_later(tmp_path, monkeypatch):
+    import urllib.error
+    folder = _hf_model(tmp_path)
+    a = "https://cdn-uploads.huggingface.co/a.png"
+    _card_fetch(monkeypatch, [a], {a: urllib.error.URLError("no route")})
+    with pytest.raises(Exception):
+        previews.fetch_for(folder)
+
+
+def test_the_filter_checks_card_pictures_also_outside_safe_mode(tmp_path, monkeypatch):
+    folder = _hf_model(tmp_path)
+    a = "https://cdn-uploads.huggingface.co/a.png"
+    _card_fetch(monkeypatch, [a], {a: _png()})
+    seen = []
+    monkeypatch.setattr(previews, "_refused", lambda data, safe: seen.append(safe) or "a likely minor")
+    monkeypatch.delenv("VK_SAFE_MODE", raising=False)
+    previews.main([str(tmp_path)])
+    assert seen == [False] and not os.path.exists(os.path.join(folder, previews.FILE))
+    assert json.load(open(os.path.join(folder, "model.json")))["preview_missing"] == "refused"
+    assert list(previews.missing([str(tmp_path)])) == []
+
+
+def test_safe_mode_refusals_are_tried_again_once_it_is_off(tmp_path, monkeypatch):
+    folder = _hf_model(tmp_path)
+    a = "https://cdn-uploads.huggingface.co/a.png"
+    _card_fetch(monkeypatch, [a], {a: _png()})
+    monkeypatch.setattr(previews, "_refused", lambda data, safe: "nudity" if safe else None)
+    monkeypatch.setenv("VK_SAFE_MODE", "1")
+    previews.main([str(tmp_path)])
+    assert json.load(open(os.path.join(folder, "model.json")))["preview_missing"] == "safe"
+    assert list(previews.missing([str(tmp_path)])) == []
+    monkeypatch.delenv("VK_SAFE_MODE")
+    assert list(previews.missing([str(tmp_path)])) == [folder]
+
+
+def test_a_filter_that_does_not_work_leaves_the_folder_for_a_later_start(tmp_path, monkeypatch):
+    folder = _hf_model(tmp_path)
+    a = "https://cdn-uploads.huggingface.co/a.png"
+    _card_fetch(monkeypatch, [a], {a: _png()})
+
+    def broken(data, safe):
+        raise RuntimeError("the filter weights are not there yet")
+    monkeypatch.setattr(previews, "_refused", broken)
+    previews.main([str(tmp_path)])
+    assert "preview_missing" not in json.load(open(os.path.join(folder, "model.json")))
+    assert list(previews.missing([str(tmp_path)])) == [folder]
+
+
+def test_civitai_samples_all_too_explicit_for_safe_mode_count_as_a_safe_refusal(tmp_path, monkeypatch):
+    folder = tmp_path / "c"
+    folder.mkdir()
+    (folder / "model.json").write_text(json.dumps({"source": {"type": "civitai", "images": [{"url": "https://image.civitai.com/x/width=450/a.jpeg", "nsfw_level": 8}]}}))
+    monkeypatch.setenv("VK_SAFE_MODE", "1")
+    previews.main([str(tmp_path)])
+    assert json.load(open(folder / "model.json"))["preview_missing"] == "safe"
+
+
+def test_a_folder_without_any_picture_is_not_tried_at_every_start(tmp_path, monkeypatch):
+    folder = _hf_model(tmp_path)
+    monkeypatch.setattr(previews, "fetch_for", lambda f, token=None: None)
+    previews.main([str(tmp_path)])
+    assert json.load(open(os.path.join(folder, "model.json"))).get("preview_missing") is True
+    assert list(previews.missing([str(tmp_path)])) == []

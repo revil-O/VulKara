@@ -290,7 +290,11 @@
    "remove": "Remover",
    "addLora": "Adicionar uma LoRA",
    "negative": "Fora da imagem",
-   "negativePlaceholder": "O que a imagem não deve mostrar"
+   "negativePlaceholder": "O que a imagem não deve mostrar",
+   "seeds": "Seeds",
+   "seedsCount": "Em sequência",
+   "seedsRandom": "Cada uma aleatória",
+   "seedsHint": "Em sequência: as imagens usam o seed, depois seed + 1, + 2 … (com o mesmo seed, de novo as mesmas). Cada uma aleatória: cada imagem recebe seu próprio seed aleatório. O histórico guarda nos dois casos o seed de cada imagem, então “Gerar de novo” repete exatamente essa imagem."
   },
   "sampler": {
    "default": "Padrão",
@@ -504,7 +508,8 @@
    "importFile": "Importar um arquivo de modelo",
    "checking": "Verificando {title} …",
    "fileTypes": ".pth, .safetensors ou .onnx",
-   "fileTypesHint": "Modelos de foto seus. Pesos PyTorch rodam na GPU: o spandrel precisa conhecer a arquitetura (ESRGAN, SwinIR, HAT, DAT, NAFNet, SCUNet, FBCNN, SPAN, OmniSR e outras), imagem colorida na entrada e na saída, ampliando 1, 2, 3, 4 ou 8 vezes; arquivos .pth são lidos sem executar código. Modelos ONNX rodam na CPU e são verificados antes: uma entrada de 1 × 3 × altura × largura, uma imagem ou máscara na saída, valores 0–1 ou 0–255; modelos com operadores próprios são recusados. Use só modelos cuja licença permita isso."
+   "fileTypesHint": "Modelos de foto seus. Pesos PyTorch rodam na GPU: o spandrel precisa conhecer a arquitetura (ESRGAN, SwinIR, HAT, DAT, NAFNet, SCUNet, FBCNN, SPAN, OmniSR e outras), imagem colorida na entrada e na saída, ampliando 1, 2, 3, 4 ou 8 vezes; arquivos .pth são lidos sem executar código. Modelos ONNX rodam na CPU e são verificados antes: uma entrada de 1 × 3 × altura × largura, uma imagem ou máscara na saída, valores 0–1 ou 0–255; modelos com operadores próprios são recusados. Use só modelos cuja licença permita isso.",
+   "uprightStrengthHint": "Quanto as verticais são endireitadas: 100 % as deixa totalmente verticais, menos deixa um pouco da inclinação, o que costuma parecer mais natural (70–90 %)."
   },
   "upscale": {
    "title": "Ampliar",
@@ -2159,7 +2164,12 @@
    "notATool": "Não é uma ferramenta de foto.",
    "needsDiffusers": "Selecionar objetos requer o runtime Diffusers: instale-o em Ajustes → Runtimes",
    "selectionStopped": "A seleção parou.",
-   "noSelection": "Nenhuma seleção"
+   "noSelection": "Nenhuma seleção",
+   "upright": {
+    "name": "Linhas convergentes",
+    "summary": "Verticais convergentes endireitadas",
+    "description": "Prédios fotografados de baixo ou de cima se inclinam para dentro. A ferramenta encontra as bordas verticais da foto e as endireita, sem modelo; os cantos que ficam vazios são recortados. A intensidade define quanto: 70–90 % costuma parecer mais natural que 100 %. Uma foto sem linhas verticais claras fica como está."
+   }
   },
   "subject": {
    "missing": "Selecionar motivo não faz parte desta versão.",

@@ -382,6 +382,13 @@ const SCANS = [
   ['A4 600 dpi, 16 bit', '4960 × 7016', 2, 0.94, 1.32, 0.77],
 ]
 
+// Upright on a Mac mini M4 16 GB (MEASUREMENTS 7db): [photo, size, result, s]
+const UPRIGHT = [
+  ['Church, slight lean', '1600 × 1065', 'straightened', 0.13],
+  ['Timber façade, strong lean', '1920 × 2880', 'straightened, capped at 25°', 0.85],
+  ['Glass façade straight up', '1920 × 1080', 'left as it is', 0.12],
+]
+
 // LTX-2.3 with sound on a Mac mini M4 16 GB (MEASUREMENTS 7cy): [case, size, frames, s, GB peak, swap]
 const LTX = [
   ['5 s, 30 fps', '768 × 512', 153, 571, 9.10, 'flat'],
@@ -847,6 +854,26 @@ function scansTable() {
     </section>`
 }
 
+function uprightTable() {
+  const max = Math.max(...UPRIGHT.map((r) => r[3]))
+  const rows = UPRIGHT.map(([label, size, result, sec]) => `
+          <tr data-tip="${esc(`${label} (${size}): ${result} in ${fmt(sec, 2)} s. MEASUREMENTS 7db`)}" tabindex="0">
+            <td>${esc(label)}<small>${esc(result)}</small></td>
+            <td class="bars"><span class="mbar b ${at(`width:${pct(sec, max)}%`)}"></span></td>
+            <td class="num">${esc(size)}</td><td class="num">${fmt(size.split(' × ').reduce((a, b) => a * b, 1) / 1e6, 1)}</td><td class="num">${fmt(sec, 2)}</td>
+          </tr>`).join('')
+  return `
+    <section class="chart" id="upright">
+      <h2>Upright: converging verticals straightened</h2>
+      <p class="sub">The Enhance tool Upright (0.11.4) straightens the verticals of buildings without a model, on a Mac mini M4 with 16 GB. It takes well under a second and at most 0.5 GB; a photo taken almost straight up, or without clear verticals, stays as it is. The bars are the seconds.</p>
+      <table class="micro">
+        <thead><tr><th>Photo</th><th>time</th><th class="num">size</th><th class="num">MP</th><th class="num">s</th></tr></thead>
+        <tbody>${rows}
+        </tbody>
+      </table>
+    </section>`
+}
+
 function ltxTable() {
   const max = Math.max(...LTX.map((r) => r[3]))
   const rows = LTX.map(([label, size, frames, sec, peak, swap]) => `
@@ -895,7 +922,7 @@ export function benchmarksPage({ BASE, GH, BLOB, VERSION, CSS_V, JS_V, BENCH_V }
     planChart('plan-after', 'Plans brought to the measurements', 'SD 1.5 planned at its own size with fused attention, ComfyUI models with the plan of a model held whole (shown in the benchmark since 0.7.5). The ComfyUI figures are the middle of two runs. Qwen-Image 2.1 streamed: the blocks kept in memory were not counted while denoising (planned 9.1 GB before). ComfyUI on 16 GB: the text encoder and the model planned apart, as ComfyUI loads them (MOSS-Image 14 GB before, NetaYume 11.6). Fibo 2.0: the activations of an edit counted (12.1 GB planned before).', PLAN_AFTER, '7p'),
     planChart('plan-m4', 'On a 16 GB Mac: Mac mini M4', 'VulKara 0.7.11 on an Apple M4 with 16 GB (the other charts: the M2, 16 GB simulated there); from MOSS-Image on, test builds after it (MEASUREMENTS 7ah, 7ba–7bl). The plan against what the engine used, 1024 px (Fibo 768 px), with the seconds per step or per picture. Fibo 2.0 on MLX started 6.3 GB short and read 18.9 GB back from the swap: slower than on the M2 (7ba). Above their plan and open: FLUX.1 [schnell] 8 bit streamed (3.9 GB), NetaYume v4 (1.8 GB), FLUX.1 Fill (0.9 GB) (7bf, 7bj).', PLAN_M4, '7af'),
     planChart('plan-list', 'The recommended list on a 16 GB Mac', 'The models kept in the recommended list of 0.10.0, five pictures each on a Mac mini M4 with 16 GB in the app (Hardware → Benchmark, the model\'s own settings, 1024 px unless named), the highest peak of pictures 2–5 against the plan, with the time per picture. The target: at most 10 % over the plan and at most 2 GB swap added. epiCRealism XL v8, MoP Mix asap, MiaoMiao RealSkin, FLUX.1 [dev] and its Q4 missed it and left the list, Chroma1 HD too; four SD 1.5 models in 32 bit are saved in 16 bit and the SDXL single files turned into folders once, at the import or the first load (MEASUREMENTS 7cq, 7cr).', RECOMMENDED, '7cq'),
-    onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), removeTable(), facesTable(), upscaleTable(), depthTable(), ltxTable(), scansTable(), vmTable(), intelTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
+    onceTable(), toolsChart(), runtimesChart(), quantChart(), captionChart(), loadsChart(), videoChart(), shortTable(), removeTable(), facesTable(), upscaleTable(), depthTable(), ltxTable(), scansTable(), uprightTable(), vmTable(), intelTable(), seamsChart(), headsChart(), attentionTable()].join('\n')
   const tileHtml = tiles()
   const css = RULES.map((r, i) => `.bench-page .p${i}{${r}}`).join('\n') + '\n'
   const cssV = createHash('sha256').update(css).digest('hex').slice(0, 10)

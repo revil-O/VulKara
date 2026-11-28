@@ -3374,6 +3374,25 @@ Conclusion (user's decision 2026-11-27): both dropped. OpenVINO would need model
 and an own pipeline around the OpenVINO runtime, on packages Intel no longer maintains for Macs, and every own model or
 LoRA would need the same conversion. The test venv was deleted afterwards.
 
+## 7db. Upright: converging verticals straightened (0.11.4, 2026-11-28, Mac mini M4 16 GB)
+
+`engines/diffusers/upright.py` (OpenCV, no model): segments on a copy with a 1500 px long side, vanishing point by random
+pairs plus least squares, one perspective transform, the largest rectangle without empty corners. Three Wikimedia
+Commons photos (CC BY-SA, used for testing only: a glass façade shot straight up, a church at a street corner, a timber
+façade from below) and the eleven photos of the remove-object set as photos that should stay as they are. Strength 100 %,
+one Python process, the time of `straighten` only.
+
+| Photo | size | result | time |
+| --- | --- | --- | --- |
+| church, slight lean | 1600 × 1065 | straightened, 1524 × 1055 | 0.13 s |
+| timber façade, strong lean | 1920 × 2880 | straightened (capped at 25°), 2054 × 2028 | 0.85 s |
+| glass façade straight up | 1920 × 1080 | left as it is (vanishing point inside the picture) | 0.12 s |
+| 11 everyday photos | 1024–5388 px | 8 left as they are; coins in a hand, a cat on tiles and a camera portrait slightly corrected and cropped | 0.01–0.41 s |
+
+Peak 0.50 GB. The first version took the stems of flowers in a vase and the tiles under a cat for converging verticals
+and distorted them badly; since then the vanishing point must lie at least 0.8 picture heights from the middle, the
+agreeing lines must spread over a quarter of the width, and a result keeping less than half of the area is not given.
+
 ## 8. Earlier references (from the user guide and the changelog)
 
 - Training on the M2 (2025–26): SDXL about 2.5 s per step at 768 px, FLUX.2 [klein] 4B about 15 s, 9B about 30 s,

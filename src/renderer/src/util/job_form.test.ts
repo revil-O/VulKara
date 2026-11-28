@@ -41,6 +41,22 @@ describe('the fast option of FLUX.1 [dev]', () => {
 })
 
 describe('generate form', () => {
+  it('makes a picture of the history again with its own seed, whatever the form had chosen before', () => {
+    const form = { ...emptyForm('text'), count: 4, seedMode: 'random' as const }
+    applyJob(form, { ...buildJob('text', { ...emptyForm('text'), prompt: 'x', seed: 1234 }, SDXL, []), id: 'j' }, [SDXL], [])
+    expect(form.seed).toBe(1234)
+    expect(form.seedMode).toBe('count')
+    expect(buildJob('text', form, SDXL, []).seedMode).toBeUndefined()
+  })
+
+  it('asks for a random seed per picture only for several pictures, and starts counting up by default', () => {
+    expect(emptyForm('text').seedMode).toBe('count')
+    const form = { ...emptyForm('text'), prompt: 'a lighthouse', count: 4, seedMode: 'random' as const }
+    expect(buildJob('text', form, SDXL, []).seedMode).toBe('random')
+    expect(buildJob('text', { ...form, count: 1 }, SDXL, []).seedMode).toBeUndefined()
+    expect(buildJob('text', { ...form, seedMode: 'count' }, SDXL, []).seedMode).toBeUndefined()
+  })
+
   it('sends further pictures with the input picture only to a model that edits several together (Fibo 2.0)', () => {
     const FIBO = model('fibo', { arch: 'fibo2', family: 'fibo2', runtime: 'comfyui', negativePrompt: false })
     const form = { ...emptyForm('image'), inputImage: '/a.png', references: ['/b.png', '', '/c.png', '/d.png', '/e.png'] }

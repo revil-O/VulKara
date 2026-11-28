@@ -68,7 +68,7 @@ export class JobQueue<E = string> {
 
   constructor(private readonly deps: QueueDeps<E>) {}
 
-  /** Adds the job count times (seeds counting up); returns the job ids. */
+  /** Adds the job count times (seeds counting up, or each picture its own random seed); returns the job ids. */
   add(job: Omit<Job, 'id'>, count = 1): string[] {
     // the restore rules go into the prompt of the edit model, so they are checked with it
     const text = [job.prompt, ...(job.restore?.rules ?? [])].join('\n')
@@ -83,11 +83,21 @@ export class JobQueue<E = string> {
     const seed = Number.isFinite(job.seed) && job.seed >= 0 ? Math.floor(job.seed) % 2 ** 31 : Math.floor(Math.random() * 2 ** 31)
     const loras = job.loras?.map((l) => ({ ...l, scale: Number.isFinite(Number(l.scale)) ? Number(l.scale) : 0 }))
     const ids: string[] = []
+    // each picture's own random seed, none twice in one job; the job keeps it, so the history can make it again
+    const used = new Set<number>()
+    const randomSeed = (): number => {
+      let s: number
+      do s = Math.floor(Math.random() * 2 ** 31)
+      while (used.has(s))
+      used.add(s)
+      return s
+    }
     for (let i = 0; i < n; i++) {
       const id = randomUUID()
       ids.push(id)
+      const own = job.seedMode === 'random' ? randomSeed() : (seed + i) % 2 ** 31
       this.entries.push({
-        job: { ...job, ...(loras ? { loras } : {}), id, seed: (seed + i) % 2 ** 31, note: undefined }, state: 'waiting', progress: -1, status: '', results: [],
+        job: { ...job, ...(loras ? { loras } : {}), id, seed: own, note: undefined }, state: 'waiting', progress: -1, status: '', results: [],
         addedAt: this.deps.now(), delivery: Promise.resolve(),
       })
     }

@@ -54,6 +54,7 @@ export default {
     auto: 'Auto',
     strength: 'Strength {strength} %',
     strengthHint: "Below 100 % the tool's result is mixed with the original; 100 % is the tool's result alone.",
+    uprightStrengthHint: 'How far the verticals are straightened: 100 % makes them fully vertical, less leaves some of the lean, which often looks more natural (70–90 %).',
     result: 'Result',
     transparent: 'Transparent',
     mask: 'Mask',

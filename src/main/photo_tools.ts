@@ -51,9 +51,16 @@ export function recommendedTools(enginesDir: string, toolsDir: string): Recommen
 }
 
 /** The installed tools (folders with a tool.json of type photo_tool). */
+/** The app's own photo tools, always there: no download, no folder (engines/diffusers/upright.py). */
+const builtinTools = (): PhotoTool[] => [{
+  folder: 'builtin:upright', name: t('main.tools.upright.name'), task: 'upright', kind: 'image', runtime: 'builtin',
+  summary: t('main.tools.upright.summary'), description: t('main.tools.upright.description'), scale: 1,
+  licence: 'PolyForm-Noncommercial-1.0.0',
+}]
+
 export function installedTools(toolsDir: string): PhotoTool[] {
-  if (!existsSync(toolsDir)) return []
-  const out: PhotoTool[] = []
+  if (!existsSync(toolsDir)) return builtinTools()
+  const out: PhotoTool[] = builtinTools()
   for (const name of readdirSync(toolsDir).sort()) {
     const folder = join(toolsDir, name)
     let m: Raw

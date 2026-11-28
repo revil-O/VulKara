@@ -18,8 +18,8 @@ describe('photo tools', () => {
     mkdirSync(join(tools, 'not-a-tool'))
     writeFileSync(join(tools, 'not-a-tool', 'tool.json'), JSON.stringify({ type: 'lora' }))
     const installed = installedTools(tools)
-    expect(installed.map((t) => t.name)).toEqual(['Mine', 'Select objects (SAM 2.1)'])
-    expect(installed[0]).toMatchObject({ kind: 'image', scale: 2, runtime: 'onnx' })
+    expect(installed.map((t) => t.name)).toEqual(['Upright', 'Mine', 'Select objects (SAM 2.1)'])
+    expect(installed[1]).toMatchObject({ kind: 'image', scale: 2, runtime: 'onnx' })
     const recommended = recommendedTools(resolve('engines'), tools)
     expect(recommended.length).toBeGreaterThanOrEqual(6)
     expect(recommended.find((t) => t.id === 'sam21-tiny')).toMatchObject({ installed: true, runtime: 'onnx' })
@@ -36,6 +36,12 @@ describe('photo tools', () => {
       // SeedVR2: its own limit and a warning, both carried to the Enhance page
       expect.objectContaining({ id: 'detailed', label: 'Detailed (AI, very slow)', sizeMb: 6947, maxOutput: 2048, warning: expect.stringContaining('Invents detail') }),
     ])
-    expect(installedTools(join(tools, 'missing'))).toEqual([])
+    expect(installedTools(join(tools, 'missing')).map((t) => t.folder)).toEqual(['builtin:upright'])
+  })
+
+  it('always offers the built-in Upright tool, which runs without a model', () => {
+    const [first] = installedTools(join(tmpdir(), 'vk-no-tools'))
+    expect(first).toMatchObject({ folder: 'builtin:upright', task: 'upright', kind: 'image', runtime: 'builtin', scale: 1, licence: 'PolyForm-Noncommercial-1.0.0' })
+    expect(first.description.length).toBeGreaterThan(20)
   })
 })

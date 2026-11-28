@@ -29,6 +29,22 @@ function setup(verdict: { ok: boolean; reason?: string } = { ok: true }) {
 }
 
 describe('job queue', () => {
+  it('gives every picture a seed of its own when asked, kept in the job for the history', () => {
+    const { queue } = setup()
+    queue.add({ ...JOB, seedMode: 'random' }, 4)
+    const seeds = queue.snapshot().map((j) => j.job.seed)
+    expect(new Set(seeds).size).toBe(4)
+    expect(seeds.every((s) => Number.isInteger(s) && s >= 0 && s < 2 ** 31)).toBe(true)
+    expect(seeds).not.toEqual([7, 8, 9, 10])
+  })
+
+  it('counts up from the seed unless random is asked for (also for an unknown mode)', () => {
+    const { queue } = setup()
+    queue.add({ ...JOB, seedMode: 'count' }, 2)
+    queue.add({ ...JOB, seedMode: 'other' as 'count' }, 2)
+    expect(queue.snapshot().map((j) => j.job.seed)).toEqual([7, 8, 7, 8])
+  })
+
   it('runs the jobs one after the other with seeds counting up', async () => {
     const { queue, sent, settle } = setup()
     const ids = queue.add(JOB, 3)

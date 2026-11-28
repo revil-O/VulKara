@@ -18,7 +18,7 @@ import { openMonitor } from './monitor_window'
 import { formatDuration } from '@shared/duration'
 import { LOCALES, resolveLang } from '@shared/i18n'
 import { en } from '@shared/i18n/en'
-import { recheckLibrary } from './migrate'
+import { fetchMissingPreviews, recheckLibrary } from './migrate'
 import { engineCommand } from './runtimes'
 import { handleSchemes, registerSchemes } from './protocols'
 import { mainWindowReady, openSplash, splashWindow } from './splash'
@@ -224,6 +224,11 @@ if (!app.requestSingleInstanceLock()) {
       for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('assets:change')
       sendToRemote('assets:change')
     }, (path) => shell.trashItem(path)))
+      // then the previews models and LoRAs still lack, from their source
+      .then(() => fetchMissingPreviews(engineCommand('diffusers', ['previews']), engineEnv(), () => {
+        for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('assets:change')
+        sendToRemote('assets:change')
+      }))
   })
 
   // closing the window leaves VulKara in the menu bar with its jobs and the remote web UI; Quit (⌘Q, the menu bar menu)
